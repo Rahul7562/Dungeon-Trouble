@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Threading System (Milestone 11):** Implemented a modern, portable, high-performance threading framework.
+  - Added `IThread` interface and RAII-based `Thread` implementation utilizing `std::thread` and platform native hooks.
+  - Added C++17 polyfills for C++20 concurrency primitives: `Semaphore`, `BinarySemaphore`, `Latch`, and `Barrier`.
+  - Added standard wrappers for `Mutex`, `RecursiveMutex`, `SharedMutex`, `ConditionVariable`, and `Event`.
+  - Added utility classes for `AtomicCounter`, `AtomicFlag`, `AtomicBool`, and `Timing`.
+  - Added `ThreadManager` for global thread registration and coordinated shutdown.
+  - Added `ThreadContext` providing thread-local storage for thread naming and diagnostics.
+  - Added comprehensive Catch2 unit tests in `Tests/Threading`.
+  - Authored `ADR-0011-Threading-System.md` documenting architecture and design decisions.
+
+### Added
 - **Platform Abstraction Layer:** Implemented a unified platform abstraction (Milestone 8).
   - Added `PlatformManager` utilizing strictly Dependency Injection to expose OS functionalities.
   - Implemented abstract interfaces: `ISystemInfo`, `IEnvironment`, `IProcess`, `ITime`, `IClipboard`, and `IDynamicLibrary`.
