@@ -82,3 +82,13 @@ Every allocator requires alignment inputs to ensure data safely lands on process
 
 ### 5. Extension Points
 New allocation strategies can easily be integrated by inheriting from `DungeonEngine::Memory::IAllocator` and fulfilling the interface contract. The `MemoryManager` easily digests new categories by updating `MemoryCategory.h`.
+
+## Window Management System
+The Window Management System provides a clean, platform-independent abstraction over native OS windows.
+
+### Architecture
+- **IWindow**: Abstract interface defining core window operations (Create, Destroy, Resize, Move, Focus, State changes, Event Polling, and Native Handle Access).
+- **WindowManager**: Centralized owner and registry of all windows. Handles creation, destruction, multi-window tracking, and identification of the main window.
+- **WindowProperties**: Configuration struct covering dimensions, title, position, fullscreen state, resizability, and DPI scale.
+- **MonitorInfo**: Abstraction of physical displays, detailing resolution, refresh rate, physical DPI, and work area.
+- **Native Backends**: Platform-specific implementations (Windows, Linux, macOS) are strictly isolated from the public headers. The `IWindow` interface exposes a `getNativeHandle()` returning an opaque pointer for use by future rendering backends (e.g., Vulkan surface creation).
