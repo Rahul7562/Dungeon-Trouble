@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Platform Abstraction Layer:** Implemented a unified platform abstraction (Milestone 8).
+  - Added `PlatformManager` utilizing strictly Dependency Injection to expose OS functionalities.
+  - Implemented abstract interfaces: `ISystemInfo`, `IEnvironment`, `IProcess`, `ITime`, `IClipboard`, and `IDynamicLibrary`.
+  - Created Windows backend implementation using Win32 API.
+  - Created POSIX backend implementation using standard POSIX APIs (macOS/Linux).
+  - Added CMake configurations and platform detection macros (`DT_PLATFORM_*`).
+  - Added comprehensive Catch2 unit tests in `Tests/Platform`.
+  - Authored `ADR-004-Platform-Abstraction.md` documenting architecture.
+  - Authored `PLATFORM.md` containing porting guides and usage examples.
+
+## Milestone 7
+### Added
 - **Configuration System:** Implemented a robust, layered configuration system (Milestone 7).
   - Added `ConfigurationManager` to orchestrate multiple providers based on priority.
   - Implemented `MemoryProvider`, `CommandLineProvider`, `EnvironmentProvider`, and `FileProvider`.
