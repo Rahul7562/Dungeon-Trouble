@@ -109,3 +109,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added multi-window and monitor enumeration support.
   - Added `WindowTests` validating window lifecycle and property updates.
   - Added `ADR-005-Window-Management.md` documenting architecture and design decisions.
+
+## [0.10.0] - 2024-05-18
+
+### Added
+- **Input Subsystem:** Implemented a platform-independent input framework supporting keyboard, mouse, and gamepads.
+- Extensible device interfaces (`IKeyboard`, `IMouse`, `IGamepad`) ready for future touch/VR expansion.
+- Simulated input devices for rigorous unit testing decoupled from the OS.
+- Context-based input mapping system to decouple logical actions from raw physical inputs.
+- Defined explicit input types, enums (e.g. `KeyCode`, `GamepadButton`), and standardized modifiers.
+- Added ADR 006 detailing the Input System architecture, state management, and thread-safety considerations.
