@@ -1,0 +1,9 @@
+# Build artifacts and compiled files
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+core_tests
+Build/
