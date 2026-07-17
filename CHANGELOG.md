@@ -1,3 +1,21 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+### Added
+- **Configuration System:** Implemented a robust, layered configuration system (Milestone 7).
+  - Added `ConfigurationManager` to orchestrate multiple providers based on priority.
+  - Implemented `MemoryProvider`, `CommandLineProvider`, `EnvironmentProvider`, and `FileProvider`.
+  - Created zero-overhead, strongly-typed cached configuration variables via `ConfigVar<T>`.
+  - Added lightweight, custom parsers for basic INI, JSON, and TOML formatting.
+  - Added support for configuration validation via lambdas attached to `ConfigVar`.
+  - Added corresponding Catch2 unit tests in `Tests/Configuration`.
+  - Authored `ADR-003-Configuration-System.md` documenting architecture and design decisions.
+
 ## Milestone 6
 
 ### Added
