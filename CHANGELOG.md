@@ -1,3 +1,25 @@
+## Milestone 6
+
+### Added
+- `FileSystem` module providing platform-independent I/O.
+- `Path` class for normalization and path operations.
+- `File` and `Directory` abstractions using `std::error_code`.
+- VFS (`VirtualFileSystem`) allowing directory mounting and aliasing.
+- Stream classes (`FileStream`, `MemoryStream`, and reader/writers).
+- `FileSystemWatcher` interface for hot-reloading support.
+- Catch2 Unit Tests for the FileSystem module.
+- `ADR-002-Filesystem.md`.
+
+### Changed
+- Root `CMakeLists.txt` updated to include FileSystem module.
+
+### Fixed
+- N/A
+
+### Known Limitations
+- The physical node path resolution in VFS is currently limited and will be expanded with Archive support.
+
+
 ## Milestone 5
 
 ### Added
