@@ -1,3 +1,26 @@
+## Milestone 5
+
+### Added
+- Modular Diagnostics framework in `DungeonEngine/Diagnostics`.
+- `Logger` subsystem supporting log levels, categories, and multiple sinks (`ConsoleSink`, `FileSink`).
+- Robust `Assertion` framework supporting custom handlers and different assertion types (`DT_ASSERT`, `DT_DEBUG_ASSERT`, `DT_ENSURE`).
+- `DiagnosticsManager` for tracking runtime messages, warnings, and errors for potential editor/console integration.
+- `Profiler` foundation providing `ScopedTimer` and region markers (`DT_PROFILE_SCOPE`).
+- `PerformanceCounters` tracking frame count, FPS, CPU time, and total allocated memory.
+- `ADR-001-Diagnostics-Framework.md` detailing the diagnostics architecture.
+- `DIAGNOSTICS.md` documenting philosophy, usage, and best practices.
+
+### Changed
+- `Core/Assert.h` now forwards to the new Diagnostics Assertion framework.
+- Root `CMakeLists.txt` updated to include Diagnostics module and tests.
+
+### Fixed
+- N/A
+
+### Known Limitations
+- The Logging system utilizes simple `std::mutex` locking which may introduce overhead in heavily multi-threaded scenarios. A lock-free queue may be implemented later if profiling demands it.
+- The Profiler currently provides a scaffold API and does not yet integrate with an external visualizer (e.g., Tracy).
+
 
 ## Milestone 4
 
