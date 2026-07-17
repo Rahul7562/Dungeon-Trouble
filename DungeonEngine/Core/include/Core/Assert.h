@@ -1,13 +1,5 @@
 #pragma once
-#include <cstdio>
-#include <cstdlib>
+// We now forward to the Diagnostics assertion framework.
+#include "Diagnostics/Assertion.h"
 
-#ifdef NDEBUG
-    #define DT_ASSERT(condition, message) ((void)0)
-#else
-    #define DT_ASSERT(condition, message) \
-        if (!(condition)) { \
-            std::fprintf(stderr, "Assertion Failed: %s\nFile: %s\nLine: %d\n", message, __FILE__, __LINE__); \
-            std::abort(); \
-        }
-#endif
+#define DT_ASSERT(condition, message) DT_ASSERT_MSG(condition, message)
