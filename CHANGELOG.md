@@ -98,3 +98,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Known Limitations
 - The `MemoryManager` currently expects manual tracking updates when custom allocators are used outside of `allocateFrom()`.
 - Global new/delete operators are not yet overridden; reliance remains on explicit allocator use.
+
+## [0.9.0] - 2024-XX-XX
+### Added
+- **Window Management System (Milestone 9):**
+  - Added `IWindow` abstract interface for cross-platform window management.
+  - Implemented `WindowManager` to handle creation, destruction, and lifecycle of multiple windows.
+  - Added `WindowProperties` and `MonitorInfo` structs.
+  - Defined dummy native backends for Windows, Linux, and macOS.
+  - Added multi-window and monitor enumeration support.
+  - Added `WindowTests` validating window lifecycle and property updates.
+  - Added `ADR-005-Window-Management.md` documenting architecture and design decisions.
