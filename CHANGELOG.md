@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## Milestone 12
+
+### Added
+- **Job System:** Implemented a scalable, high-performance job scheduling framework.
+  - Added `IJob` interface with atomic dependency tracking and priority support.
+  - Implemented `JobScheduler` to manage worker pools and coordinate shutdown.
+  - Implemented `WorkerThread` utilizing a local LIFO, steal FIFO work-stealing strategy.
+  - Created `WorkStealingQueue` and priority-based `GlobalQueue`.
+  - Added `ParallelFor` utility to easily partition ranges into multiple jobs.
+  - Added lightweight, exception-free `Future<T>` and `Promise<T>` primitives for task synchronization.
+  - Added `CancellationToken` for cooperative cancellation.
+  - Created comprehensive Catch2 unit tests in `Tests/Jobs`.
+  - Authored `ADR-0012-Job-System.md` detailing the task-graph architecture.
+
 ### Added
 - **Threading System (Milestone 11):** Implemented a modern, portable, high-performance threading framework.
   - Added `IThread` interface and RAII-based `Thread` implementation utilizing `std::thread` and platform native hooks.
