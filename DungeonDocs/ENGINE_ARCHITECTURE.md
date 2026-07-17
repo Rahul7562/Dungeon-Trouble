@@ -39,3 +39,21 @@ Shutdown occurs in the exact reverse order.
 
 ## 3. Future Expansion Strategy
 The architecture uses abstract interfaces for core services (e.g., `IRenderer`, `IAudioDevice`). Future expansion involves writing new backend implementations without changing high-level engine logic.
+
+## Math Library Architecture
+The `DungeonEngine::Math` module provides a production-quality, dependency-free mathematics library targeting C++17 without exceptions.
+
+### Coordinate System Conventions
+- **Handedness**: Right-handed coordinate system.
+- **Up Axis**: Y-up (Standard for 2.5D Isometric and 3D scenes).
+- **Forward Axis**: -Z (Negative Z points into the screen).
+- **Matrix Layout**: Column-major (compatible with Vulkan/OpenGL natively).
+
+### Precision Strategy
+- **Floating-Point Types**: `float` is standard across the library (e.g., `Vector3`, `Matrix4`) to ensure SIMD readiness and memory efficiency.
+- **Epsilon Comparisons**: `nearlyEqual` is used globally for float comparisons to account for floating-point drift. Epsilon defaults to `std::numeric_limits<float>::epsilon()`.
+
+### Performance & SIMD Readiness
+- Most small types (`Vector2`, `Vector3`, `Vector4`, `Matrix3`, `Quaternion`) are implemented as `constexpr` and `noexcept` to maximize compile-time evaluation and runtime performance.
+- The structure alignment allows for seamless integration of SIMD intrinstics (SSE/AVX or NEON) in future milestones without altering the public API.
+- Math functions are pass-by-value for small structures (`Vector2`, `Vector3`) where optimal (registers) and pass-by-const-reference for larger structures (`Matrix4`).
