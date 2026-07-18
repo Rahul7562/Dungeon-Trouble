@@ -22,4 +22,25 @@ TEST_CASE("Random Generator Functionality", "[Math][Random]") {
             REQUIRE((integer >= -5 && integer <= 5));
         }
     }
+
+    SECTION("Seed") {
+        Random r1(42);
+        uint32_t first = r1.next();
+        uint32_t second = r1.next();
+
+        // Re-seeding with the same value should reset the state
+        r1.seed(42);
+        REQUIRE(r1.next() == first);
+        REQUIRE(r1.next() == second);
+
+        // Seeding with a different value should produce different results
+        r1.seed(99);
+        REQUIRE(r1.next() != first);
+
+        // A new instance with the same seed should produce the same results
+        Random r2;
+        r2.seed(42);
+        REQUIRE(r2.next() == first);
+        REQUIRE(r2.next() == second);
+    }
 }
