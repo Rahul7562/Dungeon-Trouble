@@ -12,3 +12,17 @@ TEST_CASE("Geometry Structs", "[Math][Geometry]") {
     REQUIRE(aabb.center() == Vector3(0.0f, 0.0f, 0.0f));
     REQUIRE(aabb.extents() == Vector3(1.0f, 1.0f, 1.0f));
 }
+
+TEST_CASE("Circle Struct", "[Math][Geometry]") {
+    SECTION("Default Constructor") {
+        Circle circle;
+        REQUIRE(circle.center == Vector2(0.0f, 0.0f));
+        REQUIRE(circle.radius == 0.0f);
+    }
+
+    SECTION("Parameterized Constructor") {
+        Circle circle(Vector2(5.0f, -3.0f), 10.5f);
+        REQUIRE(circle.center == Vector2(5.0f, -3.0f));
+        REQUIRE(circle.radius == 10.5f);
+    }
+}
