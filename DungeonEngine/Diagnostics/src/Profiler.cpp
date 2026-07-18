@@ -1,5 +1,6 @@
 #include "Diagnostics/Profiler.h"
 #include "Diagnostics/Log.h"
+#include <string>
 
 namespace DungeonEngine {
 namespace Diagnostics {
@@ -20,6 +21,7 @@ void Profiler::endFrame() {
 }
 
 void Profiler::beginRegion(std::string_view name) {
+    (void)name;
     // Placeholder for region start marker
 }
 

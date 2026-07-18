@@ -1,4 +1,5 @@
 #include "Core/Config.h"
+#include <string>
 
 namespace Core {
     void Config::SetString(const std::string& key, const std::string& value) {

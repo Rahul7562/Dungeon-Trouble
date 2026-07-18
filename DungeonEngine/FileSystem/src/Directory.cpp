@@ -1,6 +1,7 @@
 #include "FileSystem/Directory.h"
 #include <filesystem>
 #include <system_error>
+#include <vector>
 
 namespace DungeonEngine::FileSystem {
 

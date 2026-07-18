@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
+#include <string>
 
 namespace DungeonEngine {
 namespace Diagnostics {

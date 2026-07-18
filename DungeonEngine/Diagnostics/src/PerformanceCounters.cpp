@@ -1,4 +1,5 @@
 #include "Diagnostics/PerformanceCounters.h"
+#include <atomic>
 
 namespace DungeonEngine {
 namespace Diagnostics {
