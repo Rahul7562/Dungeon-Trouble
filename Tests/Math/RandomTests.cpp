@@ -22,4 +22,15 @@ TEST_CASE("Random Generator Functionality", "[Math][Random]") {
             REQUIRE((integer >= -5 && integer <= 5));
         }
     }
+
+    SECTION("Vector2 Generation") {
+        Random rng(42);
+        for(int i=0; i<100; i++) {
+            Vector2 inCircle = rng.getVector2InCircle();
+            REQUIRE(inCircle.lengthSquared() <= 1.0f + EPSILON);
+
+            Vector2 unitVec = rng.getUnitVector2();
+            REQUIRE(nearlyEqual(unitVec.lengthSquared(), 1.0f));
+        }
+    }
 }
