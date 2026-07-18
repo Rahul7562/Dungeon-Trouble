@@ -12,6 +12,16 @@ TEST_CASE("Random Generator Functionality", "[Math][Random]") {
         REQUIRE(nearlyEqual(r1.getFloat(), r2.getFloat()));
     }
 
+    SECTION("getUnitVector2") {
+        Random rng(1337);
+        for(int i = 0; i < 100; i++) {
+            Vector2 v = rng.getUnitVector2();
+            REQUIRE(nearlyEqual(v.lengthSquared(), 1.0f));
+            REQUIRE((v.x >= -1.0f && v.x <= 1.0f));
+            REQUIRE((v.y >= -1.0f && v.y <= 1.0f));
+        }
+    }
+
     SECTION("Ranges") {
         Random rng(1337);
         for(int i=0; i<100; i++) {
