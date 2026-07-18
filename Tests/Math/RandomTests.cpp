@@ -12,6 +12,14 @@ TEST_CASE("Random Generator Functionality", "[Math][Random]") {
         REQUIRE(nearlyEqual(r1.getFloat(), r2.getFloat()));
     }
 
+    SECTION("Vectors") {
+        Random rng(42);
+        for(int i=0; i<100; i++) {
+            Vector3 v = rng.getVector3InSphere();
+            REQUIRE(v.lengthSquared() <= 1.0f + 1e-5f);
+        }
+    }
+
     SECTION("Ranges") {
         Random rng(1337);
         for(int i=0; i<100; i++) {
