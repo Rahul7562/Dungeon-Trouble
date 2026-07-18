@@ -26,6 +26,7 @@ namespace DungeonEngine::FileSystem {
                 case SeekOrigin::Begin: newPos = offset; break;
                 case SeekOrigin::Current: newPos = static_cast<Core::i64>(m_Position) + offset; break;
                 case SeekOrigin::End: newPos = static_cast<Core::i64>(m_Buffer.size()) + offset; break;
+                default: return Core::Result<bool>::Error("Invalid SeekOrigin");
             }
 
             if (newPos < 0 || newPos > static_cast<Core::i64>(m_Buffer.size())) {
