@@ -77,6 +77,7 @@ namespace DungeonEngine::FileSystem {
             case SeekOrigin::Begin: dir = std::ios::beg; break;
             case SeekOrigin::Current: dir = std::ios::cur; break;
             case SeekOrigin::End: dir = std::ios::end; break;
+            default: return Core::Result<bool>::Error("Invalid SeekOrigin");
         }
 
         m_File.seekg(offset, dir);
