@@ -200,6 +200,7 @@ namespace DungeonEngine::Platform {
     }
 
     bool PosixClipboard::setText(const Core::String& text) {
+        (void)text;
         return false;
     }
 

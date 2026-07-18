@@ -82,17 +82,22 @@ TEST_CASE("Input Mapping and Contexts", "[Input]") {
     InputMapper mapper(manager);
 
     // Create contexts
-    InputContext gameplayCtx{"Gameplay"};
-    InputBinding jumpBinding{"Jump"};
+    InputContext gameplayCtx;
+    gameplayCtx.id = "Gameplay";
+    InputBinding jumpBinding;
+    jumpBinding.actionId = "Jump";
     jumpBinding.physicalInput = KeyCode::SPACE;
     gameplayCtx.bindings.push_back(jumpBinding);
 
-    InputBinding attackBinding{"Attack"};
+    InputBinding attackBinding;
+    attackBinding.actionId = "Attack";
     attackBinding.physicalInput = MouseButton::LEFT;
     gameplayCtx.bindings.push_back(attackBinding);
 
-    InputContext uiCtx{"UI"};
-    InputBinding confirmBinding{"Confirm"};
+    InputContext uiCtx;
+    uiCtx.id = "UI";
+    InputBinding confirmBinding;
+    confirmBinding.actionId = "Confirm";
     confirmBinding.physicalInput = KeyCode::SPACE;
     uiCtx.bindings.push_back(confirmBinding);
 
@@ -130,8 +135,10 @@ TEST_CASE("Input Modifier Requirement", "[Input]") {
 
     InputMapper mapper(manager);
 
-    InputContext gameplayCtx{"Gameplay"};
-    InputBinding sprintBinding{"Sprint"};
+    InputContext gameplayCtx;
+    gameplayCtx.id = "Gameplay";
+    InputBinding sprintBinding;
+    sprintBinding.actionId = "Sprint";
     sprintBinding.physicalInput = KeyCode::W;
     sprintBinding.requiredModifiers = KeyModifier::SHIFT;
     gameplayCtx.bindings.push_back(sprintBinding);

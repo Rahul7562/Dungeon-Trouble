@@ -11,6 +11,7 @@ public:
     TestLayer(Core::Engine* e) : engine(e) {}
 
     void OnUpdate(float deltaTime) override {
+        (void)deltaTime;
         updates++;
         if (updates >= 5) {
             engine->Stop();

@@ -74,6 +74,7 @@ TEST_CASE("StackAllocator", "[Memory]") {
         REQUIRE(ptr3 != nullptr);
 
         std::size_t used = allocator.getUsedSize();
+        (void)used; // Just to silence unused variable warning
 
         allocator.free(ptr3);
         allocator.free(ptr2);
@@ -87,6 +88,9 @@ TEST_CASE("StackAllocator", "[Memory]") {
         auto marker = allocator.getMarker();
         void* ptr2 = allocator.allocate(128);
         void* ptr3 = allocator.allocate(256);
+        (void)ptr1;
+        (void)ptr2;
+        (void)ptr3;
 
         allocator.freeToMarker(marker);
         REQUIRE(allocator.getUsedSize() == marker);

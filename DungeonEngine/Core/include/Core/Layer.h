@@ -12,7 +12,7 @@ namespace Core {
 
         virtual void OnAttach() {}
         virtual void OnDetach() {}
-        virtual void OnUpdate(float deltaTime) {}
+        virtual void OnUpdate(float deltaTime) { (void)deltaTime; }
 
         const std::string& GetName() const { return m_DebugName; }
 

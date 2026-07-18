@@ -181,7 +181,7 @@ namespace DungeonEngine::Threading {
 #if defined(__linux__)
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
-        for (int j = 0; j < sizeof(m_AffinityMask) * 8; j++) {
+        for (size_t j = 0; j < sizeof(m_AffinityMask) * 8; j++) {
             if (m_AffinityMask & (1ULL << j)) {
                 CPU_SET(j, &cpuset);
             }
