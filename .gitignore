@@ -6,4 +6,5 @@
 *.dll
 *.exe
 core_tests
+build/
 Build/
