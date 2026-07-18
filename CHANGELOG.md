@@ -8,6 +8,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ## Milestone 12
 
+### Fixed (Pre-Rendering Phase Hardening)
+A full static + dynamic audit was run across all engine modules (Core, Math, Memory, Diagnostics,
+FileSystem, Configuration, Platform, Window, Input, Threading, Jobs) before starting the Rendering
+milestone (M21-M30). All findings were fixed via Jules-driven implementation sessions, verified by a
+clean `-Wall -Wextra -Wpedantic` build and a green full test suite (11 suites, all passing). Merged PRs:
+#48, #47, #50, #53.
+
+- **Critical build break — Math test linker error:** `Tests/Math/MathModuleTests.cpp` called
+  `DungeonEngine::Math::initMath()`, a symbol that had been removed from `MathModule.cpp`. This caused
+  an undefined-reference linker failure that prevented the entire `MathTests` target from building.
+  Removed the dead test and its forward declaration. (PR #48)
+- **Undefined behavior — `FileStream` const-cast on `std::fstream`:** `GetPosition()` and `GetLength()`
+  used `const_cast<std::fstream&>(m_File)` inside `const` methods. Made `m_File` `mutable` and dropped
+  all `const_cast` usage. Also reordered `FileStream` member declarations (`m_Path`, `m_Mode`,
+  `m_File`) to eliminate a `-Wreorder` warning. (PR #47)
+- **Security — VFS path traversal:** `PhysicalVFSNode::ResolvePhysical` blindly appended virtual paths
+  to the physical root (`../../etc/passwd` escape). It now returns `Core::Result<Path>`, normalizes the
+  resolved path, and rejects any path that escapes the mounted root. `Exists`/`OpenRead`/`OpenWrite`
+  propagate the error. `VirtualFileSystem::ResolvePhysicalPath` now returns the real physical path for
+  `PhysicalVFSNode` mounts (was previously dead code that always errored) and the unused-variable
+  warning is gone. A regression test (`Tests/FileSystem/src/Test_VFS.cpp`) asserts traversal is blocked.
+  (PR #50)
+- **Missing standard-library includes:** Added the correct `<string>`, `<vector>`, `<mutex>`,
+  `<atomic>`, `<thread>` includes to 15 `.cpp` files that relied on transitive includes. Prevents
+  breakage under stricter/isolated builds. (PR #48)
+- **Compiler-warning cleanup (`-Wall -Wextra -Wpedantic`):** Silenced all remaining warnings in the
+  touched files using the project's `(void)param;` convention — unused parameters in `Providers.cpp`,
+  `Layer.h`, `SimulatedDevices.h`, `PlatformPosix.cpp`, `Test_Engine.cpp`; the `int`→`size_t` sign
+  mismatch in `Thread::PlatformSetAffinity`; `-Wmissing-field-initializers` in `InputTests.cpp`; and
+  unused variables in `MemoryTests.cpp`. The full engine now builds warning-free under
+  `-Wall -Wextra -Wpedantic`. (PR #53)
+- **Repo hygiene:** Deleted stale scratch files `commit_msg.txt` and `pr_description.md` from the repo
+  root; added `AGENTS.md` (orchestrator workflow contract) and ignored the `build/` directory via
+  `.gitignore`. Removed all feature branches — only `main` remains. (PR #50, #48, manual)
+
+### Changed
+- `PhysicalVFSNode::ResolvePhysical` signature changed from `Path ResolvePhysical(...)` to
+  `Core::Result<Path> ResolvePhysical(...)` and is now `public` (was `private`). Callers must check
+  `IsError()` before using the result.
+- `PhysicalVFSNode` gained a `const Path& GetPhysicalRoot() const` accessor.
+
 ### Added
 - **Job System:** Implemented a scalable, high-performance job scheduling framework.
   - Added `IJob` interface with atomic dependency tracking and priority support.
