@@ -22,4 +22,20 @@ TEST_CASE("Random Generator Functionality", "[Math][Random]") {
             REQUIRE((integer >= -5 && integer <= 5));
         }
     }
+
+    SECTION("getColor") {
+        Random rng(42);
+        Color c1 = rng.getColor();
+        Color c2 = rng.getColor();
+
+        // Check ranges
+        REQUIRE((c1.r >= 0.0f && c1.r <= 1.0f));
+        REQUIRE((c1.g >= 0.0f && c1.g <= 1.0f));
+        REQUIRE((c1.b >= 0.0f && c1.b <= 1.0f));
+        REQUIRE(c1.a == 1.0f);
+
+        // Check that sequential calls produce different colors (extremely unlikely to be identical)
+        bool isDifferent = (c1.r != c2.r) || (c1.g != c2.g) || (c1.b != c2.b);
+        REQUIRE(isDifferent);
+    }
 }
