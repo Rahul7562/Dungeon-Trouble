@@ -4,6 +4,8 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <vector>
+#include <mutex>
 
 namespace Configuration {
 

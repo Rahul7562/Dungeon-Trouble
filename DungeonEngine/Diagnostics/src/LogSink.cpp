@@ -1,6 +1,7 @@
 #include "Diagnostics/LogSink.h"
 #include <cstdio>
 #include <ctime>
+#include <string>
 
 namespace DungeonEngine {
 namespace Diagnostics {
