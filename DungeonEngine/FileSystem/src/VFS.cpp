@@ -11,17 +11,36 @@ namespace DungeonEngine::FileSystem {
         : m_PhysicalRoot(physicalRoot), m_ReadOnly(readOnly) {
     }
 
-    Path PhysicalVFSNode::ResolvePhysical(const Path& virtualPath) const {
-        return m_PhysicalRoot / virtualPath;
+    Core::Result<Path> PhysicalVFSNode::ResolvePhysical(const Path& virtualPath) const {
+        Path resolved = (m_PhysicalRoot / virtualPath).LexicallyNormal();
+        Path normalizedRoot = m_PhysicalRoot.LexicallyNormal();
+
+        Core::String rootStr = normalizedRoot.ToString();
+        if (!rootStr.empty() && rootStr.back() != Path::Separator) {
+            rootStr += Path::Separator;
+        }
+
+        if (resolved.ToString().find(rootStr) != 0) {
+            return Core::Result<Path>::Error("Path escapes mounted root");
+        }
+
+        return resolved;
     }
 
     Core::Result<bool> PhysicalVFSNode::Exists(const Path& path) const {
-        Path physicalPath = ResolvePhysical(path);
-        return File::Exists(physicalPath);
+        auto resolvedRes = ResolvePhysical(path);
+        if (resolvedRes.IsError()) {
+            return Core::Result<bool>::Error(resolvedRes.GetError());
+        }
+        return File::Exists(resolvedRes.Get());
     }
 
     Core::Result<std::unique_ptr<IStream>> PhysicalVFSNode::OpenRead(const Path& path) const {
-        Path physicalPath = ResolvePhysical(path);
+        auto resolvedRes = ResolvePhysical(path);
+        if (resolvedRes.IsError()) {
+            return Core::Result<std::unique_ptr<IStream>>::Error(resolvedRes.GetError());
+        }
+        Path physicalPath = resolvedRes.Get();
         auto result = File::Exists(physicalPath);
         if (result.IsError() || !result.Get()) {
             return Core::Result<std::unique_ptr<IStream>>::Error("File does not exist in physical node");
@@ -39,7 +58,11 @@ namespace DungeonEngine::FileSystem {
             return Core::Result<std::unique_ptr<IStream>>::Error("Physical node is read-only");
         }
 
-        Path physicalPath = ResolvePhysical(path);
+        auto resolvedRes = ResolvePhysical(path);
+        if (resolvedRes.IsError()) {
+            return Core::Result<std::unique_ptr<IStream>>::Error(resolvedRes.GetError());
+        }
+        Path physicalPath = resolvedRes.Get();
         auto stream = std::make_unique<FileStream>(physicalPath, FileMode::Write);
         if (!stream->IsOpen()) {
              return Core::Result<std::unique_ptr<IStream>>::Error("Failed to open file stream for writing");
@@ -189,11 +212,7 @@ namespace DungeonEngine::FileSystem {
                         relPathStr = relPathStr.substr(1);
                     }
                     Path relativePath(relPathStr);
-                    // Hackish but allows retrieving it from PhysicalVFSNode
-                    // A proper design would expose this interface if supported
-                    // We know for a fact it's a PhysicalVFSNode right now
-                    // Just return something for now, the real physical node doesn't expose physicalRoot publicly yet
-                    return Core::Result<Path>::Error("Cannot properly resolve physical path directly currently.");
+                    return physicalNode->ResolvePhysical(relativePath);
                 }
             }
         }
