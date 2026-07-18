@@ -35,8 +35,8 @@ namespace DungeonEngine::FileSystem {
         void Close() override;
 
     private:
-        std::fstream m_File;
-        FileMode m_Mode;
         Path m_Path;
+        FileMode m_Mode;
+        mutable std::fstream m_File;
     };
 }

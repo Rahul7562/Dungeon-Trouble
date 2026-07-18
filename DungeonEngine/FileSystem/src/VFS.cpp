@@ -3,6 +3,7 @@
 #include "FileSystem/FileStream.h"
 #include "Core/Assert.h"
 #include <algorithm>
+#include <mutex>
 
 namespace DungeonEngine::FileSystem {
 

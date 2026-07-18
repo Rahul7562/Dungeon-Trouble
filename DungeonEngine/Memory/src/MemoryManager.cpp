@@ -2,6 +2,7 @@
 #include <Core/Assert.h>
 #include <cstdio>
 #include <cstdlib>
+#include <mutex>
 
 namespace DungeonEngine::Memory {
 

@@ -1,6 +1,7 @@
 #include "Window/WindowManager.h"
 #include "Core/Assert.h"
 #include <algorithm>
+#include <vector>
 
 namespace DungeonEngine::Window {
 

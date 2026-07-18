@@ -1,5 +1,8 @@
 #include "Diagnostics/DiagnosticsManager.h"
 #include "Diagnostics/Log.h"
+#include <string>
+#include <vector>
+#include <mutex>
 
 namespace DungeonEngine {
 namespace Diagnostics {

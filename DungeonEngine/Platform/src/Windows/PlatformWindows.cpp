@@ -2,6 +2,7 @@
 #if defined(DT_PLATFORM_WINDOWS)
 
 #include "PlatformWindows.h"
+#include <vector>
 #include <intrin.h>
 
 namespace DungeonEngine::Platform {

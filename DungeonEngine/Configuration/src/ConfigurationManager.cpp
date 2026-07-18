@@ -1,5 +1,8 @@
 #include "Configuration/ConfigurationManager.h"
 #include <algorithm>
+#include <string>
+#include <vector>
+#include <mutex>
 
 namespace Configuration {
 

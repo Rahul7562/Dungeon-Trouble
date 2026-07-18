@@ -2,6 +2,7 @@
 #include "Core/Assert.h"
 #include <thread>
 #include <algorithm>
+#include <vector>
 
 namespace DungeonEngine::Threading {
 

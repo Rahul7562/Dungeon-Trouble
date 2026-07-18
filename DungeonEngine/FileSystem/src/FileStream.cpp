@@ -44,9 +44,9 @@ namespace DungeonEngine::FileSystem {
         if (!m_File.is_open()) return 0;
 
         if (CanRead()) {
-            return static_cast<Core::u64>(const_cast<std::fstream&>(m_File).tellg());
+            return static_cast<Core::u64>(m_File.tellg());
         } else {
-            return static_cast<Core::u64>(const_cast<std::fstream&>(m_File).tellp());
+            return static_cast<Core::u64>(m_File.tellp());
         }
     }
 
@@ -57,14 +57,14 @@ namespace DungeonEngine::FileSystem {
         auto currentPos = GetPosition();
 
         // Seek to end
-        const_cast<std::fstream&>(m_File).seekg(0, std::ios::end);
-        const_cast<std::fstream&>(m_File).seekp(0, std::ios::end);
+        m_File.seekg(0, std::ios::end);
+        m_File.seekp(0, std::ios::end);
 
         Core::u64 length = GetPosition();
 
         // Restore pos
-        const_cast<std::fstream&>(m_File).seekg(currentPos, std::ios::beg);
-        const_cast<std::fstream&>(m_File).seekp(currentPos, std::ios::beg);
+        m_File.seekg(currentPos, std::ios::beg);
+        m_File.seekp(currentPos, std::ios::beg);
 
         return length;
     }

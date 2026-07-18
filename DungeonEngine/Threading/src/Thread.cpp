@@ -2,6 +2,7 @@
 #include "Threading/Utilities/ThreadLocal.h"
 #include "Core/Assert.h"
 #include "Diagnostics/Log.h"
+#include <thread>
 
 // Platform-specific headers
 #if defined(_WIN32)
