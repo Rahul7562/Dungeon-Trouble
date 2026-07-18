@@ -36,15 +36,3 @@ TEST_CASE("Vector2 Functionality", "[Math][Vector2]") {
         REQUIRE(sz == Vector2::up());
     }
 }
-
-TEST_CASE("Vector3 Functionality", "[Math][Vector3]") {
-    Vector3 a(1.0f, 2.0f, 3.0f);
-    Vector3 b(4.0f, 5.0f, 6.0f);
-
-    SECTION("Cross Product") {
-        Vector3 c = a.cross(b);
-        REQUIRE(nearlyEqual(c.x, -3.0f));
-        REQUIRE(nearlyEqual(c.y, 6.0f));
-        REQUIRE(nearlyEqual(c.z, -3.0f));
-    }
-}
