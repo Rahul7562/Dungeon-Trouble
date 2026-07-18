@@ -19,9 +19,9 @@ namespace DungeonEngine::Input {
         bool isKeyReleased(KeyCode key) const override;
         bool isKeyHeld(KeyCode key) const override;
 
-        bool isKeyPressed(ScanCode scancode) const override { return false; } // Stub
-        bool isKeyReleased(ScanCode scancode) const override { return false; } // Stub
-        bool isKeyHeld(ScanCode scancode) const override { return false; } // Stub
+        bool isKeyPressed(ScanCode scancode) const override { (void)scancode; return false; } // Stub
+        bool isKeyReleased(ScanCode scancode) const override { (void)scancode; return false; } // Stub
+        bool isKeyHeld(ScanCode scancode) const override { (void)scancode; return false; } // Stub
 
         bool hasModifier(KeyModifier modifier) const override;
         KeyModifier getModifiers() const override;

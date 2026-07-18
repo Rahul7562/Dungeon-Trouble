@@ -59,6 +59,7 @@ namespace Configuration {
     }
 
     Core::Result<bool> CommandLineProvider::SetValue(const std::string& key, const ConfigValue& value) {
+        (void)key; (void)value;
         return Core::Result<bool>::Error("CommandLineProvider is read-only.");
     }
 
@@ -84,6 +85,7 @@ namespace Configuration {
     }
 
     Core::Result<bool> EnvironmentProvider::SetValue(const std::string& key, const ConfigValue& value) {
+         (void)key; (void)value;
          return Core::Result<bool>::Error("EnvironmentProvider is read-only.");
     }
 
