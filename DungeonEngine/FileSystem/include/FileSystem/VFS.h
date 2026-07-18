@@ -30,8 +30,10 @@ namespace DungeonEngine::FileSystem {
         Core::Result<std::unique_ptr<IStream>> OpenWrite(const Path& path) override;
         bool IsReadOnly() const override { return m_ReadOnly; }
 
+        Core::Result<Path> ResolvePhysical(const Path& virtualPath) const;
+        const Path& GetPhysicalRoot() const { return m_PhysicalRoot; }
+
     private:
-        Path ResolvePhysical(const Path& virtualPath) const;
         Path m_PhysicalRoot;
         bool m_ReadOnly;
     };
