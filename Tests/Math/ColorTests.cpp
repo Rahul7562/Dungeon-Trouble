@@ -12,6 +12,12 @@ TEST_CASE("Color Functionality", "[Math][Color]") {
         Color red = Color::red();
         REQUIRE(nearlyEqual(red.r, 1.0f));
         REQUIRE(nearlyEqual(red.g, 0.0f));
+
+        Color black = Color::black();
+        REQUIRE(nearlyEqual(black.r, 0.0f));
+        REQUIRE(nearlyEqual(black.g, 0.0f));
+        REQUIRE(nearlyEqual(black.b, 0.0f));
+        REQUIRE(nearlyEqual(black.a, 1.0f));
     }
 
     SECTION("Hex Conversion") {
