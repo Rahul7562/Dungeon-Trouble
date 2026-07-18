@@ -22,4 +22,25 @@ TEST_CASE("Color Functionality", "[Math][Color]") {
         uint32_t hex = c.toHex();
         REQUIRE(hex == 0xFF0000FF);
     }
+
+    SECTION("RGB8 Conversion") {
+        // Typical values
+        Color c1 = Color::fromRGB8(255, 128, 64, 255);
+        REQUIRE(nearlyEqual(c1.r, 1.0f));
+        REQUIRE(nearlyEqual(c1.g, 128.0f / 255.0f));
+        REQUIRE(nearlyEqual(c1.b, 64.0f / 255.0f));
+        REQUIRE(nearlyEqual(c1.a, 1.0f));
+
+        // All zeros
+        Color c2 = Color::fromRGB8(0, 0, 0, 0);
+        REQUIRE(nearlyEqual(c2.r, 0.0f));
+        REQUIRE(nearlyEqual(c2.g, 0.0f));
+        REQUIRE(nearlyEqual(c2.b, 0.0f));
+        REQUIRE(nearlyEqual(c2.a, 0.0f));
+
+        // Default alpha
+        Color c3 = Color::fromRGB8(255, 255, 255);
+        REQUIRE(nearlyEqual(c3.r, 1.0f));
+        REQUIRE(nearlyEqual(c3.a, 1.0f));
+    }
 }
