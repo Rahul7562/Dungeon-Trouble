@@ -22,4 +22,21 @@ TEST_CASE("Random Generator Functionality", "[Math][Random]") {
             REQUIRE((integer >= -5 && integer <= 5));
         }
     }
+
+    SECTION("Boolean") {
+        Random r1(12345);
+        Random r2(12345);
+
+        REQUIRE(r1.getBool() == r2.getBool());
+
+        int trueCount = 0;
+        int falseCount = 0;
+        Random rng(1337);
+        for(int i = 0; i < 10000; i++) {
+            if (rng.getBool()) trueCount++;
+            else falseCount++;
+        }
+        REQUIRE(trueCount > 4000);
+        REQUIRE(falseCount > 4000);
+    }
 }
