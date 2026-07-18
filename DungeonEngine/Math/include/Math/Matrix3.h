@@ -59,9 +59,9 @@ struct Matrix3 {
 
     constexpr Matrix3 transpose() const noexcept {
         return Matrix3(
-            col[0].x, col[0].y, col[0].z,
-            col[1].x, col[1].y, col[1].z,
-            col[2].x, col[2].y, col[2].z
+            col[0].x, col[1].x, col[2].x,
+            col[0].y, col[1].y, col[2].y,
+            col[0].z, col[1].z, col[2].z
         );
     }
 
