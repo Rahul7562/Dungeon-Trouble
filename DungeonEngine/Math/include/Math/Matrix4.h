@@ -75,10 +75,10 @@ struct Matrix4 {
 
     constexpr Matrix4 transpose() const noexcept {
         return Matrix4(
-            col[0].x, col[0].y, col[0].z, col[0].w,
-            col[1].x, col[1].y, col[1].z, col[1].w,
-            col[2].x, col[2].y, col[2].z, col[2].w,
-            col[3].x, col[3].y, col[3].z, col[3].w
+            col[0].x, col[1].x, col[2].x, col[3].x,
+            col[0].y, col[1].y, col[2].y, col[3].y,
+            col[0].z, col[1].z, col[2].z, col[3].z,
+            col[0].w, col[1].w, col[2].w, col[3].w
         );
     }
 
