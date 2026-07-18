@@ -1,4 +1,5 @@
 #include "FileSystem/FileStream.h"
+#include "Core/Assert.h"
 
 namespace DungeonEngine::FileSystem {
 
@@ -18,6 +19,9 @@ namespace DungeonEngine::FileSystem {
                 break;
             case FileMode::ReadWrite:
                 openMode |= std::ios_base::in | std::ios_base::out;
+                break;
+            default:
+                DT_ASSERT(false, "Unknown FileMode");
                 break;
         }
 
