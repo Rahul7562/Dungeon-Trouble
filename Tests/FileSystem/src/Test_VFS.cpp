@@ -18,5 +18,18 @@ TEST_CASE("VFS Basic Operations", "[FileSystem][VFS]") {
         REQUIRE(unmountRes.IsOk());
     }
 
+    SECTION("ResolvePhysicalPath security test") {
+        Path physicalRoot = Directory::GetCurrentWorkingDirectory();
+        VirtualFileSystem::Get().Mount(Path("/assets"), physicalRoot, true);
+
+        auto resolvedValid = VirtualFileSystem::Get().ResolvePhysicalPath(Path("/assets/textures/player.png"));
+        REQUIRE(resolvedValid.IsOk());
+
+        auto resolvedInvalid = VirtualFileSystem::Get().ResolvePhysicalPath(Path("/assets/../../etc/passwd"));
+        REQUIRE(resolvedInvalid.IsError());
+
+        VirtualFileSystem::Get().Unmount(Path("/assets"));
+    }
+
     VirtualFileSystem::Get().Shutdown();
 }
