@@ -117,7 +117,7 @@ namespace DungeonEngine::Input {
         return false;
     }
 
-    bool InputMapper::isActionPressed(const InputActionId& actionId) const {
+    bool InputMapper::checkActionState(const InputActionId& actionId, InputState targetState) const {
         // Evaluate from top of stack downwards
         for (auto it = m_activeContextStack.rbegin(); it != m_activeContextStack.rend(); ++it) {
             const auto& ctxIt = m_contexts.find(*it);
@@ -125,7 +125,7 @@ namespace DungeonEngine::Input {
                 const auto& context = ctxIt->second;
                 for (const auto& binding : context.bindings) {
                     if (binding.actionId == actionId) {
-                        if (evaluateBindingState(binding, InputState::PRESSED)) {
+                        if (evaluateBindingState(binding, targetState)) {
                             return true;
                         }
                     }
@@ -133,40 +133,18 @@ namespace DungeonEngine::Input {
             }
         }
         return false;
+    }
+
+    bool InputMapper::isActionPressed(const InputActionId& actionId) const {
+        return checkActionState(actionId, InputState::PRESSED);
     }
 
     bool InputMapper::isActionReleased(const InputActionId& actionId) const {
-        for (auto it = m_activeContextStack.rbegin(); it != m_activeContextStack.rend(); ++it) {
-            const auto& ctxIt = m_contexts.find(*it);
-            if (ctxIt != m_contexts.end()) {
-                const auto& context = ctxIt->second;
-                for (const auto& binding : context.bindings) {
-                    if (binding.actionId == actionId) {
-                        if (evaluateBindingState(binding, InputState::RELEASED)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return false;
+        return checkActionState(actionId, InputState::RELEASED);
     }
 
     bool InputMapper::isActionHeld(const InputActionId& actionId) const {
-        for (auto it = m_activeContextStack.rbegin(); it != m_activeContextStack.rend(); ++it) {
-            const auto& ctxIt = m_contexts.find(*it);
-            if (ctxIt != m_contexts.end()) {
-                const auto& context = ctxIt->second;
-                for (const auto& binding : context.bindings) {
-                    if (binding.actionId == actionId) {
-                        if (evaluateBindingState(binding, InputState::HELD)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return false;
+        return checkActionState(actionId, InputState::HELD);
     }
 
     Core::f32 InputMapper::getActionValue(const InputActionId& actionId) const {

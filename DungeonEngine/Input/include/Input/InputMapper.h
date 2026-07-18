@@ -37,6 +37,7 @@ namespace DungeonEngine::Input {
         std::vector<InputContextId> m_activeContextStack;
 
         bool evaluateBindingState(const InputBinding& binding, InputState targetState) const;
+        bool checkActionState(const InputActionId& actionId, InputState targetState) const;
     };
 
 }
