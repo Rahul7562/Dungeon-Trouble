@@ -41,6 +41,9 @@ void DiagnosticsManager::report(DiagnosticEventType type, std::string_view subsy
         case DiagnosticEventType::Error:
             DT_LOG_ERROR(subsystem, "%.*s", static_cast<int>(message.length()), message.data());
             break;
+        default:
+            DT_LOG_WARN(subsystem, "Unknown DiagnosticEventType");
+            break;
     }
 }
 
