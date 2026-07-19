@@ -6,6 +6,10 @@ add_library(DungeonEngine_Gameplay
     src/Items/ItemDefTable.cpp
     src/Items/Inventory.cpp
     src/Items/EquipmentOps.cpp
+    src/Abilities/AbilityDefTable.cpp
+    src/Abilities/StatusEffectDefTable.cpp
+    src/Abilities/AbilitySystem.cpp
+    src/Abilities/StatusEffectSystem.cpp
 )
 
 target_include_directories(DungeonEngine_Gameplay PUBLIC include)
