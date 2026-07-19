@@ -1,5 +1,6 @@
 add_executable(GameplayTests
     GameplayTests.cpp
+    ItemsTests.cpp
 )
 
 target_include_directories(GameplayTests PRIVATE ../../ThirdParty/catch2)
