@@ -30,8 +30,6 @@ add_subdirectory(Tests/Window)
 add_subdirectory(Tests/Input)
 add_subdirectory(Tests/Threading)
 add_subdirectory(Tests/Jobs)
-
 add_subdirectory(DungeonEngine/Simulation)
 add_subdirectory(Tests/Simulation)
-
 add_subdirectory(Tests/Events)
