@@ -3,6 +3,9 @@ add_library(DungeonEngine_Gameplay
     src/Combat/DamagePipeline.cpp
     src/Combat/CombatSystem.cpp
     src/Combat/HitQuery.cpp
+    src/Items/ItemDefTable.cpp
+    src/Items/Inventory.cpp
+    src/Items/EquipmentOps.cpp
 )
 
 target_include_directories(DungeonEngine_Gameplay PUBLIC include)
