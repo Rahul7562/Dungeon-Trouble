@@ -133,6 +133,7 @@ TEST_CASE("LootSystem End-to-End", "[Loot]") {
         REQUIRE(e.itemDefId == 500);
         REQUIRE(e.count == 5);
     });
+    (void)sub;
 
     eventBus.DispatchQueue(EventChannel::GAMEPLAY);
     REQUIRE(dropEvents == 1);
@@ -231,11 +232,13 @@ TEST_CASE("LootSystem Determinism", "[Loot]") {
     auto sub1 = eventBus1.Subscribe<LootDroppedEvent>([&](const LootDroppedEvent& e) {
         drops1.push_back({e.itemDefId, e.count});
     });
+    (void)sub1;
 
     std::vector<ItemStack> drops2;
     auto sub2 = eventBus2.Subscribe<LootDroppedEvent>([&](const LootDroppedEvent& e) {
         drops2.push_back({e.itemDefId, e.count});
     });
+    (void)sub2;
 
     // Ensure enemy entity IDs are the same for determinism (both created as first entity)
     REQUIRE(enemy1 == enemy2);
