@@ -30,10 +30,12 @@ TEST_CASE("Synchronous Event Dispatching", "[Events]") {
     auto handleA = dispatcher.Subscribe<TestEventA>([&](const TestEventA& e) {
         receivedA += e.value;
     });
+    REQUIRE(handleA.IsValid());
 
     auto handleB = dispatcher.Subscribe<TestEventB>([&](const TestEventB& e) {
         receivedB += static_cast<int>(e.value);
     });
+    REQUIRE(handleB.IsValid());
 
     dispatcher.Dispatch(TestEventA{5});
     REQUIRE(receivedA == 5);
@@ -59,6 +61,7 @@ TEST_CASE("Unsubscribe During Dispatch", "[Events]") {
     auto handle2 = dispatcher.Subscribe<TestEventA>([&](const TestEventA&) {
         calls2++;
     });
+    REQUIRE(handle2.IsValid());
 
     // First dispatch should call both, but handle1 unsubscribes itself
     dispatcher.Dispatch(TestEventA{1});
