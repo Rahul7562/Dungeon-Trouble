@@ -3,6 +3,7 @@ add_executable(GameplayTests
     CombatTests.cpp
     ItemsTests.cpp
     AbilitiesTests.cpp
+    LootTests.cpp
 )
 
 target_include_directories(GameplayTests PRIVATE ../../ThirdParty/catch2)

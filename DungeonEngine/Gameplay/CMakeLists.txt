@@ -10,6 +10,9 @@ add_library(DungeonEngine_Gameplay
     src/Abilities/StatusEffectDefTable.cpp
     src/Abilities/AbilitySystem.cpp
     src/Abilities/StatusEffectSystem.cpp
+    src/Loot/LootTableDefTable.cpp
+    src/Loot/LootRoller.cpp
+    src/Loot/LootSystem.cpp
 )
 
 target_include_directories(DungeonEngine_Gameplay PUBLIC include)
