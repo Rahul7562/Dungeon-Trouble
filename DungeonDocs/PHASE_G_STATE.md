@@ -4,9 +4,9 @@ Tracking file for the gameplay-foundation milestone batch. Update after every se
 
 | Milestone | Module | Jules Session | State | PR | Merged |
 |---|---|---|---|---|---|
-| M13 ECS Core | DungeonEngine/ECS | 10259790162906470759 | implementing | - | - |
-| M14 Event System | DungeonEngine/Events | 9501713371708288481 | implementing | - | - |
-| M15 Simulation Loop | DungeonEngine/Simulation | 14194793646827082701 | implementing | - | - |
+| M13 ECS Core | DungeonEngine/ECS | 17306491816127604942 (retry) | done | #56 | ✅ |
+| M14 Event System | DungeonEngine/Events | 9501713371708288481 | done | #55 | ✅ |
+| M15 Simulation Loop | DungeonEngine/Simulation | 14194793646827082701 | done | #54 | ✅ |
 | M16 Stats & Attributes | DungeonEngine/Gameplay | not started (needs M13) | - | - | - |
 | M17 Combat Core | DungeonEngine/Gameplay | not started (needs M13,M15,M16) | - | - | - |
 | M18 Abilities & Status FX | DungeonEngine/Gameplay | not started (needs M17) | - | - | - |

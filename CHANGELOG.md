@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## Milestones 13-15 — Gameplay Foundation, Batch 1 (Phase G)
+
+### Added
+- **ECS Core (M13, PR #56):** `DungeonEngine/ECS` — 64-bit `Entity` handles (32-bit index +
+  32-bit generation), `EntityRegistry` with index recycling and stale-handle detection,
+  sparse-set `ComponentStorage<T>` with swap-and-pop removal, `Registry` facade,
+  multi-component `View` iteration (smallest-set-first), and a `CommandBuffer` for deferred
+  structural changes during iteration. 29 test assertions incl. a 10k-entity stress view.
+- **Event System (M14, PR #55):** `DungeonEngine/Events` — synchronous `EventDispatcher`
+  (type-erased callbacks, safe subscribe/unsubscribe during dispatch via deferred mutations),
+  contiguous-buffer `EventQueue` (no per-event heap allocation, double-buffered drain safe
+  against re-enqueue during dispatch), and channel-routing `EventBus` (SYSTEM / GAMEPLAY).
+  19 assertions incl. 10k-event drain and destructor-safety tests.
+- **Simulation Loop (M15, PR #54):** `DungeonEngine/Simulation` — fixed-tick
+  `SimulationClock` (30 Hz default, spiral-of-death cap), phase-ordered `SystemScheduler`
+  with stable registration order, `SimulationLoop` deriving deterministic per-tick seeds,
+  and `SimRandom` (XorShift64*) for reproducible gameplay RNG. 17 assertions incl.
+  same-seed determinism proof.
+- **Docs:** Roadmap Rev 2 (gameplay-first strategy), `TDD_GAMEPLAY.md` (Phase G technical
+  design: module map, tick phases, stats/combat pipelines, determinism contract),
+  `PHASE_G_STATE.md` (execution tracker).
+
+### Governance
+- All three modules verified headless (no Window/Input/render includes), warning-free under
+  `-Wall -Wextra -Wpedantic`, `-fno-exceptions` compliant; full 13-suite test pass before merge.
+- CMakeLists merge conflicts between parallel PRs resolved by union; feature branches deleted
+  after merge (main is the only branch).
+
 ## Milestone 12
 
 ### Fixed (Pre-Rendering Phase Hardening)
