@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Milestones 16-20 — Gameplay Foundation, Batches 2-4 (Phase G COMPLETE)
+
+### Added
+- **Stats & Attributes (M16, PR #57):** `Gameplay/Stats` — STR/DEX/INT/VIT attributes, ten
+  derived stats with tunable formulas (`StatFormulas.h`), `StatModifier` stacking pipeline
+  (Flat → PercentAdd → PercentMult), lazy dirty-flag recalculation, remove-by-source, and
+  duration-ticked temporary modifiers. `StatSheet` is a plain ECS component.
+- **Combat Core (M17, PR #59):** `Gameplay/Combat` — Health/TeamId/HitShape/DeadTag
+  components, `DamageEvent` with CanCrit/IgnoreArmor/TrueDamage flags, deterministic
+  `DamagePipeline` (school scaling → seeded crit roll → armor mitigation `A/(A+100)` →
+  clamp → integer truncation), `CombatSystem` (tick phase 300) with command-buffer death
+  handling and once-only `EntityDiedEvent`, and swappable brute-force `HitQuery`
+  (circle/AABB overlaps) ready for M21 spatial acceleration.
+- **Abilities & Status Effects (M18, PR #61):** `Gameplay/Abilities` — `AbilityDef` /
+  `StatusEffectDef` tables, `AbilityBook` cooldowns (CooldownReduction-aware), `Mana`,
+  full cast-validation chain (alive → not stunned → known → off cooldown → in range →
+  mana), `AbilitySystem` (phase 100) forwarding damage to CombatSystem, and
+  `StatusEffectSystem` handling DoT/HoT/Stun/StatBuff with tick-interval scheduling and
+  exact-expiry cleanup (stat buffs revert via remove-by-source).
+- **Items & Inventory (M19, PR #58):** `Gameplay/Items` — data-driven `ItemDefTable` with
+  a dependency-free tolerant JSON parser (Result-based errors, no exceptions), rarity and
+  equip-slot enums, stacking `Inventory` component (fill-existing-first, capacity +
+  maxStack, remainder reporting), and `Equipment`/`EquipmentOps` applying item stat
+  modifiers through the M16 pipeline with slot-derived source ids (clean swap semantics).
+- **Loot & Drops (M20, PR #60):** `Gameplay/Loot` — weighted + guaranteed `LootTableDef`
+  rolls via `LootRoller`, `LootSystem` (phase 400) subscribing to death events and spawning
+  `DroppedLoot` entities with per-entity deterministic seeds (tick seed XOR entity id),
+  `LootDroppedEvent` emission, and partial-pickup-aware `PickUp` into M19 inventories.
+
+### Verification
+- Full regression on main after final merge: **15/15 suites, 3,081 assertions, zero
+  failures, zero warnings** under `-Wall -Wextra -Wpedantic`; determinism proven by
+  same-seed double-run tests in Combat, Abilities, and Loot.
+- Phase G headless rule held: no Window/Input/render includes anywhere under ECS, Events,
+  Simulation, or Gameplay.
+
+### Governance
+- 4 parallel-batch CMakeLists conflicts union-resolved and build-verified before push;
+  M20 test-file warnings fixed in review; all 8 feature branches deleted after merge —
+  `main` remains the only branch.
+
 ## Milestones 13-15 — Gameplay Foundation, Batch 1 (Phase G)
 
 ### Added

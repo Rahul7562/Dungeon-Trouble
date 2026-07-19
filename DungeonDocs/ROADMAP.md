@@ -19,18 +19,18 @@
 * ✅ M12: Threading + Job System (work-stealing scheduler, parallel-for).
 * ✅ M12.5: Pre-gameplay hardening — zero warnings, VFS security, FileStream UB fix (PRs #47-#53).
 
-## Phase G: Gameplay Foundation (M13-M20) — 🔄 CURRENT
-Headless simulation core. No rendering dependencies allowed in any Phase G module.
-* 🔄 M13: **ECS Core** — entity registry, sparse-set component storage, views/queries, deferred command buffer.
-* 🔄 M14: **Event System** — synchronous dispatcher + queued event bus; gameplay/system channels.
-* 🔄 M15: **Simulation Loop** — fixed-tick simulation (deterministic, 30 Hz), tick scheduler, time services, system update ordering.
-* ⏳ M16: **Stats & Attributes** — attribute sheets (STR/DEX/INT/VIT), derived stats, modifier stacking (flat/percent/mult), stat recalculation graph.
-* ⏳ M17: **Combat Core** — damage pipeline (mitigation, resist, crit), hitbox/hurtbox shapes on ECS, hit registration (headless), damage events, death/respawn.
-* ⏳ M18: **Abilities & Status Effects** — ability definitions (cast time, cooldown, cost, telegraphs), buff/debuff engine (DoT, HoT, CC), synergy hooks.
-* ⏳ M19: **Items & Inventory** — item definitions (data-driven via VFS/JSON), inventory containers, equipment slots, stat integration.
-* ⏳ M20: **Loot & Drop System** — loot tables (deterministic + RNG blend per GDD), drop rolls, rarity tiers, pickup flow.
+## Phase G: Gameplay Foundation (M13-M20) — ✅ COMPLETE
+Headless simulation core. No rendering dependencies in any Phase G module.
+* ✅ M13: **ECS Core** — entity registry, sparse-set component storage, views/queries, deferred command buffer. (PR #56)
+* ✅ M14: **Event System** — synchronous dispatcher + queued event bus; SYSTEM/GAMEPLAY channels. (PR #55)
+* ✅ M15: **Simulation Loop** — fixed-tick 30 Hz deterministic loop, phase-ordered scheduler, per-tick seeds, SimRandom. (PR #54)
+* ✅ M16: **Stats & Attributes** — attribute sheets, derived stats, modifier stacking, duration ticking. (PR #57)
+* ✅ M17: **Combat Core** — damage pipeline (crit/armor/flags), hitbox overlaps, CombatSystem, death events. (PR #59)
+* ✅ M18: **Abilities & Status Effects** — ability defs, cooldown/mana/CDR, cast validation, DoT/HoT/Stun/StatBuff engine. (PR #61)
+* ✅ M19: **Items & Inventory** — data-driven item defs (JSON), stacking inventory, equipment + stat integration. (PR #58)
+* ✅ M20: **Loot & Drop System** — weighted+guaranteed loot tables, deterministic rolls, drop entities, pickup. (PR #60)
 
-## Phase W: World Simulation (M21-M28) — ⏳
+## Phase W: World Simulation (M21-M28) — 🔄 CURRENT
 * M21: Spatial partitioning (grid/quadtree for isometric world), proximity queries.
 * M22: Collision & movement (2D physics on iso plane: solids, triggers, knockback).
 * M23: Zone/map data model (tiles, nav data, spawn points, hazards) — data-driven.
