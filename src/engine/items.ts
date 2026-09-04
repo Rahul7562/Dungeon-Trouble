@@ -5,7 +5,309 @@ import {
   StatType,
   ModifierOp,
   ItemStack,
+  StatSheet,
+  EquipmentState,
 } from './types';
+import { StatCalculator } from './stats';
+
+export class Result<T> {
+  private ok: boolean;
+  private value?: T;
+  private error?: string;
+
+  constructor(ok: boolean, value?: T, error?: string) {
+    this.ok = ok;
+    this.value = value;
+    this.error = error;
+  }
+
+  static Ok<T>(value: T): Result<T> {
+    return new Result<T>(true, value);
+  }
+
+  static Error<T>(error: string): Result<T> {
+    return new Result<T>(false, undefined, error);
+  }
+
+  IsOk(): boolean { return this.ok; }
+  IsError(): boolean { return !this.ok; }
+  Get(): T { return this.value!; }
+  GetError(): string { return this.error || ''; }
+
+  // Lowercase aliases
+  isOk(): boolean { return this.ok; }
+  isError(): boolean { return !this.ok; }
+  get(): T { return this.value!; }
+  getError(): string { return this.error || ''; }
+}
+
+export class ItemDefTable {
+  private items = new Map<number, ItemDef>();
+
+  Register(def: ItemDef): void {
+    this.items.set(def.id, { ...def });
+  }
+
+  Get(id: number): ItemDef | undefined {
+    return this.items.get(id);
+  }
+
+  register = this.Register.bind(this);
+  get = this.Get.bind(this);
+
+  LoadFromJson(jsonString: string): Result<boolean> {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (!Array.isArray(parsed)) {
+        return Result.Error('Expected JSON array of items');
+      }
+
+      for (const raw of parsed) {
+        if (raw.id === undefined || typeof raw.id !== 'number') {
+          return Result.Error('Item is missing required "id" attribute');
+        }
+
+        const rarityStr = String(raw.rarity || 'Common').toLowerCase();
+        let rarity = ItemRarity.Common;
+        if (rarityStr === 'uncommon') rarity = ItemRarity.Uncommon;
+        else if (rarityStr === 'rare') rarity = ItemRarity.Rare;
+        else if (rarityStr === 'epic') rarity = ItemRarity.Epic;
+        else if (rarityStr === 'legendary') rarity = ItemRarity.Legendary;
+
+        const slotStr = String(raw.slot || 'None').toLowerCase();
+        let slot = EquipSlot.None;
+        if (slotStr === 'head') slot = EquipSlot.Head;
+        else if (slotStr === 'chest') slot = EquipSlot.Chest;
+        else if (slotStr === 'legs') slot = EquipSlot.Legs;
+        else if (slotStr === 'boots') slot = EquipSlot.Boots;
+        else if (slotStr === 'mainhand') slot = EquipSlot.MainHand;
+        else if (slotStr === 'offhand') slot = EquipSlot.OffHand;
+        else if (slotStr === 'ring') slot = EquipSlot.Ring;
+        else if (slotStr === 'amulet') slot = EquipSlot.Amulet;
+
+        const equipModifiers: any[] = [];
+        if (Array.isArray(raw.equipModifiers)) {
+          for (const m of raw.equipModifiers) {
+            let stat = StatType.AttackPower;
+            const statStr = String(m.stat || '').toLowerCase();
+            if (statStr === 'maxhealth') stat = StatType.MaxHealth;
+            else if (statStr === 'maxmana') stat = StatType.MaxMana;
+            else if (statStr === 'attackpower') stat = StatType.AttackPower;
+            else if (statStr === 'spellpower') stat = StatType.SpellPower;
+            else if (statStr === 'armor') stat = StatType.Armor;
+            else if (statStr === 'evasion') stat = StatType.Evasion;
+            else if (statStr === 'critchance') stat = StatType.CritChance;
+            else if (statStr === 'critmultiplier') stat = StatType.CritMultiplier;
+            else if (statStr === 'movespeed') stat = StatType.MoveSpeed;
+            else if (statStr === 'cooldownreduction') stat = StatType.CooldownReduction;
+
+            let op = ModifierOp.Flat;
+            const opStr = String(m.op || '').toLowerCase();
+            if (opStr === 'percentadd' || opStr === 'percent') op = ModifierOp.PercentAdd;
+            else if (opStr === 'percentmult') op = ModifierOp.PercentMult;
+
+            equipModifiers.push({
+              sourceId: m.sourceId ?? 0,
+              stat,
+              op,
+              value: Number(m.value) || 0,
+              durationTicks: m.durationTicks ?? -1,
+            });
+          }
+        }
+
+        const def: ItemDef = {
+          id: raw.id,
+          name: raw.name || `Item ${raw.id}`,
+          rarity,
+          slot,
+          maxStack: raw.maxStack ?? (slot === EquipSlot.None ? 20 : 1),
+          equipModifiers,
+        };
+
+        this.Register(def);
+      }
+
+      return Result.Ok(true);
+    } catch (e: any) {
+      return Result.Error(`JSON parsing error: ${e.message || String(e)}`);
+    }
+  }
+
+  loadFromJson = this.LoadFromJson.bind(this);
+}
+
+export interface InventorySlot {
+  defId: number;
+  count: number;
+}
+
+export class Inventory {
+  slots: InventorySlot[];
+
+  constructor(size = 12) {
+    this.slots = [];
+    for (let i = 0; i < size; i++) {
+      this.slots.push({ defId: 0, count: 0 });
+    }
+  }
+
+  AddItem(table: ItemDefTable, defId: number, count: number): number {
+    const def = table.Get(defId);
+    const maxStack = def?.maxStack ?? 1;
+    let remaining = count;
+
+    // 1. Stack into existing non-full slots
+    for (let i = 0; i < this.slots.length; i++) {
+      const slot = this.slots[i];
+      if (slot.defId === defId && slot.count < maxStack) {
+        const canAdd = maxStack - slot.count;
+        const add = Math.min(canAdd, remaining);
+        slot.count += add;
+        remaining -= add;
+        if (remaining <= 0) return 0;
+      }
+    }
+
+    // 2. Put into empty slots
+    for (let i = 0; i < this.slots.length; i++) {
+      const slot = this.slots[i];
+      if (slot.defId === 0 || slot.count === 0) {
+        slot.defId = defId;
+        const add = Math.min(maxStack, remaining);
+        slot.count = add;
+        remaining -= add;
+        if (remaining <= 0) return 0;
+      }
+    }
+
+    return remaining;
+  }
+
+  addItem = this.AddItem.bind(this);
+
+  RemoveItem(defId: number, count: number): number {
+    let toRemove = count;
+    let removedTotal = 0;
+
+    for (let i = 0; i < this.slots.length; i++) {
+      const slot = this.slots[i];
+      if (slot.defId === defId && slot.count > 0) {
+        const take = Math.min(slot.count, toRemove);
+        slot.count -= take;
+        toRemove -= take;
+        removedTotal += take;
+
+        if (slot.count === 0) {
+          slot.defId = 0;
+        }
+
+        if (toRemove <= 0) break;
+      }
+    }
+
+    return removedTotal;
+  }
+
+  removeItem = this.RemoveItem.bind(this);
+
+  CountOf(defId: number): number {
+    let total = 0;
+    for (const slot of this.slots) {
+      if (slot.defId === defId) {
+        total += slot.count;
+      }
+    }
+    return total;
+  }
+
+  countOf = this.CountOf.bind(this);
+}
+
+export class Equipment {
+  slots: number[] = new Array(9).fill(0); // EquipSlot enum indices 0..8
+}
+
+export class EquipmentOps {
+  static Equip(
+    equip: Equipment | any,
+    stats: StatSheet,
+    table: ItemDefTable,
+    itemDefId: number
+  ): Result<number> {
+    const def = table.Get(itemDefId);
+    if (!def || def.slot === EquipSlot.None) {
+      return Result.Error(`Item ${itemDefId} cannot be equipped in slot None`);
+    }
+
+    const slotIndex = def.slot;
+    const slotSourceId = 1000000 + slotIndex;
+
+    let oldItemId = 0;
+    if (equip.slots !== undefined) {
+      oldItemId = equip.slots[slotIndex] || 0;
+    } else if (equip[slotIndex] !== undefined) {
+      oldItemId = typeof equip[slotIndex] === 'number' ? equip[slotIndex] : (equip[slotIndex]?.itemDefId || 0);
+    }
+
+    // Unequip old item stats
+    if (oldItemId !== 0) {
+      StatCalculator.RemoveModifiersFromSource(stats, slotSourceId);
+    }
+
+    // Set new slot
+    if (equip.slots !== undefined) {
+      equip.slots[slotIndex] = itemDefId;
+    } else {
+      equip[slotIndex] = {
+        instanceId: String(itemDefId),
+        itemDefId,
+        count: 1,
+      };
+    }
+
+    // Apply new modifiers
+    if (def.equipModifiers) {
+      for (const mod of def.equipModifiers) {
+        StatCalculator.AddModifier(stats, {
+          ...mod,
+          sourceId: slotSourceId,
+        });
+      }
+    }
+
+    return Result.Ok(oldItemId);
+  }
+
+  static equip = EquipmentOps.Equip;
+
+  static Unequip(
+    equip: Equipment | any,
+    stats: StatSheet,
+    slot: EquipSlot
+  ): number {
+    const slotSourceId = 1000000 + slot;
+    let oldItemId = 0;
+    if (equip.slots !== undefined) {
+      oldItemId = equip.slots[slot] || 0;
+    } else if (equip[slot] !== undefined) {
+      oldItemId = typeof equip[slot] === 'number' ? equip[slot] : (equip[slot]?.itemDefId || 0);
+    }
+
+    if (oldItemId !== 0) {
+      StatCalculator.RemoveModifiersFromSource(stats, slotSourceId);
+      if (equip.slots !== undefined) {
+        equip.slots[slot] = 0;
+      } else {
+        equip[slot] = null;
+      }
+    }
+
+    return oldItemId;
+  }
+
+  static unequip = EquipmentOps.Unequip;
+}
 
 export const ITEM_REGISTRY: Record<number, ItemDef> = {
   1: {
@@ -15,6 +317,7 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.MainHand,
     description: 'An old iron blade with slight notches. Still sharp enough to cleave bone.',
     icon: 'Sword',
+    maxStack: 1,
     equipModifiers: [
       { stat: StatType.AttackPower, op: ModifierOp.Flat, value: 5 },
     ],
@@ -26,6 +329,7 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.Chest,
     description: 'Forged plate offering solid physical deflection.',
     icon: 'Shield',
+    maxStack: 1,
     equipModifiers: [
       { stat: StatType.Armor, op: ModifierOp.Flat, value: 15 },
       { stat: StatType.MaxHealth, op: ModifierOp.Flat, value: 25 },
@@ -38,8 +342,9 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.Boots,
     description: 'Lightweight leather imbued with swift dungeon enchantments.',
     icon: 'Footprints',
+    maxStack: 1,
     equipModifiers: [
-      { stat: StatType.MoveSpeed, op: ModifierOp.Percent, value: 20 },
+      { stat: StatType.MoveSpeed, op: ModifierOp.PercentAdd, value: 20 },
       { stat: StatType.Evasion, op: ModifierOp.Flat, value: 8 },
     ],
   },
@@ -50,10 +355,11 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.Head,
     description: 'Resonates with high arcane frequencies, boosting magical potency.',
     icon: 'Crown',
+    maxStack: 1,
     equipModifiers: [
       { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 24 },
       { stat: StatType.MaxMana, op: ModifierOp.Flat, value: 50 },
-      { stat: StatType.CooldownReduction, op: ModifierOp.Percent, value: 15 },
+      { stat: StatType.CooldownReduction, op: ModifierOp.PercentAdd, value: 15 },
     ],
   },
   5: {
@@ -63,6 +369,7 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.Legs,
     description: 'Heavy dragon-scale plating giving unparalleled resilience.',
     icon: 'ShieldAlert',
+    maxStack: 1,
     equipModifiers: [
       { stat: StatType.Armor, op: ModifierOp.Flat, value: 25 },
       { stat: StatType.MaxHealth, op: ModifierOp.Flat, value: 60 },
@@ -75,10 +382,11 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.MainHand,
     description: 'A cataclysmic relic discovered in the deepest abyss. Radiates destructive power.',
     icon: 'Flame',
+    maxStack: 1,
     equipModifiers: [
       { stat: StatType.AttackPower, op: ModifierOp.Flat, value: 45 },
       { stat: StatType.CritChance, op: ModifierOp.Flat, value: 18 },
-      { stat: StatType.CritMultiplier, op: ModifierOp.Percent, value: 40 },
+      { stat: StatType.CritMultiplier, op: ModifierOp.PercentAdd, value: 40 },
     ],
   },
   7: {
@@ -88,6 +396,7 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.OffHand,
     description: 'A polished shield bearing the crest of a fallen sun deity.',
     icon: 'Shield',
+    maxStack: 1,
     equipModifiers: [
       { stat: StatType.Armor, op: ModifierOp.Flat, value: 20 },
       { stat: StatType.MaxHealth, op: ModifierOp.Flat, value: 35 },
@@ -100,6 +409,7 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.Ring,
     description: 'Hones lethal reflexes and precision strikes.',
     icon: 'CircleDot',
+    maxStack: 1,
     equipModifiers: [
       { stat: StatType.CritChance, op: ModifierOp.Flat, value: 10 },
       { stat: StatType.Evasion, op: ModifierOp.Flat, value: 12 },
@@ -112,6 +422,7 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.Amulet,
     description: 'Warm to the touch, this talisman infuses the wearer with steady vigor.',
     icon: 'Gem',
+    maxStack: 1,
     equipModifiers: [
       { stat: StatType.MaxHealth, op: ModifierOp.Flat, value: 80 },
       { stat: StatType.MaxMana, op: ModifierOp.Flat, value: 40 },
@@ -124,6 +435,7 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.None,
     description: 'Restores 50 Health immediately upon consumption.',
     icon: 'Heart',
+    maxStack: 20,
     equipModifiers: [],
   },
   11: {
@@ -133,23 +445,68 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
     slot: EquipSlot.None,
     description: 'Restores 40 Mana immediately upon consumption.',
     icon: 'Sparkles',
+    maxStack: 20,
+    equipModifiers: [],
+  },
+  12: {
+    id: 12,
+    name: 'Phoenix Flame Mantle',
+    rarity: ItemRarity.Legendary,
+    slot: EquipSlot.Chest,
+    description: 'Forged within primordial volcanic embers. Grants fire resistance and immense resilience.',
+    icon: 'Shield',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.Armor, op: ModifierOp.Flat, value: 35 },
+      { stat: StatType.MaxHealth, op: ModifierOp.Flat, value: 90 },
+      { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 20 },
+    ],
+  },
+  13: {
+    id: 13,
+    name: 'Boots of the Windstrider',
+    rarity: ItemRarity.Legendary,
+    slot: EquipSlot.Boots,
+    description: 'Legendary footwear allowing the wearer to glide effortlessly across treacherous terrain.',
+    icon: 'Footprints',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.MoveSpeed, op: ModifierOp.PercentAdd, value: 35 },
+      { stat: StatType.Evasion, op: ModifierOp.Flat, value: 20 },
+      { stat: StatType.CooldownReduction, op: ModifierOp.PercentAdd, value: 15 },
+    ],
+  },
+  14: {
+    id: 14,
+    name: 'Elixir of Regeneration',
+    rarity: ItemRarity.Rare,
+    slot: EquipSlot.None,
+    description: 'A soothing concoction that accelerates cellular recovery, restoring health over time.',
+    icon: 'Sparkles',
+    maxStack: 20,
     equipModifiers: [],
   },
 };
 
+export const defaultItemDefTable = new ItemDefTable();
+for (const item of Object.values(ITEM_REGISTRY)) {
+  defaultItemDefTable.Register(item);
+}
+
 export function getItemDef(id: number): ItemDef | undefined {
-  return ITEM_REGISTRY[id];
+  return defaultItemDefTable.Get(id);
 }
 
 export function createItemStack(itemDefId: number, count = 1): ItemStack {
   return {
     instanceId: Math.random().toString(36).substring(2, 9),
     itemDefId,
+    defId: itemDefId,
     count,
   };
 }
 
-export function getRarityColor(rarity: ItemRarity): string {
+export function getRarityColor(rarity: ItemRarity = ItemRarity.Common): string {
   switch (rarity) {
     case ItemRarity.Common:
       return 'text-slate-300 border-slate-600 bg-slate-800/60';
@@ -164,7 +521,7 @@ export function getRarityColor(rarity: ItemRarity): string {
   }
 }
 
-export function getRarityBadgeColor(rarity: ItemRarity): string {
+export function getRarityBadgeColor(rarity: ItemRarity = ItemRarity.Common): string {
   switch (rarity) {
     case ItemRarity.Common:
       return 'bg-slate-700 text-slate-200';
@@ -179,7 +536,7 @@ export function getRarityBadgeColor(rarity: ItemRarity): string {
   }
 }
 
-export function getRarityName(rarity: ItemRarity): string {
+export function getRarityName(rarity: ItemRarity = ItemRarity.Common): string {
   switch (rarity) {
     case ItemRarity.Common:
       return 'Common';

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - Complete C++ to TypeScript Migration & Web Release
+
+### Added
+- **Authoritative TypeScript Architecture:** Full port and migration of all core engine logic, simulation loops, ECS, events, math, and gameplay mechanics to TypeScript.
+- **Engine Modules:**
+  - `src/engine/ecs.ts`: Complete generation-based Entity Component System with Entity recycling, Views, and CommandBuffer.
+  - `src/engine/events.ts`: Multi-channel EventBus and synchronous EventDispatcher with channel filtering (SYSTEM, GAMEPLAY, RENDER, UI) and deferred FIFO queues.
+  - `src/engine/simulation.ts`: SimulationClock (30Hz tick rate, fixedDelta, max-ticks-per-advance spiral-of-death cap), deterministic SystemScheduler, and SimulationLoop.
+  - `src/engine/math.ts`: Complete Vector2, Vector3, Color (RGB/HSV/sRGB conversions), Collision (Circle-Circle, Circle-AABB, AABB-AABB, Point), and math utilities (clamp, saturate, nearlyEqual, wrap, pingPong).
+  - `src/engine/stats.ts`: STR/DEX/INT/VIT attribute formulas, derived stats calculation, and modifier pipeline (Flat, PercentAdd, PercentMult) with source tracking and dirty-flag optimization.
+  - `src/engine/combat.ts`: Complete damage pipeline with critical strike rolling, armor mitigation (`armor / (armor + 100)`), evasion checks, and lethal death events.
+  - `src/engine/abilities.ts`: AbilityDefTable, cooldown reduction scaling, mana verification, projectile spawning, and status effect processing (DoT, HoT, Stuns, Stat buffs).
+  - `src/engine/items.ts`: Inventory management (stacking, capacity, remainders), Equipment system with dynamic stat modifiers, and zero-exception Result pattern.
+  - `src/engine/loot.ts`: Weighted and guaranteed loot rolling, dropped loot entities, rarity light pillars, and inventory pickups.
+  - `src/engine/world.ts`: Isometric tile mapping, zone registry, zone loader, and spawn points.
+- **Web UI & Presentation:**
+  - Modern React 18 + HTML5 Canvas 2.5D isometric renderer with dynamic lighting, particle effects, character sheet, inventory modal, combat log, and minimap.
+- **Test Suite:** 11 Vitest test suites containing 49 automated unit tests verifying deterministic execution and math calculations.
+
+### Removed
+- Removed legacy C++ source files, CMake build files, Catch2 test executables, and obsolete C++ engine documentation.
+
 ## Milestones 16-20 — Gameplay Foundation, Batches 2-4 (Phase G COMPLETE)
 
 ### Added

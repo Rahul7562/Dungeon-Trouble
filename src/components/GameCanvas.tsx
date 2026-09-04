@@ -36,24 +36,43 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
 
     // Input handlers
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore key events when typing into an input or textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault();
       }
-      engine.handleKeyDown(e.key);
+      engine.handleKeyDown(e.key, e.code);
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      engine.handleKeyUp(e.key);
+      engine.handleKeyUp(e.key, e.code);
+    };
+
+    const handleBlur = () => {
+      engine.clearInput();
+    };
+
+    let mouseClientX = window.innerWidth / 2;
+    let mouseClientY = window.innerHeight / 2;
+
+    const updateFacing = () => {
+      if (rendererRef.current) {
+        const worldMouse = rendererRef.current.screenToWorld(mouseClientX, mouseClientY, engine.camera);
+        const dx = worldMouse.x - engine.state.player.x;
+        const dy = worldMouse.y - engine.state.player.y;
+        if (Math.hypot(dx, dy) > 2) {
+          engine.state.player.facingAngle = Math.atan2(dy, dx);
+        }
+      }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
+      mouseClientX = e.clientX;
+      mouseClientY = e.clientY;
       engine.mousePos = { x: e.clientX, y: e.clientY };
-      if (rendererRef.current) {
-        const worldMouse = rendererRef.current.screenToWorld(e.clientX, e.clientY, engine.camera);
-        const dx = worldMouse.x - engine.state.player.x;
-        const dy = worldMouse.y - engine.state.player.y;
-        engine.state.player.facingAngle = Math.atan2(dy, dx);
-      }
+      updateFacing();
     };
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -72,6 +91,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleBlur);
     window.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('contextmenu', handleContextMenu);
@@ -79,19 +100,34 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
     // Main Game Loop
     let lastTime = performance.now();
     let animId: number;
+    let tickAccumulator = 0;
 
     const gameLoop = (now: number) => {
-      const dt = Math.min(0.1, (now - lastTime) / 1000);
+      const elapsedSec = (now - lastTime) / 1000;
       lastTime = now;
+      // Clamp dt between 0.001s and 0.05s to prevent tunneling or teleporting on lag spikes
+      const dt = Math.min(0.05, Math.max(0.001, elapsedSec));
 
       engine.update(dt);
-      onEngineTick();
+      updateFacing();
+
+      // Throttle React HUD updates to ~15 fps to prevent React re-render lag spikes
+      tickAccumulator += dt;
+      if (tickAccumulator >= 0.066) {
+        tickAccumulator = 0;
+        onEngineTick();
+      }
 
       if (rendererRef.current) {
         const maxHp = engine.state.playerStats.calculated[StatType.MaxHealth];
+        const shake = engine.state.screenShake || 0;
+        const shakenCamera = {
+          x: engine.camera.x + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0),
+          y: engine.camera.y + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0),
+        };
         rendererRef.current.render(
           engine.state.dungeon.map,
-          engine.camera,
+          shakenCamera,
           {
             x: engine.state.player.x,
             y: engine.state.player.y,
@@ -106,7 +142,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           engine.state.lootDrops,
           engine.state.particles,
           engine.state.floatingTexts,
-          now / 1000
+          now / 1000,
+          engine.state.telegraphs || []
         );
       }
 
@@ -120,6 +157,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
       window.removeEventListener('resize', updateSize);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleBlur);
       window.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mousedown', handleMouseDown);
       canvas.removeEventListener('contextmenu', handleContextMenu);

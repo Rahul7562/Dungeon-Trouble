@@ -53,28 +53,41 @@ export enum EquipSlot {
 
 export enum ModifierOp {
   Flat = 0,
-  Percent = 1,
+  PercentAdd = 1,
+  PercentMult = 2,
+  Percent = 1, // alias for backwards compatibility
 }
 
 export interface StatModifier {
+  sourceId?: number;
   stat: StatType;
   op: ModifierOp;
   value: number;
+  durationTicks?: number; // -1 = permanent
+}
+
+export interface StatSheet {
+  attributes: Record<AttributeType, number>;
+  modifiers: StatModifier[];
+  cachedStats: Record<StatType, number>;
+  isDirty: boolean;
 }
 
 export interface ItemDef {
   id: number;
   name: string;
-  rarity: ItemRarity;
+  rarity?: ItemRarity;
   slot: EquipSlot;
-  description: string;
-  icon: string;
-  equipModifiers: StatModifier[];
+  description?: string;
+  icon?: string;
+  maxStack?: number;
+  equipModifiers?: StatModifier[];
 }
 
 export interface ItemStack {
-  instanceId: string;
+  instanceId?: string;
   itemDefId: number;
+  defId?: number; // alias for C++ tests
   count: number;
 }
 
@@ -104,17 +117,98 @@ export interface WorldCoord {
 export interface AbilityDef {
   id: number;
   name: string;
-  key: string;
-  description: string;
-  icon: string;
+  key?: string;
+  description?: string;
+  icon?: string;
   baseDamage: number;
   school: DamageSchool;
   damageFlags: number; // 1: CanCrit, 2: IgnoreArmor, 4: TrueDamage
-  cooldownSec: number;
+  cooldownTicks?: number;
+  cooldownSec?: number;
   manaCost: number;
   range: number;
   radius?: number;
-  appliesStatusId?: string;
+  appliesStatusId?: number | string;
+}
+
+export enum StatusKind {
+  DamageOverTime = 0,
+  HealOverTime = 1,
+  Stun = 2,
+  StatBuff = 3,
+}
+
+export interface StatusEffectDef {
+  id: number;
+  name: string;
+  kind: StatusKind;
+  magnitudePerTick?: number;
+  school?: DamageSchool;
+  durationTicks: number;
+  tickInterval: number;
+  statModifier?: StatModifier;
+}
+
+export enum HitShapeKind {
+  Circle = 0,
+  AABB = 1,
+}
+
+export interface HitShape {
+  kind: HitShapeKind;
+  x: number;
+  y: number;
+  radius: number;
+  halfW: number;
+  halfH: number;
+}
+
+export interface DamageEvent {
+  source: any;
+  target: any;
+  baseAmount: number;
+  school: DamageSchool;
+  flags: number;
+}
+
+export interface DamageAppliedEvent {
+  source: any;
+  target: any;
+  finalAmount: number;
+  wasCrit: boolean;
+}
+
+export interface EntityDiedEvent {
+  entity: any;
+  killer?: any;
+}
+
+export interface AbilityCastEvent {
+  caster: any;
+  abilityId: number;
+  target: any;
+}
+
+export enum SpawnKind {
+  PlayerStart = 0,
+  Enemy = 1,
+  Boss = 2,
+  Chest = 3,
+}
+
+export interface SpawnPoint {
+  id: number;
+  x: number;
+  y: number;
+  kind: SpawnKind;
+  refId: number;
+}
+
+export interface ZoneDef {
+  id: number;
+  name: string;
+  tiles: any;
+  spawns: SpawnPoint[];
 }
 
 export interface AbilityCooldown {
@@ -130,9 +224,24 @@ export interface StatusEffectInstance {
   icon: string;
   color: string;
   tickTimer: number;
+  kind?: 'dot' | 'hot' | 'buff' | 'stun';
   damagePerTick?: number;
+  healPerTick?: number;
   school?: DamageSchool;
   speedMultiplier?: number;
+  isStunned?: boolean;
+  statModifier?: StatModifier;
+}
+
+export interface BossTelegraph {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+  duration: number;
+  maxDuration: number;
+  damage: number;
+  school: DamageSchool;
 }
 
 export interface FloatingCombatText {
@@ -209,6 +318,10 @@ export interface EnemyEntity {
   facingAngle: number;
   statusEffects: StatusEffectInstance[];
   isHitFlashTimer: number;
+  phase?: number;
+  isEnraged?: boolean;
+  specialAttackTimer?: number;
+  summonTimer?: number;
 }
 
 export interface PlayerStats {

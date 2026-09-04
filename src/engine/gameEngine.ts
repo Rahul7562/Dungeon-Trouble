@@ -13,6 +13,8 @@ import {
   DamageSchool,
   EquipSlot,
   PlayerStats,
+  BossTelegraph,
+  StatusEffectInstance,
 } from './types';
 import { TileMap, generateDungeonLevel, TileFlags } from './world';
 import { computeTotalStats, getStatName } from './stats';
@@ -33,6 +35,7 @@ export interface GameEngineState {
     facingAngle: number;
     isAttacking: boolean;
     attackAnimTimer: number;
+    statusEffects: StatusEffectInstance[];
   };
   playerStats: PlayerStats;
   equipment: EquipmentState;
@@ -44,6 +47,8 @@ export interface GameEngineState {
   floatingTexts: FloatingCombatText[];
   combatLogs: CombatLogEntry[];
   abilityCooldowns: Record<number, number>; // abilityId -> seconds left
+  telegraphs: BossTelegraph[];
+  screenShake: number;
   dungeon: ReturnType<typeof generateDungeonLevel>;
   isGameOver: boolean;
   isVictory: boolean;
@@ -53,6 +58,7 @@ export interface GameEngineState {
 
 export class GameEngine {
   public state: GameEngineState;
+  public isPaused: boolean = false;
   private keyState: Record<string, boolean> = {};
   public mousePos = { x: 0, y: 0 };
   public camera = { x: 0, y: 0 };
@@ -111,6 +117,7 @@ export class GameEngine {
         facingAngle: 0,
         isAttacking: false,
         attackAnimTimer: 0,
+        statusEffects: [],
       },
       playerStats,
       equipment: initialEquipment,
@@ -129,6 +136,8 @@ export class GameEngine {
         },
       ],
       abilityCooldowns: {},
+      telegraphs: [],
+      screenShake: 0,
       dungeon,
       isGameOver: false,
       isVictory: false,
@@ -172,6 +181,7 @@ export class GameEngine {
         facingAngle: 0,
         isAttacking: false,
         attackAnimTimer: 0,
+        statusEffects: [],
       },
       playerStats,
       equipment: { ...cp.equipment },
@@ -190,6 +200,8 @@ export class GameEngine {
         },
       ],
       abilityCooldowns: {},
+      telegraphs: [],
+      screenShake: 0,
       dungeon,
       isGameOver: false,
       isVictory: false,
@@ -324,28 +336,58 @@ export class GameEngine {
       facingAngle: 0,
       statusEffects: [],
       isHitFlashTimer: 0,
+      phase: 1,
+      isEnraged: false,
+      specialAttackTimer: 4.0,
+      summonTimer: 6.0,
     });
 
     state.enemies = enemies;
   }
 
-  public handleKeyDown(key: string) {
+  public handleKeyDown(key: string, code?: string) {
+    if (this.isPaused || this.state.isGameOver || this.state.isVictory) return;
     const k = key.toLowerCase();
     this.keyState[k] = true;
+    if (code) {
+      this.keyState[code.toLowerCase()] = true;
+    }
 
-    if (k === '1') {
+    if (k === '1' || code === 'Digit1') {
       this.triggerAbility(1);
-    } else if (k === '2' || k === 'q') {
+    } else if (k === '2' || k === 'q' || code === 'Digit2' || code === 'KeyQ') {
       this.triggerAbility(2);
-    } else if (k === '3' || k === 'e') {
+    } else if (k === '3' || k === 'e' || code === 'Digit3' || code === 'KeyE') {
       this.triggerAbility(3);
-    } else if (k === '4' || k === ' ') {
+    } else if (k === '4' || k === ' ' || code === 'Digit4' || code === 'Space') {
       this.triggerAbility(4);
     }
   }
 
-  public handleKeyUp(key: string) {
-    this.keyState[key.toLowerCase()] = false;
+  public handleKeyUp(key: string, code?: string) {
+    const k = key.toLowerCase();
+    delete this.keyState[k];
+    if (code) {
+      delete this.keyState[code.toLowerCase()];
+    }
+  }
+
+  public clearInput() {
+    this.keyState = {};
+  }
+
+  public isMoveActive(dir: 'up' | 'down' | 'left' | 'right'): boolean {
+    if (this.isPaused) return false;
+    switch (dir) {
+      case 'up':
+        return !!(this.keyState['w'] || this.keyState['arrowup'] || this.keyState['keyw']);
+      case 'down':
+        return !!(this.keyState['s'] || this.keyState['arrowdown'] || this.keyState['keys']);
+      case 'left':
+        return !!(this.keyState['a'] || this.keyState['arrowleft'] || this.keyState['keya']);
+      case 'right':
+        return !!(this.keyState['d'] || this.keyState['arrowright'] || this.keyState['keyd']);
+    }
   }
 
   public triggerAbility(abilityId: number) {
@@ -369,7 +411,8 @@ export class GameEngine {
 
     // Calculate Cooldown with CDR stat
     const cdr = state.playerStats.calculated[StatType.CooldownReduction] || 0;
-    const effectiveCooldown = ability.cooldownSec * (1 - Math.min(60, cdr) / 100);
+    const cooldownSec = ability.cooldownSec ?? (ability.cooldownTicks !== undefined ? ability.cooldownTicks / 30 : 1.0);
+    const effectiveCooldown = cooldownSec * (1 - Math.min(60, cdr) / 100);
     state.abilityCooldowns[abilityId] = effectiveCooldown;
 
     // Execute ability
@@ -467,30 +510,26 @@ export class GameEngine {
         }
       }
     } else if (ability.id === 4) {
-      // Aether Dash: Rapid dash with sweep raycasting to prevent wall clipping
+      // Aether Dash: Rapid dash with continuous sliding collision
       sound.playDash();
       const dashDist = ability.range;
-      const steps = 16;
-      let validX = px;
-      let validY = py;
+      const steps = 8;
+      const stepDist = dashDist / steps;
+      let currX = px;
+      let currY = py;
 
-      // Raycast along dash vector to find furthest valid walkable point
-      for (let s = 1; s <= steps; s++) {
-        const stepDist = (dashDist / steps) * s;
-        const testX = px + Math.cos(aimAngle) * stepDist;
-        const testY = py + Math.sin(aimAngle) * stepDist;
-        if (state.dungeon.map.isCircleWalkable(testX, testY, 14)) {
-          validX = testX;
-          validY = testY;
-        } else {
-          break;
-        }
+      for (let s = 0; s < steps; s++) {
+        const stepDx = Math.cos(aimAngle) * stepDist;
+        const stepDy = Math.sin(aimAngle) * stepDist;
+        const next = state.dungeon.map.resolveCircleMovement(currX, currY, stepDx, stepDy, 14);
+        currX = next.x;
+        currY = next.y;
       }
 
       // Dash trail particles
       for (let s = 0; s < 10; s++) {
-        const tx = px + (validX - px) * (s / 10);
-        const ty = py + (validY - py) * (s / 10);
+        const tx = px + (currX - px) * (s / 10);
+        const ty = py + (currY - py) * (s / 10);
         state.particles.push({
           x: tx,
           y: ty,
@@ -502,12 +541,12 @@ export class GameEngine {
           maxLife: 0.35,
         });
       }
-      state.player.x = validX;
-      state.player.y = validY;
+      state.player.x = currX;
+      state.player.y = currY;
 
       // Damage enemies passed through
       for (const enemy of state.enemies) {
-        const dist = Math.hypot(enemy.x - validX, enemy.y - validY);
+        const dist = Math.hypot(enemy.x - currX, enemy.y - currY);
         if (dist <= ability.radius!) {
           this.applyPlayerDamageToEnemy(enemy, ability);
         }
@@ -612,7 +651,7 @@ export class GameEngine {
 
   public update(dt: number) {
     const state = this.state;
-    if (state.isGameOver || state.isVictory) return;
+    if (this.isPaused || state.isGameOver || state.isVictory) return;
 
     // 1. Ability Cooldowns update
     for (const idStr of Object.keys(state.abilityCooldowns)) {
@@ -633,33 +672,60 @@ export class GameEngine {
     // 3. Player Movement
     let mx = 0;
     let my = 0;
-    if (this.keyState['w'] || this.keyState['arrowup']) my -= 1;
-    if (this.keyState['s'] || this.keyState['arrowdown']) my += 1;
-    if (this.keyState['a'] || this.keyState['arrowleft']) mx -= 1;
-    if (this.keyState['d'] || this.keyState['arrowright']) mx += 1;
+    if (this.isMoveActive('up')) my -= 1;
+    if (this.isMoveActive('down')) my += 1;
+    if (this.isMoveActive('left')) mx -= 1;
+    if (this.isMoveActive('right')) mx += 1;
 
     if (mx !== 0 && my !== 0) {
-      const len = Math.hypot(mx, my);
-      mx /= len;
-      my /= len;
+      const invLen = 1 / Math.SQRT2;
+      mx *= invLen;
+      my *= invLen;
     }
 
     const moveSpeedStat = state.playerStats.calculated[StatType.MoveSpeed];
-    const actualSpeed = 175 * (moveSpeedStat / 100);
+    let actualSpeed = 175 * (moveSpeedStat / 100);
     const playerRadius = 14;
 
-    // Independent Axis Movement with Circle Collision for smooth wall gliding
-    if (mx !== 0) {
-      const nextX = state.player.x + mx * actualSpeed * dt;
-      if (state.dungeon.map.isCircleWalkable(nextX, state.player.y, playerRadius)) {
-        state.player.x = nextX;
+    // Environmental Hazards interaction
+    const playerTile = state.dungeon.map.worldToTile(state.player.x, state.player.y);
+    const tileUnderPlayer = state.dungeon.map.get(playerTile.x, playerTile.y);
+
+    if (tileUnderPlayer === TileType.Water) {
+      // Water tile: 45% movement slowdown
+      actualSpeed *= 0.55;
+    } else if (tileUnderPlayer === TileType.Lava) {
+      // Lava pool: applies ticking Fire Burn
+      if (!state.player.statusEffects.some((e) => e.name === 'Lava Burn')) {
+        state.player.statusEffects.push({
+          id: `lava-${this.nextEntityId++}`,
+          name: 'Lava Burn',
+          kind: 'dot',
+          damagePerTick: 12,
+          school: DamageSchool.Fire,
+          totalDuration: 1.5,
+          durationLeft: 1.5,
+          tickTimer: 0,
+          icon: 'Flame',
+          color: '#f97316',
+        });
+        sound.playHit(false);
       }
     }
-    if (my !== 0) {
-      const nextY = state.player.y + my * actualSpeed * dt;
-      if (state.dungeon.map.isCircleWalkable(state.player.x, nextY, playerRadius)) {
-        state.player.y = nextY;
-      }
+
+    // Robust continuous collision resolution with smooth wall sliding
+    if (mx !== 0 || my !== 0) {
+      const dx = mx * actualSpeed * dt;
+      const dy = my * actualSpeed * dt;
+      const resolved = state.dungeon.map.resolveCircleMovement(
+        state.player.x,
+        state.player.y,
+        dx,
+        dy,
+        playerRadius
+      );
+      state.player.x = resolved.x;
+      state.player.y = resolved.y;
     }
 
     // Smooth Camera Follow
@@ -677,6 +743,60 @@ export class GameEngine {
       state.playerStats.calculated[StatType.MaxMana],
       state.playerStats.mana + (3 + state.playerStats.attributes[AttributeType.INT] * 0.4) * dt
     );
+
+    // Player Status Effects (Regeneration HoTs, Burn DoTs)
+    for (let s = state.player.statusEffects.length - 1; s >= 0; s--) {
+      const eff = state.player.statusEffects[s];
+      eff.durationLeft -= dt;
+
+      // HoT
+      if (eff.healPerTick) {
+        eff.tickTimer += dt;
+        if (eff.tickTimer >= 1.0) {
+          eff.tickTimer = 0;
+          const maxHp = state.playerStats.calculated[StatType.MaxHealth];
+          state.playerStats.health = Math.min(maxHp, state.playerStats.health + eff.healPerTick);
+          state.floatingTexts.push({
+            id: `fct-${this.nextEntityId++}`,
+            text: `+${eff.healPerTick}`,
+            x: state.player.x,
+            y: state.player.y - 14,
+            color: '#22c55e',
+            isCrit: false,
+            lifetime: 0.8,
+            maxLifetime: 0.8,
+          });
+        }
+      }
+
+      // DoT
+      if (eff.damagePerTick) {
+        eff.tickTimer += dt;
+        if (eff.tickTimer >= 0.5) {
+          eff.tickTimer = 0;
+          state.playerStats.health -= eff.damagePerTick;
+          state.floatingTexts.push({
+            id: `fct-${this.nextEntityId++}`,
+            text: `-${eff.damagePerTick}`,
+            x: state.player.x,
+            y: state.player.y - 14,
+            color: eff.color || '#ef4444',
+            isCrit: false,
+            lifetime: 0.7,
+            maxLifetime: 0.7,
+          });
+          if (state.playerStats.health <= 0) {
+            state.playerStats.health = 0;
+            state.isGameOver = true;
+            this.addCombatLog('You perished to hazards in the abyss...', 'system');
+          }
+        }
+      }
+
+      if (eff.durationLeft <= 0) {
+        state.player.statusEffects.splice(s, 1);
+      }
+    }
 
     // 4. Update Enemies
     for (let i = state.enemies.length - 1; i >= 0; i--) {
@@ -728,21 +848,108 @@ export class GameEngine {
       enemy.facingAngle = Math.atan2(dy, dx);
 
       // Aggro radius
-      if (dist < 420) {
+      if (dist < 440) {
+        // Boss Mechanics: Enrage & AoE Telegraphs
+        if (enemy.archetype === 'dungeon_lord') {
+          // Check Enrage transition at 50% HP
+          if (enemy.health <= enemy.maxHealth * 0.5 && !enemy.isEnraged) {
+            enemy.isEnraged = true;
+            enemy.attackCooldown *= 0.65;
+            enemy.moveSpeed += 25;
+            state.screenShake = 12;
+            this.addCombatLog(`⚠️ ${enemy.name.toUpperCase()} HAS ENRAGED! RUNIC HELLFIRE IMMINENT!`, 'system');
+            sound.playFireball();
+            for (let p = 0; p < 25; p++) {
+              const angle = Math.random() * Math.PI * 2;
+              const spd = Math.random() * 180 + 60;
+              state.particles.push({
+                x: enemy.x,
+                y: enemy.y,
+                vx: Math.cos(angle) * spd,
+                vy: Math.sin(angle) * spd,
+                color: '#ef4444',
+                size: Math.random() * 4 + 3,
+                life: 0.6,
+                maxLife: 0.6,
+              });
+            }
+          }
+
+          // Special AoE Ground Telegraph
+          if (enemy.specialAttackTimer !== undefined) {
+            enemy.specialAttackTimer -= dt;
+            if (enemy.specialAttackTimer <= 0) {
+              enemy.specialAttackTimer = enemy.isEnraged ? 2.5 : 4.5;
+              state.telegraphs.push({
+                id: `tele-${this.nextEntityId++}`,
+                x: state.player.x,
+                y: state.player.y,
+                radius: enemy.isEnraged ? 65 : 50,
+                duration: 1.2,
+                maxDuration: 1.2,
+                damage: Math.round(enemy.attackPower * (enemy.isEnraged ? 1.6 : 1.2)),
+                school: DamageSchool.Fire,
+              });
+              sound.playFireball();
+              this.addCombatLog(`⚠️ Ground Rupture detonating beneath you! Evade!`, 'system');
+            }
+          }
+
+          // Phase 1 Minion Reinforcements
+          if (!enemy.isEnraged && enemy.summonTimer !== undefined) {
+            enemy.summonTimer -= dt;
+            if (enemy.summonTimer <= 0 && state.enemies.length < 8) {
+              enemy.summonTimer = 16.0;
+              this.addCombatLog(`${enemy.name} summons skeletal reinforcements!`, 'system');
+              for (let s = 0; s < 2; s++) {
+                const sx = enemy.x + (s === 0 ? -40 : 40);
+                const sy = enemy.y + 20;
+                state.enemies.push({
+                  id: `minion-${this.nextEntityId++}`,
+                  archetype: 'skeleton_warrior',
+                  name: 'Summoned Marauder',
+                  x: sx,
+                  y: sy,
+                  z: 0,
+                  vx: 0,
+                  vy: 0,
+                  health: 60,
+                  maxHealth: 60,
+                  attackPower: 12,
+                  armor: 6,
+                  moveSpeed: 90,
+                  attackRange: 45,
+                  attackCooldown: 1.3,
+                  attackTimer: 0.8,
+                  xpReward: 15,
+                  color: '#e2e8f0',
+                  size: 14,
+                  facingAngle: 0,
+                  statusEffects: [],
+                  isHitFlashTimer: 0,
+                });
+              }
+            }
+          }
+        }
+
         if (dist > enemy.attackRange) {
-          // Move towards player with independent axis sliding
+          // Move towards player with continuous sliding collision
           const dirX = dx / dist;
           const dirY = dy / dist;
           const enemyRadius = enemy.size * 0.7;
+          const edx = dirX * currentSpeed * dt;
+          const edy = dirY * currentSpeed * dt;
 
-          const testX = enemy.x + dirX * currentSpeed * dt;
-          if (state.dungeon.map.isCircleWalkable(testX, enemy.y, enemyRadius)) {
-            enemy.x = testX;
-          }
-          const testY = enemy.y + dirY * currentSpeed * dt;
-          if (state.dungeon.map.isCircleWalkable(enemy.x, testY, enemyRadius)) {
-            enemy.y = testY;
-          }
+          const resolved = state.dungeon.map.resolveCircleMovement(
+            enemy.x,
+            enemy.y,
+            edx,
+            edy,
+            enemyRadius
+          );
+          enemy.x = resolved.x;
+          enemy.y = resolved.y;
         } else {
           // Attack in range - only if line of sight is clear (cannot shoot/attack through walls)
           enemy.attackTimer -= dt;
@@ -914,35 +1121,82 @@ export class GameEngine {
     }
 
     // 7. Chest interaction
-    const playerTile = state.dungeon.map.worldToTile(state.player.x, state.player.y);
-    if (state.dungeon.map.get(playerTile.x, playerTile.y) === TileType.Chest) {
-      state.dungeon.map.set(playerTile.x, playerTile.y, TileType.Floor);
-      sound.playLootDrop();
-      const drops = rollLoot('chest');
-      for (const d of drops) {
-        state.lootDrops.push({
-          id: `chest-${this.nextEntityId++}`,
-          x: state.player.x + (Math.random() - 0.5) * 40,
-          y: state.player.y + (Math.random() - 0.5) * 40,
-          item: d,
-          creationTime: Date.now(),
-        });
+    for (let cIdx = state.dungeon.chestLocations.length - 1; cIdx >= 0; cIdx--) {
+      const chestPos = state.dungeon.chestLocations[cIdx];
+      const distToChest = Math.hypot(state.player.x - chestPos.x, state.player.y - chestPos.y);
+      if (distToChest < 48) {
+        const ct = state.dungeon.map.worldToTile(chestPos.x, chestPos.y);
+        state.dungeon.map.set(ct.x, ct.y, TileType.Floor);
+        sound.playLootDrop();
+        const drops = rollLoot('chest');
+        for (const d of drops) {
+          state.lootDrops.push({
+            id: `chest-${this.nextEntityId++}`,
+            x: chestPos.x + (Math.random() - 0.5) * 40,
+            y: chestPos.y + (Math.random() - 0.5) * 40,
+            item: d,
+            creationTime: Date.now(),
+          });
+        }
+        this.addCombatLog('Opened an Ancient Treasure Chest!', 'loot');
+        state.dungeon.chestLocations.splice(cIdx, 1);
       }
-      this.addCombatLog('Opened an Ancient Treasure Chest!', 'loot');
     }
 
     // 8. Exit Portal interaction
-    if (
-      playerTile.x === state.dungeon.exitTile.x &&
-      playerTile.y === state.dungeon.exitTile.y &&
-      state.floorCleared
-    ) {
+    const exitPos = state.dungeon.map.tileToWorldCenter(
+      state.dungeon.exitTile.x,
+      state.dungeon.exitTile.y
+    );
+    const distToExit = Math.hypot(state.player.x - exitPos.x, state.player.y - exitPos.y);
+    if (distToExit < 44 && state.floorCleared) {
       if (state.currentFloor >= 3) {
         state.isVictory = true;
         this.addCombatLog('YOU HAVE CONQUERED THE ABYSS! VICTORY!', 'system');
       } else {
         this.advanceToNextFloor();
       }
+    }
+
+    // 8.5 Update Ground Warning Telegraphs
+    for (let t = state.telegraphs.length - 1; t >= 0; t--) {
+      const tele = state.telegraphs[t];
+      tele.duration -= dt;
+      if (tele.duration <= 0) {
+        // DETONATE!
+        state.screenShake = 10;
+        sound.playHit(true);
+
+        // Explosion particles
+        for (let p = 0; p < 24; p++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = Math.random() * 160 + 40;
+          state.particles.push({
+            x: tele.x,
+            y: tele.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            color: '#ef4444',
+            size: Math.random() * 4 + 2,
+            life: 0.45,
+            maxLife: 0.45,
+          });
+        }
+
+        // Damage player if in detonation radius
+        const dist = Math.hypot(state.player.x - tele.x, state.player.y - tele.y);
+        if (dist <= tele.radius) {
+          this.applyEnemyDamageToPlayer(tele.damage, tele.school);
+          this.addCombatLog('Struck by Boss Ground Rupture!', 'damage');
+        }
+
+        state.telegraphs.splice(t, 1);
+      }
+    }
+
+    // 8.6 Decay Screen Shake
+    if (state.screenShake > 0) {
+      state.screenShake = Math.max(0, state.screenShake - dt * 25);
     }
 
     // 9. Update Particles
@@ -1075,6 +1329,9 @@ export class GameEngine {
     this.state.player.x = newDungeon.playerSpawn.x;
     this.state.player.y = newDungeon.playerSpawn.y;
     this.state.floorCleared = false;
+    this.state.player.statusEffects = [];
+    this.state.telegraphs = [];
+    this.state.screenShake = 0;
     this.state.enemies = [];
     this.state.projectiles = [];
     this.state.lootDrops = [];
@@ -1125,6 +1382,21 @@ export class GameEngine {
         state.playerStats.mana = Math.min(maxMana, state.playerStats.mana + 40);
         sound.playPotion();
         this.addCombatLog('Consumed Mana Flask (+40 MP).', 'heal');
+      } else if (def.id === 14) {
+        // Elixir of Regeneration (HoT: heals 15 HP/sec for 6 sec)
+        sound.playPotion();
+        state.player.statusEffects.push({
+          id: `regen-${this.nextEntityId++}`,
+          name: 'Regeneration',
+          kind: 'hot',
+          healPerTick: 15,
+          totalDuration: 6.0,
+          durationLeft: 6.0,
+          tickTimer: 0,
+          icon: 'Sparkles',
+          color: '#22c55e',
+        });
+        this.addCombatLog('Consumed Elixir of Regeneration (+15 HP/s for 6s).', 'heal');
       }
 
       if (item.count > 1) {

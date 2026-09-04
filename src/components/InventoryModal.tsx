@@ -83,7 +83,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({ engine, onClose 
         </div>
         <p className="text-xs text-slate-300 italic mb-3">{def.description}</p>
 
-        {def.equipModifiers.length > 0 && (
+        {def.equipModifiers && def.equipModifiers.length > 0 && (
           <div className="border-t border-slate-800 pt-2 space-y-1">
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
               Item Properties:

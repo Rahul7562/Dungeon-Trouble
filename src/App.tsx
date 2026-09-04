@@ -24,6 +24,15 @@ export const App: React.FC = () => {
   const [showHelpGuide, setShowHelpGuide] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
 
+  const isAnyModalOpen = isInMainMenu || isPausedMenu || showInventory || showCharacterSheet;
+
+  useEffect(() => {
+    engine.isPaused = isAnyModalOpen;
+    if (isAnyModalOpen) {
+      engine.clearInput();
+    }
+  }, [engine, isAnyModalOpen]);
+
   const handleEngineTick = useCallback(() => {
     // Force re-render periodically for HUD numbers
     setTick((t) => (t + 1) % 10000);

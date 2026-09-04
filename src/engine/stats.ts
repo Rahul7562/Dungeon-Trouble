@@ -4,6 +4,7 @@ import {
   ModifierOp,
   EquipmentState,
   StatModifier,
+  StatSheet,
 } from './types';
 import { getItemDef } from './items';
 
@@ -30,7 +31,29 @@ export const StatFormulas = {
   BaseCritMultiplier: 150.0,
   BaseMoveSpeed: 100.0,
   BaseCooldownReduction: 0.0,
+
+  CalculateBaseStats(attributes: Record<AttributeType, number>): Record<StatType, number> {
+    return calculateBaseStats(attributes);
+  }
 };
+
+export function createStatSheet(attributes?: Partial<Record<AttributeType, number>>): StatSheet {
+  const attrs: Record<AttributeType, number> = {
+    [AttributeType.STR]: attributes?.[AttributeType.STR] ?? 0,
+    [AttributeType.DEX]: attributes?.[AttributeType.DEX] ?? 0,
+    [AttributeType.INT]: attributes?.[AttributeType.INT] ?? 0,
+    [AttributeType.VIT]: attributes?.[AttributeType.VIT] ?? 0,
+  };
+
+  const initialStats = calculateBaseStats(attrs);
+
+  return {
+    attributes: attrs,
+    modifiers: [],
+    cachedStats: initialStats,
+    isDirty: true,
+  };
+}
 
 export function calculateBaseStats(attributes: Record<AttributeType, number>): Record<StatType, number> {
   const str = attributes[AttributeType.STR] || 0;
@@ -52,36 +75,119 @@ export function calculateBaseStats(attributes: Record<AttributeType, number>): R
   };
 }
 
+export class StatCalculator {
+  static Recalculate(sheet: StatSheet): void {
+    const baseStats = calculateBaseStats(sheet.attributes);
+
+    const flatAdd: Record<StatType, number> = {
+      [StatType.MaxHealth]: 0,
+      [StatType.MaxMana]: 0,
+      [StatType.AttackPower]: 0,
+      [StatType.SpellPower]: 0,
+      [StatType.Armor]: 0,
+      [StatType.Evasion]: 0,
+      [StatType.CritChance]: 0,
+      [StatType.CritMultiplier]: 0,
+      [StatType.MoveSpeed]: 0,
+      [StatType.CooldownReduction]: 0,
+    };
+
+    const percentAdd: Record<StatType, number> = {
+      [StatType.MaxHealth]: 0,
+      [StatType.MaxMana]: 0,
+      [StatType.AttackPower]: 0,
+      [StatType.SpellPower]: 0,
+      [StatType.Armor]: 0,
+      [StatType.Evasion]: 0,
+      [StatType.CritChance]: 0,
+      [StatType.CritMultiplier]: 0,
+      [StatType.MoveSpeed]: 0,
+      [StatType.CooldownReduction]: 0,
+    };
+
+    const percentMult: Record<StatType, number> = {
+      [StatType.MaxHealth]: 1.0,
+      [StatType.MaxMana]: 1.0,
+      [StatType.AttackPower]: 1.0,
+      [StatType.SpellPower]: 1.0,
+      [StatType.Armor]: 1.0,
+      [StatType.Evasion]: 1.0,
+      [StatType.CritChance]: 1.0,
+      [StatType.CritMultiplier]: 1.0,
+      [StatType.MoveSpeed]: 1.0,
+      [StatType.CooldownReduction]: 1.0,
+    };
+
+    for (const mod of sheet.modifiers) {
+      if (mod.op === ModifierOp.Flat) {
+        flatAdd[mod.stat] += mod.value;
+      } else if (mod.op === ModifierOp.PercentAdd) {
+        percentAdd[mod.stat] += mod.value;
+      } else if (mod.op === ModifierOp.PercentMult) {
+        percentMult[mod.stat] *= (1.0 + mod.value / 100.0);
+      }
+    }
+
+    const statCount = 10;
+    for (let i = 0; i < statCount; i++) {
+      const st = i as StatType;
+      const val = (baseStats[st] + flatAdd[st]) * (1.0 + percentAdd[st] / 100.0) * percentMult[st];
+      sheet.cachedStats[st] = val;
+    }
+
+    sheet.isDirty = false;
+  }
+
+  static GetStat(sheet: StatSheet, stat: StatType): number {
+    if (sheet.isDirty) {
+      StatCalculator.Recalculate(sheet);
+    }
+    return sheet.cachedStats[stat];
+  }
+
+  static AddModifier(sheet: StatSheet, modifier: StatModifier): void {
+    sheet.modifiers.push(modifier);
+    sheet.isDirty = true;
+  }
+
+  static RemoveModifiersFromSource(sheet: StatSheet, sourceId: number): void {
+    const before = sheet.modifiers.length;
+    sheet.modifiers = sheet.modifiers.filter(m => m.sourceId !== sourceId);
+    if (sheet.modifiers.length !== before) {
+      sheet.isDirty = true;
+    }
+  }
+
+  static TickModifiers(sheet: StatSheet): void {
+    let removed = false;
+    for (let i = sheet.modifiers.length - 1; i >= 0; i--) {
+      const mod = sheet.modifiers[i];
+      if (mod.durationTicks !== undefined && mod.durationTicks > 0) {
+        mod.durationTicks--;
+        if (mod.durationTicks === 0) {
+          sheet.modifiers.splice(i, 1);
+          removed = true;
+        }
+      }
+    }
+    if (removed) {
+      sheet.isDirty = true;
+    }
+  }
+
+  // Lowercase aliases for convenience
+  static recalculate = StatCalculator.Recalculate;
+  static getStat = StatCalculator.GetStat;
+  static addModifier = StatCalculator.AddModifier;
+  static removeModifiersFromSource = StatCalculator.RemoveModifiersFromSource;
+  static tickModifiers = StatCalculator.TickModifiers;
+}
+
 export function computeTotalStats(
   attributes: Record<AttributeType, number>,
   equipment: EquipmentState
 ): Record<StatType, number> {
-  const base = calculateBaseStats(attributes);
-  const flatMods: Record<StatType, number> = {
-    [StatType.MaxHealth]: 0,
-    [StatType.MaxMana]: 0,
-    [StatType.AttackPower]: 0,
-    [StatType.SpellPower]: 0,
-    [StatType.Armor]: 0,
-    [StatType.Evasion]: 0,
-    [StatType.CritChance]: 0,
-    [StatType.CritMultiplier]: 0,
-    [StatType.MoveSpeed]: 0,
-    [StatType.CooldownReduction]: 0,
-  };
-
-  const percentMods: Record<StatType, number> = {
-    [StatType.MaxHealth]: 0,
-    [StatType.MaxMana]: 0,
-    [StatType.AttackPower]: 0,
-    [StatType.SpellPower]: 0,
-    [StatType.Armor]: 0,
-    [StatType.Evasion]: 0,
-    [StatType.CritChance]: 0,
-    [StatType.CritMultiplier]: 0,
-    [StatType.MoveSpeed]: 0,
-    [StatType.CooldownReduction]: 0,
-  };
+  const sheet = createStatSheet(attributes);
 
   for (const slotKey of Object.keys(equipment)) {
     const stack = equipment[Number(slotKey) as keyof EquipmentState];
@@ -89,24 +195,17 @@ export function computeTotalStats(
     const def = getItemDef(stack.itemDefId);
     if (!def || !def.equipModifiers) continue;
 
+    const sourceId = 1000000 + Number(slotKey);
     for (const mod of def.equipModifiers) {
-      if (mod.op === ModifierOp.Flat) {
-        flatMods[mod.stat] += mod.value;
-      } else if (mod.op === ModifierOp.Percent) {
-        percentMods[mod.stat] += mod.value;
-      }
+      StatCalculator.AddModifier(sheet, {
+        ...mod,
+        sourceId,
+      });
     }
   }
 
-  const result: Record<StatType, number> = { ...base };
-  for (const statKey of Object.keys(result)) {
-    const st = Number(statKey) as StatType;
-    const baseVal = base[st] + flatMods[st];
-    const multiplier = 1 + percentMods[st] / 100;
-    result[st] = Math.max(0, Math.round(baseVal * multiplier * 10) / 10);
-  }
-
-  return result;
+  StatCalculator.Recalculate(sheet);
+  return { ...sheet.cachedStats };
 }
 
 export function getStatName(stat: StatType): string {

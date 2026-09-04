@@ -6,6 +6,7 @@ import {
   Projectile,
   EnemyEntity,
   ItemRarity,
+  BossTelegraph,
 } from './types';
 import { TileMap } from './world';
 import { getItemDef } from './items';
@@ -79,7 +80,8 @@ export class IsometricRenderer {
     lootDrops: LootDropEntity[],
     particles: Particle[],
     floatingTexts: FloatingCombatText[],
-    gameTime: number
+    gameTime: number,
+    telegraphs: BossTelegraph[] = []
   ) {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
@@ -104,9 +106,8 @@ export class IsometricRenderer {
         const type = map.get(tx, ty);
         if (type === TileType.Empty) continue;
 
-        const wx = tx * 64;
-        const wy = ty * 64;
-        const pos = this.worldToScreen(wx, wy, 0, camera);
+        const center = map.tileToWorldCenter(tx, ty);
+        const pos = this.worldToScreen(center.x, center.y, 0, camera);
 
         // Cull off-screen tiles
         if (pos.x < -100 || pos.x > this.width + 100 || pos.y < -100 || pos.y > this.height + 100) {
@@ -115,6 +116,38 @@ export class IsometricRenderer {
 
         this.drawTile(ctx, pos.x, pos.y, type, tx, ty, gameTime);
       }
+    }
+
+    // 1.5 Render Ground Warning Telegraphs (Boss AoE circles)
+    for (const tele of telegraphs) {
+      const pos = this.worldToScreen(tele.x, tele.y, 0, camera);
+      const ratio = Math.max(0, Math.min(1, 1 - tele.duration / tele.maxDuration));
+      const rx = tele.radius * (this.isoTileW / 64);
+      const ry = tele.radius * (this.isoTileH / 64);
+
+      ctx.save();
+      // Outer warning perimeter
+      ctx.beginPath();
+      ctx.ellipse(pos.x, pos.y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+      ctx.fill();
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+
+      // Expanding detonation progress circle
+      ctx.beginPath();
+      ctx.ellipse(pos.x, pos.y, rx * ratio, ry * ratio, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
+      ctx.fill();
+
+      // Warning text
+      ctx.fillStyle = '#fef08a';
+      ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚠ DANGER', pos.x, pos.y + 4);
+      ctx.restore();
     }
 
     // 2. Collect all depth-sorted renderables: Wall blocks, Enemies, Player, Loot drops, Chests
@@ -129,30 +162,27 @@ export class IsometricRenderer {
       for (let tx = startX; tx <= endX; tx++) {
         const type = map.get(tx, ty);
         if (type === TileType.Wall) {
-          const wx = tx * 64;
-          const wy = ty * 64;
-          const pos = this.worldToScreen(wx, wy, 0, camera);
+          const center = map.tileToWorldCenter(tx, ty);
+          const pos = this.worldToScreen(center.x, center.y, 0, camera);
           if (pos.x < -100 || pos.x > this.width + 100 || pos.y < -100 || pos.y > this.height + 100) {
             continue;
           }
           depthList.push({
-            depth: wx + wy + 32,
+            depth: center.x + center.y,
             draw: () => this.drawWallBlock(ctx, pos.x, pos.y, tx, ty),
           });
         } else if (type === TileType.Chest) {
-          const wx = tx * 64;
-          const wy = ty * 64;
-          const pos = this.worldToScreen(wx, wy, 0, camera);
+          const center = map.tileToWorldCenter(tx, ty);
+          const pos = this.worldToScreen(center.x, center.y, 0, camera);
           depthList.push({
-            depth: wx + wy + 32,
+            depth: center.x + center.y,
             draw: () => this.drawChest(ctx, pos.x, pos.y, gameTime),
           });
         } else if (type === TileType.Exit) {
-          const wx = tx * 64;
-          const wy = ty * 64;
-          const pos = this.worldToScreen(wx, wy, 0, camera);
+          const center = map.tileToWorldCenter(tx, ty);
+          const pos = this.worldToScreen(center.x, center.y, 0, camera);
           depthList.push({
-            depth: wx + wy + 32,
+            depth: center.x + center.y,
             draw: () => this.drawExitPortal(ctx, pos.x, pos.y, gameTime),
           });
         }
@@ -285,6 +315,23 @@ export class IsometricRenderer {
       ctx.strokeStyle = '#fb923c';
       ctx.lineWidth = 1;
       ctx.stroke();
+    } else if (type === TileType.Pit) {
+      // Bottomless Chasm Abyss
+      ctx.fillStyle = '#030712';
+      ctx.fill();
+      ctx.strokeStyle = '#1e1b4b';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Deep void inner rim
+      ctx.beginPath();
+      ctx.moveTo(x, y - hh * 0.65);
+      ctx.lineTo(x + hw * 0.65, y);
+      ctx.lineTo(x, y + hh * 0.65);
+      ctx.lineTo(x - hw * 0.65, y);
+      ctx.closePath();
+      ctx.fillStyle = '#000000';
+      ctx.fill();
     }
 
     ctx.restore();
@@ -557,11 +604,23 @@ export class IsometricRenderer {
       ctx.fill();
     } else if (enemy.archetype === 'dungeon_lord') {
       // Boss: massive horned demonic brute
+      if (enemy.isEnraged) {
+        // Enraged fiery aura pulsing around the boss
+        const auraRadius = enemy.size * 1.1 + Math.sin(gameTime * 8) * 4;
+        ctx.beginPath();
+        ctx.arc(x, charY, auraRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.28)';
+        ctx.fill();
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
       ctx.beginPath();
       ctx.arc(x, charY, enemy.size * 0.7, 0, Math.PI * 2);
       ctx.fill();
       // Horns
-      ctx.strokeStyle = '#f97316';
+      ctx.strokeStyle = enemy.isEnraged ? '#ef4444' : '#f97316';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(x - 10, charY - 10);
@@ -569,6 +628,13 @@ export class IsometricRenderer {
       ctx.moveTo(x + 10, charY - 10);
       ctx.lineTo(x + 18, charY - 24);
       ctx.stroke();
+
+      // Glowing Eyes
+      ctx.fillStyle = enemy.isEnraged ? '#fbbf24' : '#ef4444';
+      ctx.beginPath();
+      ctx.arc(x - 4, charY - 4, 3, 0, Math.PI * 2);
+      ctx.arc(x + 4, charY - 4, 3, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // Health bar
@@ -579,15 +645,28 @@ export class IsometricRenderer {
 
     ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
     ctx.fillRect(x - hbWidth / 2, hbY, hbWidth, hbHeight);
-    ctx.fillStyle = enemy.archetype === 'dungeon_lord' ? '#f59e0b' : '#ef4444';
+    ctx.fillStyle = enemy.archetype === 'dungeon_lord' ? (enemy.isEnraged ? '#dc2626' : '#f59e0b') : '#ef4444';
     ctx.fillRect(x - hbWidth / 2, hbY, hbWidth * pct, hbHeight);
 
-    // Enemy Name for Boss
+    // Enemy Name and Badges for Boss
     if (enemy.archetype === 'dungeon_lord') {
       ctx.font = 'bold 12px "Cinzel", serif';
       ctx.fillStyle = '#fef08a';
       ctx.textAlign = 'center';
-      ctx.fillText(enemy.name, x, hbY - 4);
+      const label = enemy.isEnraged ? `🔥 ${enemy.name} (ENRAGED) 🔥` : enemy.name;
+      ctx.fillText(label, x, hbY - 4);
+    }
+
+    // Status effect badges above health bar
+    if (enemy.statusEffects.length > 0) {
+      let iconX = x - ((enemy.statusEffects.length - 1) * 12) / 2;
+      for (const eff of enemy.statusEffects) {
+        ctx.fillStyle = eff.color;
+        ctx.beginPath();
+        ctx.arc(iconX, hbY - 12, 4, 0, Math.PI * 2);
+        ctx.fill();
+        iconX += 12;
+      }
     }
 
     ctx.restore();
@@ -607,15 +686,17 @@ export class IsometricRenderer {
     const bob = Math.sin(gameTime * 4 + drop.x) * 3;
     const itemY = y - 10 + bob;
 
+    const rarity = itemDef.rarity ?? ItemRarity.Common;
+
     // Rarity aura & pillar beam
     let beamColor = '#94a3b8';
-    if (itemDef.rarity === ItemRarity.Uncommon) beamColor = '#10b981';
-    if (itemDef.rarity === ItemRarity.Rare) beamColor = '#0ea5e9';
-    if (itemDef.rarity === ItemRarity.Epic) beamColor = '#a855f7';
-    if (itemDef.rarity === ItemRarity.Legendary) beamColor = '#f59e0b';
+    if (rarity === ItemRarity.Uncommon) beamColor = '#10b981';
+    if (rarity === ItemRarity.Rare) beamColor = '#0ea5e9';
+    if (rarity === ItemRarity.Epic) beamColor = '#a855f7';
+    if (rarity === ItemRarity.Legendary) beamColor = '#f59e0b';
 
     // Vertical light beam for Rare, Epic, Legendary
-    if (itemDef.rarity >= ItemRarity.Rare) {
+    if (rarity >= ItemRarity.Rare) {
       const grad = ctx.createLinearGradient(x, itemY, x, itemY - 60);
       grad.addColorStop(0, beamColor);
       grad.addColorStop(1, 'transparent');

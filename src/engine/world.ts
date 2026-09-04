@@ -1,13 +1,31 @@
-import { TileType, TileCoord, WorldCoord } from './types';
+import { TileType, TileCoord, WorldCoord, ZoneDef, SpawnPoint, SpawnKind } from './types';
+import { Result } from './items';
+
+export type { TileCoord, WorldCoord, ZoneDef, SpawnPoint };
+export { TileType, SpawnKind, Result };
 
 export const TileFlags = {
   isWalkable(type: TileType): boolean {
-    return type === TileType.Floor || type === TileType.Exit;
+    return (
+      type === TileType.Floor ||
+      type === TileType.Exit ||
+      type === TileType.Water ||
+      type === TileType.Lava
+    );
   },
   blocksProjectiles(type: TileType): boolean {
     return type === TileType.Wall || type === TileType.Chest;
   },
   isHazard(type: TileType): boolean {
+    return type === TileType.Pit || type === TileType.Water || type === TileType.Lava;
+  },
+  IsWalkable(type: TileType): boolean {
+    return type === TileType.Floor;
+  },
+  BlocksProjectiles(type: TileType): boolean {
+    return type === TileType.Wall;
+  },
+  IsHazard(type: TileType): boolean {
     return type === TileType.Pit || type === TileType.Water || type === TileType.Lava;
   },
 };
@@ -29,6 +47,9 @@ export class TileMap {
     this.tiles = new Array(width * height).fill(TileType.Wall);
   }
 
+  GetWidth(): number { return this.width; }
+  GetHeight(): number { return this.height; }
+
   get(x: number, y: number): TileType {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
       return TileType.Wall;
@@ -41,6 +62,9 @@ export class TileMap {
       this.tiles[y * this.width + x] = type;
     }
   }
+
+  Get(x: number, y: number): TileType { return this.get(x, y); }
+  Set(x: number, y: number, type: TileType): void { this.set(x, y, type); }
 
   worldToTile(wx: number, wy: number): TileCoord {
     const relX = wx - this.originX;
@@ -58,21 +82,24 @@ export class TileMap {
     };
   }
 
+  WorldToTile(wx: number, wy: number): TileCoord { return this.worldToTile(wx, wy); }
+  TileToWorldCenter(tx: number, ty: number): WorldCoord { return this.tileToWorldCenter(tx, ty); }
+
   // Check if a circular body (cx, cy, radius) intersects any non-walkable tile
   isCircleWalkable(cx: number, cy: number, radius: number): boolean {
-    const minTileX = Math.floor((cx - radius) / this.tileSize);
-    const maxTileX = Math.floor((cx + radius) / this.tileSize);
-    const minTileY = Math.floor((cy - radius) / this.tileSize);
-    const maxTileY = Math.floor((cy + radius) / this.tileSize);
+    const minTileX = Math.floor((cx - radius - this.originX) / this.tileSize);
+    const maxTileX = Math.floor((cx + radius - this.originX) / this.tileSize);
+    const minTileY = Math.floor((cy - radius - this.originY) / this.tileSize);
+    const maxTileY = Math.floor((cy + radius - this.originY) / this.tileSize);
 
     for (let ty = minTileY; ty <= maxTileY; ty++) {
       for (let tx = minTileX; tx <= maxTileX; tx++) {
         const tile = this.get(tx, ty);
         if (!TileFlags.isWalkable(tile)) {
           // AABB vs Circle test
-          const tileMinX = tx * this.tileSize;
+          const tileMinX = this.originX + tx * this.tileSize;
           const tileMaxX = tileMinX + this.tileSize;
-          const tileMinY = ty * this.tileSize;
+          const tileMinY = this.originY + ty * this.tileSize;
           const tileMaxY = tileMinY + this.tileSize;
 
           const closestX = Math.max(tileMinX, Math.min(cx, tileMaxX));
@@ -87,6 +114,124 @@ export class TileMap {
       }
     }
     return true;
+  }
+
+  // Smooth continuous collision and wall-sliding resolution
+  resolveCircleMovement(
+    cx: number,
+    cy: number,
+    dx: number,
+    dy: number,
+    radius: number
+  ): { x: number; y: number } {
+    let currentX = cx;
+    let currentY = cy;
+    const skin = 0.01;
+
+    // 1. Resolve X axis
+    if (dx !== 0) {
+      let nextX = currentX + dx;
+      const minTx = Math.floor((Math.min(currentX, nextX) - radius - this.originX) / this.tileSize);
+      const maxTx = Math.floor((Math.max(currentX, nextX) + radius - this.originX) / this.tileSize);
+      const minTy = Math.floor((currentY - radius - this.originY) / this.tileSize);
+      const maxTy = Math.floor((currentY + radius - this.originY) / this.tileSize);
+
+      for (let ty = minTy; ty <= maxTy; ty++) {
+        for (let tx = minTx; tx <= maxTx; tx++) {
+          const tile = this.get(tx, ty);
+          if (!TileFlags.isWalkable(tile)) {
+            const tileMinX = this.originX + tx * this.tileSize;
+            const tileMaxX = tileMinX + this.tileSize;
+            const tileMinY = this.originY + ty * this.tileSize;
+            const tileMaxY = tileMinY + this.tileSize;
+
+            const closestY = Math.max(tileMinY, Math.min(currentY, tileMaxY));
+            const distY = currentY - closestY;
+            if (distY * distY < radius * radius) {
+              const allowedDistX = Math.sqrt(Math.max(0, radius * radius - distY * distY));
+              if (dx > 0 && currentX <= tileMinX && nextX + allowedDistX > tileMinX) {
+                nextX = Math.min(nextX, tileMinX - allowedDistX - skin);
+              } else if (dx < 0 && currentX >= tileMaxX && nextX - allowedDistX < tileMaxX) {
+                nextX = Math.max(nextX, tileMaxX + allowedDistX + skin);
+              }
+            }
+          }
+        }
+      }
+      currentX = nextX;
+    }
+
+    // 2. Resolve Y axis
+    if (dy !== 0) {
+      let nextY = currentY + dy;
+      const minTx = Math.floor((currentX - radius - this.originX) / this.tileSize);
+      const maxTx = Math.floor((currentX + radius - this.originX) / this.tileSize);
+      const minTy = Math.floor((Math.min(currentY, nextY) - radius - this.originY) / this.tileSize);
+      const maxTy = Math.floor((Math.max(currentY, nextY) + radius - this.originY) / this.tileSize);
+
+      for (let ty = minTy; ty <= maxTy; ty++) {
+        for (let tx = minTx; tx <= maxTx; tx++) {
+          const tile = this.get(tx, ty);
+          if (!TileFlags.isWalkable(tile)) {
+            const tileMinX = this.originX + tx * this.tileSize;
+            const tileMaxX = tileMinX + this.tileSize;
+            const tileMinY = this.originY + ty * this.tileSize;
+            const tileMaxY = tileMinY + this.tileSize;
+
+            const closestX = Math.max(tileMinX, Math.min(currentX, tileMaxX));
+            const distX = currentX - closestX;
+            if (distX * distX < radius * radius) {
+              const allowedDistY = Math.sqrt(Math.max(0, radius * radius - distX * distX));
+              if (dy > 0 && currentY <= tileMinY && nextY + allowedDistY > tileMinY) {
+                nextY = Math.min(nextY, tileMinY - allowedDistY - skin);
+              } else if (dy < 0 && currentY >= tileMaxY && nextY - allowedDistY < tileMaxY) {
+                nextY = Math.max(nextY, tileMaxY + allowedDistY + skin);
+              }
+            }
+          }
+        }
+      }
+      currentY = nextY;
+    }
+
+    // 3. Post-resolve any diagonal corner penetration / pinch
+    const checkMinTx = Math.floor((currentX - radius - this.originX) / this.tileSize);
+    const checkMaxTx = Math.floor((currentX + radius - this.originX) / this.tileSize);
+    const checkMinTy = Math.floor((currentY - radius - this.originY) / this.tileSize);
+    const checkMaxTy = Math.floor((currentY + radius - this.originY) / this.tileSize);
+
+    for (let ty = checkMinTy; ty <= checkMaxTy; ty++) {
+      for (let tx = checkMinTx; tx <= checkMaxTx; tx++) {
+        const tile = this.get(tx, ty);
+        if (!TileFlags.isWalkable(tile)) {
+          const tileMinX = this.originX + tx * this.tileSize;
+          const tileMaxX = tileMinX + this.tileSize;
+          const tileMinY = this.originY + ty * this.tileSize;
+          const tileMaxY = tileMinY + this.tileSize;
+
+          const closestX = Math.max(tileMinX, Math.min(currentX, tileMaxX));
+          const closestY = Math.max(tileMinY, Math.min(currentY, tileMaxY));
+          const distX = currentX - closestX;
+          const distY = currentY - closestY;
+          const distSq = distX * distX + distY * distY;
+
+          if (distSq < radius * radius) {
+            const dist = Math.sqrt(distSq);
+            if (dist > 0.0001) {
+              const push = (radius - dist) + skin;
+              currentX += (distX / dist) * push;
+              currentY += (distY / dist) * push;
+            } else {
+              // Exact center inside tile, push toward open space
+              currentX += (dx !== 0 ? -Math.sign(dx) : 1) * skin;
+              currentY += (dy !== 0 ? -Math.sign(dy) : 1) * skin;
+            }
+          }
+        }
+      }
+    }
+
+    return { x: currentX, y: currentY };
   }
 
   // Check if line of sight between two points is clear of projectile blockers
@@ -195,15 +340,37 @@ export function generateDungeonLevel(floorNumber = 1): GeneratedDungeon {
     }
   }
 
-  // Add decorative/hazard tiles (lava pool in deeper floors, water pools in early floors)
-  if (rooms.length > 2) {
-    const hazardRoom = rooms[1];
-    const hazardType = floorNumber >= 3 ? TileType.Lava : TileType.Water;
-    for (let hx = hazardRoom.x + 1; hx < hazardRoom.x + hazardRoom.w - 1; hx++) {
-      for (let hy = hazardRoom.y + 1; hy < hazardRoom.y + hazardRoom.h - 1; hy++) {
-        if (Math.random() > 0.6) {
-          map.set(hx, hy, hazardType);
+  // Add decorative/hazard tiles (Pits, Lava pools in deeper floors, Water pools in early floors)
+  for (let r = 1; r < rooms.length - 1; r++) {
+    const room = rooms[r];
+    // Keep centers and exits clear so navigation is always safe
+    if (r === 1 && rooms.length > 2) {
+      // Water pool room with slowdown
+      for (let hx = room.x + 1; hx < room.x + room.w - 1; hx++) {
+        for (let hy = room.y + 1; hy < room.y + room.h - 1; hy++) {
+          if (hx !== room.centerX && hy !== room.centerY && Math.random() > 0.45) {
+            map.set(hx, hy, TileType.Water);
+          }
         }
+      }
+    } else if (r === 2 && floorNumber >= 2) {
+      // Lava pool room with burning hazards
+      for (let hx = room.x + 1; hx < room.x + room.w - 1; hx++) {
+        for (let hy = room.y + 1; hy < room.y + room.h - 1; hy++) {
+          if (hx !== room.centerX && hy !== room.centerY && Math.random() > 0.5) {
+            map.set(hx, hy, TileType.Lava);
+          }
+        }
+      }
+    } else if (r >= 3 && Math.random() > 0.4) {
+      // Chasm / Pit pockets along corners (impassable void)
+      const corners = [
+        { x: room.x + 1, y: room.y + 1 },
+        { x: room.x + room.w - 2, y: room.y + 1 },
+        { x: room.x + 1, y: room.y + room.h - 2 },
+      ];
+      for (const c of corners) {
+        map.set(c.x, c.y, TileType.Pit);
       }
     }
   }
@@ -237,3 +404,148 @@ export function generateDungeonLevel(floorNumber = 1): GeneratedDungeon {
     chestLocations,
   };
 }
+
+export class ZoneLoader {
+  static LoadFromText(text: string): Result<ZoneDef> {
+    const lines = text.split('\n');
+    let lineIdx = 0;
+
+    // Line 1: zone <id> <name>
+    if (lineIdx >= lines.length) return Result.Error('Line 1: Missing zone definition');
+    const line1 = lines[lineIdx++].trim();
+    const parts1 = line1.split(/\s+/);
+    if (parts1[0] !== 'zone') return Result.Error('Line 1: Expected \'zone\'');
+    const id = parseInt(parts1[1], 10);
+    if (isNaN(id)) return Result.Error('Line 1: Invalid zone id');
+    if (!parts1[2]) return Result.Error('Line 1: Missing zone name');
+    const name = parts1[2];
+
+    // Line 2: size <width> <height>
+    if (lineIdx >= lines.length) return Result.Error('Line 2: Missing size definition');
+    const line2 = lines[lineIdx++].trim();
+    const parts2 = line2.split(/\s+/);
+    if (parts2[0] !== 'size') return Result.Error('Line 2: Expected \'size\'');
+    const width = parseInt(parts2[1], 10);
+    const height = parseInt(parts2[2], 10);
+    if (isNaN(width)) return Result.Error('Line 2: Invalid width');
+    if (isNaN(height)) return Result.Error('Line 2: Invalid height');
+
+    // Line 3: tilesize <tileSize> <originX> <originY>
+    if (lineIdx >= lines.length) return Result.Error('Line 3: Missing tilesize definition');
+    const line3 = lines[lineIdx++].trim();
+    const parts3 = line3.split(/\s+/);
+    if (parts3[0] !== 'tilesize') return Result.Error('Line 3: Expected \'tilesize\'');
+    const tileSize = parseFloat(parts3[1]);
+    const originX = parseFloat(parts3[2]);
+    const originY = parseFloat(parts3[3]);
+    if (isNaN(tileSize)) return Result.Error('Line 3: Invalid tileSize');
+    if (isNaN(originX)) return Result.Error('Line 3: Invalid originX');
+    if (isNaN(originY)) return Result.Error('Line 3: Invalid originY');
+
+    const tiles = new TileMap(width, height, tileSize, originX, originY);
+
+    // Map rows
+    for (let y = 0; y < height; ++y) {
+      if (lineIdx >= lines.length) return Result.Error(`Line ${lineIdx + 1}: Missing map row`);
+      const rowLine = lines[lineIdx++];
+      const currentLineNum = lineIdx;
+
+      let parsedChars = 0;
+      for (let c = 0; c < rowLine.length; c++) {
+        const ch = rowLine[c];
+        if (ch === '\r' || ch === '\n' || ch === ' ') continue;
+        if (parsedChars >= width) break;
+
+        let type: TileType;
+        switch (ch) {
+          case '.': type = TileType.Floor; break;
+          case '#': type = TileType.Wall; break;
+          case '_': type = TileType.Empty; break;
+          case 'P': type = TileType.Pit; break;
+          case 'W': type = TileType.Water; break;
+          case 'L': type = TileType.Lava; break;
+          default: return Result.Error(`Line ${currentLineNum}: Unknown tile char '${ch}'`);
+        }
+        tiles.Set(parsedChars, y, type);
+        parsedChars++;
+      }
+      if (parsedChars < width) {
+        return Result.Error(`Line ${currentLineNum}: Row too short`);
+      }
+    }
+
+    const spawnIds = new Set<number>();
+    const spawns: SpawnPoint[] = [];
+
+    // Spawns
+    while (lineIdx < lines.length) {
+      const line = lines[lineIdx++];
+      const currentLineNum = lineIdx;
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      const parts = trimmed.split(/\s+/);
+      if (parts[0] !== 'spawn') return Result.Error(`Line ${currentLineNum}: Expected 'spawn'`);
+
+      const spawnId = parseInt(parts[1], 10);
+      const kindStr = parts[2];
+      const tileX = parseInt(parts[3], 10);
+      const tileY = parseInt(parts[4], 10);
+      const refId = parseInt(parts[5], 10);
+
+      if (isNaN(spawnId) || !kindStr || isNaN(tileX) || isNaN(tileY) || isNaN(refId)) {
+        return Result.Error(`Line ${currentLineNum}: Malformed spawn line`);
+      }
+
+      if (spawnIds.has(spawnId)) {
+        return Result.Error(`Line ${currentLineNum}: Duplicate spawn id ${spawnId}`);
+      }
+      spawnIds.add(spawnId);
+
+      let kind: SpawnKind;
+      if (kindStr === 'player') kind = SpawnKind.PlayerStart;
+      else if (kindStr === 'enemy') kind = SpawnKind.Enemy;
+      else if (kindStr === 'boss') kind = SpawnKind.Boss;
+      else if (kindStr === 'chest') kind = SpawnKind.Chest;
+      else return Result.Error(`Line ${currentLineNum}: Unknown spawn kind '${kindStr}'`);
+
+      const wc = tiles.TileToWorldCenter(tileX, tileY);
+      spawns.push({
+        id: spawnId,
+        kind,
+        x: wc.x,
+        y: wc.y,
+        refId,
+      });
+    }
+
+    return Result.Ok({
+      id,
+      name,
+      tiles,
+      spawns,
+    });
+  }
+
+  static loadFromText = ZoneLoader.LoadFromText;
+}
+
+export class ZoneRegistry {
+  private zones = new Map<number, ZoneDef>();
+
+  Register(def: ZoneDef): Result<boolean> {
+    if (this.zones.has(def.id)) {
+      return Result.Error(`Zone with id ${def.id} already registered`);
+    }
+    this.zones.set(def.id, def);
+    return Result.Ok(true);
+  }
+
+  Get(id: number): ZoneDef | undefined {
+    return this.zones.get(id);
+  }
+
+  register = this.Register.bind(this);
+  get = this.Get.bind(this);
+}
+

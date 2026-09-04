@@ -145,6 +145,23 @@ export const HUD: React.FC<HUDProps> = ({
           {playerStats.gold} Gold
         </div>
 
+        {/* Active Status Effects Bar */}
+        {engine.state.player.statusEffects && engine.state.player.statusEffects.length > 0 && (
+          <div className="pointer-events-auto flex items-center gap-2 mb-0.5">
+            {engine.state.player.statusEffects.map((eff) => (
+              <div
+                key={eff.id}
+                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900/90 border text-xs shadow-md"
+                style={{ borderColor: eff.color }}
+              >
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: eff.color }} />
+                <span className="font-semibold text-slate-200 text-[11px]">{eff.name}</span>
+                <span className="font-mono text-slate-400 text-[10px]">{eff.durationLeft.toFixed(1)}s</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Central HUD Panel */}
         <div className="pointer-events-auto flex items-center gap-4 bg-slate-900/90 backdrop-blur-md border border-slate-800/90 px-6 py-3 rounded-2xl shadow-2xl">
           {/* Health Bar / Stat */}
