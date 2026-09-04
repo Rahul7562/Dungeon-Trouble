@@ -11,7 +11,7 @@ import {
   User,
   Volume2,
   VolumeX,
-  RotateCcw,
+  Menu,
 } from 'lucide-react';
 import { sound } from '../engine/audio';
 
@@ -19,7 +19,7 @@ interface HUDProps {
   engine: GameEngine;
   onOpenInventory: () => void;
   onOpenCharacterSheet: () => void;
-  onResetGame: () => void;
+  onOpenMenu: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
 }
@@ -28,7 +28,7 @@ export const HUD: React.FC<HUDProps> = ({
   engine,
   onOpenInventory,
   onOpenCharacterSheet,
-  onResetGame,
+  onOpenMenu,
   isMuted,
   onToggleMute,
 }) => {
@@ -81,18 +81,18 @@ export const HUD: React.FC<HUDProps> = ({
           </p>
         </div>
 
-        {/* Action buttons (Inventory, Character Sheet, Audio, Reset) */}
-        <div className="pointer-events-auto flex items-center gap-2">
+        {/* Action buttons (Hero, Inventory, Audio, Menu) */}
+        <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/90 backdrop-blur border border-slate-800 p-1.5 rounded-2xl shadow-xl">
           <button
             id="char-sheet-btn"
             onClick={onOpenCharacterSheet}
-            className="relative flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900/85 hover:bg-slate-800/90 text-slate-200 border border-slate-700/80 shadow transition active:scale-95"
+            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-slate-800 text-slate-200 text-xs font-semibold transition active:scale-95"
             title="Character Sheet (C)"
           >
-            <User className="w-4 h-4 text-sky-400" />
-            <span className="text-xs font-semibold">Hero</span>
+            <User className="w-3.5 h-3.5 text-sky-400" />
+            <span>Hero</span>
             {unallocatedStatPoints > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center animate-bounce">
+              <span className="w-4 h-4 rounded-full bg-amber-500 text-slate-950 font-bold text-[10px] flex items-center justify-center animate-bounce">
                 {unallocatedStatPoints}
               </span>
             )}
@@ -101,29 +101,32 @@ export const HUD: React.FC<HUDProps> = ({
           <button
             id="inventory-btn"
             onClick={onOpenInventory}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900/85 hover:bg-slate-800/90 text-slate-200 border border-slate-700/80 shadow transition active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-slate-800 text-slate-200 text-xs font-semibold transition active:scale-95"
             title="Inventory & Gear (I)"
           >
-            <Backpack className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-semibold">Inventory</span>
+            <Backpack className="w-3.5 h-3.5 text-amber-400" />
+            <span>Inventory</span>
           </button>
 
           <button
             id="mute-btn"
             onClick={onToggleMute}
-            className="p-2 rounded-lg bg-slate-900/85 hover:bg-slate-800/90 text-slate-300 border border-slate-700/80 shadow transition"
-            title={isMuted ? 'Unmute SFX' : 'Mute SFX'}
+            className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-300 transition"
+            title={isMuted ? 'Unmute SFX' : 'Mute SFX (M)'}
           >
-            {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
+            {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-slate-300" />}
           </button>
 
+          <div className="w-px h-5 bg-slate-800 mx-0.5" />
+
           <button
-            id="reset-btn"
-            onClick={onResetGame}
-            className="p-2 rounded-lg bg-slate-900/85 hover:bg-slate-800/90 text-slate-300 border border-slate-700/80 shadow transition"
-            title="Restart Run"
+            id="menu-btn"
+            onClick={onOpenMenu}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold font-cinzel transition active:scale-95"
+            title="Menu / Pause (Esc)"
           >
-            <RotateCcw className="w-4 h-4 text-slate-400" />
+            <Menu className="w-3.5 h-3.5" />
+            <span>Menu</span>
           </button>
         </div>
       </div>

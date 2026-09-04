@@ -21,6 +21,7 @@ import { rollLoot } from './loot';
 import { getItemDef, createItemStack } from './items';
 import { PLAYER_ABILITIES } from './abilities';
 import { sound } from './audio';
+import { saveFloorCheckpoint, loadFloorCheckpoint } from './checkpoint';
 
 export interface GameEngineState {
   currentFloor: number;
@@ -136,7 +137,69 @@ export class GameEngine {
     };
 
     this.spawnFloorEnemies(state, dungeon, startFloor);
+    saveFloorCheckpoint(startFloor, playerStats, initialEquipment, initialInventory, 0);
     return state;
+  }
+
+  public loadCheckpointGame(): boolean {
+    const cp = loadFloorCheckpoint();
+    if (!cp) return false;
+
+    const dungeon = generateDungeonLevel(cp.currentFloor);
+    this.camera.x = ((dungeon.playerSpawn.x - dungeon.playerSpawn.y) / 64) * 32;
+    this.camera.y = ((dungeon.playerSpawn.x + dungeon.playerSpawn.y) / 64) * 16;
+
+    const calculatedStats = computeTotalStats(cp.playerStats.attributes, cp.equipment);
+
+    const playerStats: PlayerStats = {
+      attributes: { ...cp.playerStats.attributes },
+      calculated: calculatedStats,
+      health: Math.min(calculatedStats[StatType.MaxHealth], Math.max(20, cp.playerStats.health)),
+      mana: Math.min(calculatedStats[StatType.MaxMana], cp.playerStats.mana),
+      level: cp.playerStats.level,
+      xp: cp.playerStats.xp,
+      xpToNextLevel: cp.playerStats.xpToNextLevel,
+      gold: cp.playerStats.gold,
+    };
+
+    this.state = {
+      currentFloor: cp.currentFloor,
+      player: {
+        x: dungeon.playerSpawn.x,
+        y: dungeon.playerSpawn.y,
+        vx: 0,
+        vy: 0,
+        facingAngle: 0,
+        isAttacking: false,
+        attackAnimTimer: 0,
+      },
+      playerStats,
+      equipment: { ...cp.equipment },
+      inventory: cp.inventory.map((slot) => (slot ? { ...slot } : null)),
+      enemies: [],
+      projectiles: [],
+      lootDrops: [],
+      particles: [],
+      floatingTexts: [],
+      combatLogs: [
+        {
+          id: 'load-cp',
+          text: `Loaded checkpoint: Floor ${cp.currentFloor} (Level ${playerStats.level} Hero).`,
+          type: 'system',
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ],
+      abilityCooldowns: {},
+      dungeon,
+      isGameOver: false,
+      isVictory: false,
+      unallocatedStatPoints: cp.unallocatedStatPoints,
+      floorCleared: false,
+    };
+
+    this.spawnFloorEnemies(this.state, dungeon, cp.currentFloor);
+    this.recalculatePlayerStats();
+    return true;
   }
 
   private spawnFloorEnemies(state: GameEngineState, dungeon: ReturnType<typeof generateDungeonLevel>, floor: number) {
@@ -320,21 +383,27 @@ export class GameEngine {
       state.player.isAttacking = true;
       state.player.attackAnimTimer = 0.25;
 
-      const cleaveArc = 1.3;
-      const hitRadius = ability.range;
+      const cleaveArc = 1.8; // Generous ~100-degree frontal cleave
+      const hitRadius = ability.range + 10;
+      const pointBlankProximity = 36; // Foes right next to player always get hit
 
       for (const enemy of state.enemies) {
         const dx = enemy.x - px;
         const dy = enemy.y - py;
         const dist = Math.hypot(dx, dy);
 
+        // Point-blank check
+        if (dist <= pointBlankProximity) {
+          this.applyPlayerDamageToEnemy(enemy, ability);
+          continue;
+        }
+
         if (dist <= hitRadius + enemy.size) {
           const angleToEnemy = Math.atan2(dy, dx);
-          let diff = Math.abs(angleToEnemy - aimAngle);
-          while (diff > Math.PI) diff -= Math.PI * 2;
-          diff = Math.abs(diff);
+          let angleDiff = angleToEnemy - aimAngle;
+          const normalizedDiff = Math.abs(Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)));
 
-          if (diff <= cleaveArc / 2) {
+          if (normalizedDiff <= cleaveArc / 2) {
             this.applyPlayerDamageToEnemy(enemy, ability);
           }
         }
@@ -398,39 +467,49 @@ export class GameEngine {
         }
       }
     } else if (ability.id === 4) {
-      // Aether Dash: Rapid teleport
+      // Aether Dash: Rapid dash with sweep raycasting to prevent wall clipping
       sound.playDash();
       const dashDist = ability.range;
-      let targetX = px + Math.cos(aimAngle) * dashDist;
-      let targetY = py + Math.sin(aimAngle) * dashDist;
+      const steps = 16;
+      let validX = px;
+      let validY = py;
 
-      // Check collision
-      const targetTile = state.dungeon.map.worldToTile(targetX, targetY);
-      if (TileFlags.isWalkable(state.dungeon.map.get(targetTile.x, targetTile.y))) {
-        // Dash trail
-        for (let s = 0; s < 8; s++) {
-          const tx = px + (targetX - px) * (s / 8);
-          const ty = py + (targetY - py) * (s / 8);
-          state.particles.push({
-            x: tx,
-            y: ty,
-            vx: (Math.random() - 0.5) * 30,
-            vy: (Math.random() - 0.5) * 30,
-            color: '#a855f7',
-            size: 5,
-            life: 0.35,
-            maxLife: 0.35,
-          });
+      // Raycast along dash vector to find furthest valid walkable point
+      for (let s = 1; s <= steps; s++) {
+        const stepDist = (dashDist / steps) * s;
+        const testX = px + Math.cos(aimAngle) * stepDist;
+        const testY = py + Math.sin(aimAngle) * stepDist;
+        if (state.dungeon.map.isCircleWalkable(testX, testY, 14)) {
+          validX = testX;
+          validY = testY;
+        } else {
+          break;
         }
-        state.player.x = targetX;
-        state.player.y = targetY;
+      }
 
-        // Damage enemies passed through
-        for (const enemy of state.enemies) {
-          const dist = Math.hypot(enemy.x - targetX, enemy.y - targetY);
-          if (dist <= ability.radius!) {
-            this.applyPlayerDamageToEnemy(enemy, ability);
-          }
+      // Dash trail particles
+      for (let s = 0; s < 10; s++) {
+        const tx = px + (validX - px) * (s / 10);
+        const ty = py + (validY - py) * (s / 10);
+        state.particles.push({
+          x: tx,
+          y: ty,
+          vx: (Math.random() - 0.5) * 40,
+          vy: (Math.random() - 0.5) * 40,
+          color: '#a855f7',
+          size: 5,
+          life: 0.35,
+          maxLife: 0.35,
+        });
+      }
+      state.player.x = validX;
+      state.player.y = validY;
+
+      // Damage enemies passed through
+      for (const enemy of state.enemies) {
+        const dist = Math.hypot(enemy.x - validX, enemy.y - validY);
+        if (dist <= ability.radius!) {
+          this.applyPlayerDamageToEnemy(enemy, ability);
         }
       }
     }
@@ -566,19 +645,21 @@ export class GameEngine {
     }
 
     const moveSpeedStat = state.playerStats.calculated[StatType.MoveSpeed];
-    const actualSpeed = 160 * (moveSpeedStat / 100);
+    const actualSpeed = 175 * (moveSpeedStat / 100);
+    const playerRadius = 14;
 
-    const newX = state.player.x + mx * actualSpeed * dt;
-    const newY = state.player.y + my * actualSpeed * dt;
-
-    // Tile Collision Check for player
-    const tileX = state.dungeon.map.worldToTile(newX, state.player.y);
-    if (TileFlags.isWalkable(state.dungeon.map.get(tileX.x, tileX.y))) {
-      state.player.x = newX;
+    // Independent Axis Movement with Circle Collision for smooth wall gliding
+    if (mx !== 0) {
+      const nextX = state.player.x + mx * actualSpeed * dt;
+      if (state.dungeon.map.isCircleWalkable(nextX, state.player.y, playerRadius)) {
+        state.player.x = nextX;
+      }
     }
-    const tileY = state.dungeon.map.worldToTile(state.player.x, newY);
-    if (TileFlags.isWalkable(state.dungeon.map.get(tileY.x, tileY.y))) {
-      state.player.y = newY;
+    if (my !== 0) {
+      const nextY = state.player.y + my * actualSpeed * dt;
+      if (state.dungeon.map.isCircleWalkable(state.player.x, nextY, playerRadius)) {
+        state.player.y = nextY;
+      }
     }
 
     // Smooth Camera Follow
@@ -647,23 +728,54 @@ export class GameEngine {
       enemy.facingAngle = Math.atan2(dy, dx);
 
       // Aggro radius
-      if (dist < 380) {
+      if (dist < 420) {
         if (dist > enemy.attackRange) {
-          // Move towards player
-          const nx = enemy.x + (dx / dist) * currentSpeed * dt;
-          const ny = enemy.y + (dy / dist) * currentSpeed * dt;
+          // Move towards player with independent axis sliding
+          const dirX = dx / dist;
+          const dirY = dy / dist;
+          const enemyRadius = enemy.size * 0.7;
 
-          const tCheck = state.dungeon.map.worldToTile(nx, ny);
-          if (TileFlags.isWalkable(state.dungeon.map.get(tCheck.x, tCheck.y))) {
-            enemy.x = nx;
-            enemy.y = ny;
+          const testX = enemy.x + dirX * currentSpeed * dt;
+          if (state.dungeon.map.isCircleWalkable(testX, enemy.y, enemyRadius)) {
+            enemy.x = testX;
+          }
+          const testY = enemy.y + dirY * currentSpeed * dt;
+          if (state.dungeon.map.isCircleWalkable(enemy.x, testY, enemyRadius)) {
+            enemy.y = testY;
           }
         } else {
-          // Attack in range
+          // Attack in range - only if line of sight is clear (cannot shoot/attack through walls)
           enemy.attackTimer -= dt;
           if (enemy.attackTimer <= 0) {
-            enemy.attackTimer = enemy.attackCooldown;
-            this.enemyAttack(enemy);
+            if (state.dungeon.map.hasLineOfSight(enemy.x, enemy.y, state.player.x, state.player.y)) {
+              enemy.attackTimer = enemy.attackCooldown;
+              this.enemyAttack(enemy);
+            }
+          }
+        }
+      }
+    }
+
+    // Enemy-Enemy Soft Separation so enemies don't overlap into a single dot
+    for (let i = 0; i < state.enemies.length; i++) {
+      for (let j = i + 1; j < state.enemies.length; j++) {
+        const e1 = state.enemies[i];
+        const e2 = state.enemies[j];
+        const sepX = e2.x - e1.x;
+        const sepY = e2.y - e1.y;
+        const sepDist = Math.hypot(sepX, sepY);
+        const minDist = (e1.size + e2.size) * 0.75;
+        if (sepDist > 0 && sepDist < minDist) {
+          const push = (minDist - sepDist) * 0.5;
+          const nx = (sepX / sepDist) * push;
+          const ny = (sepY / sepDist) * push;
+          if (state.dungeon.map.isCircleWalkable(e1.x - nx, e1.y - ny, e1.size * 0.5)) {
+            e1.x -= nx;
+            e1.y -= ny;
+          }
+          if (state.dungeon.map.isCircleWalkable(e2.x + nx, e2.y + ny, e2.size * 0.5)) {
+            e2.x += nx;
+            e2.y += ny;
           }
         }
       }
@@ -692,6 +804,25 @@ export class GameEngine {
       // Wall collision
       const t = state.dungeon.map.worldToTile(proj.x, proj.y);
       if (TileFlags.blocksProjectiles(state.dungeon.map.get(t.x, t.y))) {
+        if (proj.school === DamageSchool.Fire && proj.sourceId === 'player') {
+          for (const splash of state.enemies) {
+            if (Math.hypot(splash.x - proj.x, splash.y - proj.y) <= 85) {
+              this.applyPlayerDamageToEnemy(splash, {
+                id: 99,
+                name: 'Fire Splash',
+                key: '',
+                description: '',
+                icon: '',
+                baseDamage: proj.damage * 0.6,
+                school: DamageSchool.Fire,
+                damageFlags: proj.flags,
+                cooldownSec: 0,
+                manaCost: 0,
+                range: 0,
+              });
+            }
+          }
+        }
         state.projectiles.splice(i, 1);
         continue;
       }
@@ -954,6 +1085,13 @@ export class GameEngine {
     this.state.playerStats = prevStats;
 
     this.spawnFloorEnemies(this.state, newDungeon, nextFloor);
+    saveFloorCheckpoint(
+      nextFloor,
+      this.state.playerStats,
+      this.state.equipment,
+      this.state.inventory,
+      this.state.unallocatedStatPoints
+    );
     this.addCombatLog(`Descended into Floor ${nextFloor}! Be on your guard!`, 'system');
   }
 

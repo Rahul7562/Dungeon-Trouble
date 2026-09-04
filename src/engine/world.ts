@@ -57,6 +57,53 @@ export class TileMap {
       y: this.originY + ty * this.tileSize + this.tileSize * 0.5,
     };
   }
+
+  // Check if a circular body (cx, cy, radius) intersects any non-walkable tile
+  isCircleWalkable(cx: number, cy: number, radius: number): boolean {
+    const minTileX = Math.floor((cx - radius) / this.tileSize);
+    const maxTileX = Math.floor((cx + radius) / this.tileSize);
+    const minTileY = Math.floor((cy - radius) / this.tileSize);
+    const maxTileY = Math.floor((cy + radius) / this.tileSize);
+
+    for (let ty = minTileY; ty <= maxTileY; ty++) {
+      for (let tx = minTileX; tx <= maxTileX; tx++) {
+        const tile = this.get(tx, ty);
+        if (!TileFlags.isWalkable(tile)) {
+          // AABB vs Circle test
+          const tileMinX = tx * this.tileSize;
+          const tileMaxX = tileMinX + this.tileSize;
+          const tileMinY = ty * this.tileSize;
+          const tileMaxY = tileMinY + this.tileSize;
+
+          const closestX = Math.max(tileMinX, Math.min(cx, tileMaxX));
+          const closestY = Math.max(tileMinY, Math.min(cy, tileMaxY));
+
+          const distX = cx - closestX;
+          const distY = cy - closestY;
+          if (distX * distX + distY * distY < radius * radius) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  // Check if line of sight between two points is clear of projectile blockers
+  hasLineOfSight(x1: number, y1: number, x2: number, y2: number, step = 16): boolean {
+    const dist = Math.hypot(x2 - x1, y2 - y1);
+    const steps = Math.max(1, Math.floor(dist / step));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const px = x1 + (x2 - x1) * t;
+      const py = y1 + (y2 - y1) * t;
+      const tile = this.worldToTile(px, py);
+      if (TileFlags.blocksProjectiles(this.get(tile.x, tile.y))) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 export interface DungeonRoom {

@@ -63,10 +63,13 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
   }, [engine, engine.state.player.x, engine.state.player.y, engine.state.enemies.length]);
 
   return (
-    <div className="pointer-events-auto absolute top-4 right-4 z-20 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-xl p-2 shadow-2xl">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 mb-1.5 px-1">
-        <Compass className="w-3.5 h-3.5 text-amber-400" />
-        <span>Chamber Radar</span>
+    <div className="pointer-events-auto absolute bottom-4 right-4 z-20 bg-slate-950/85 backdrop-blur border border-slate-800 rounded-2xl p-2 shadow-2xl select-none">
+      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-1.5 px-1">
+        <div className="flex items-center gap-1.5">
+          <Compass className="w-3.5 h-3.5 text-amber-400" />
+          <span>Chamber Radar</span>
+        </div>
+        <span className="font-mono text-[10px] text-slate-500">Floor {engine.state.currentFloor}</span>
       </div>
       <canvas
         id="minimap-canvas"

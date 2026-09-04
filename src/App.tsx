@@ -7,6 +7,7 @@ import { CharacterSheetModal } from './components/CharacterSheetModal';
 import { CombatLog } from './components/CombatLog';
 import { Minimap } from './components/Minimap';
 import { VictoryDefeatModal } from './components/VictoryDefeatModal';
+import { MainMenuModal } from './components/MainMenuModal';
 import { sound } from './engine/audio';
 import { Info, X } from 'lucide-react';
 
@@ -16,6 +17,8 @@ export const App: React.FC = () => {
 
   // React state for HUD updates
   const [, setTick] = useState(0);
+  const [isInMainMenu, setIsInMainMenu] = useState(true);
+  const [isPausedMenu, setIsPausedMenu] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showCharacterSheet, setShowCharacterSheet] = useState(false);
   const [showHelpGuide, setShowHelpGuide] = useState(true);
@@ -34,6 +37,27 @@ export const App: React.FC = () => {
 
   const handleResetGame = () => {
     engine.state = engine.initializeNewGame(1);
+    setIsInMainMenu(false);
+    setIsPausedMenu(false);
+    setShowInventory(false);
+    setShowCharacterSheet(false);
+  };
+
+  const handleContinueGame = () => {
+    const loaded = engine.loadCheckpointGame();
+    if (loaded) {
+      setIsInMainMenu(false);
+      setIsPausedMenu(false);
+      setShowInventory(false);
+      setShowCharacterSheet(false);
+    } else {
+      handleResetGame();
+    }
+  };
+
+  const handleQuitToMenu = () => {
+    setIsInMainMenu(true);
+    setIsPausedMenu(false);
     setShowInventory(false);
     setShowCharacterSheet(false);
   };
@@ -41,6 +65,7 @@ export const App: React.FC = () => {
   // Global key bindings for UI
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (isInMainMenu) return;
       const k = e.key.toLowerCase();
       if (k === 'i' || k === 'b') {
         setShowInventory((prev) => !prev);
@@ -52,15 +77,29 @@ export const App: React.FC = () => {
         setShowInventory(false);
         setShowCharacterSheet(false);
         setShowHelpGuide(false);
+        setIsPausedMenu((prev) => !prev);
       }
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+  }, [isInMainMenu]);
 
   return (
     <main id="dungeon-trouble-app" className="relative w-full h-full overflow-hidden bg-slate-950 font-sans">
+      {/* Main Menu Screen (Initial or Pause overlay) */}
+      {(isInMainMenu || isPausedMenu) && (
+        <MainMenuModal
+          isPausedMode={!isInMainMenu && isPausedMenu}
+          onResume={() => setIsPausedMenu(false)}
+          onNewGame={handleResetGame}
+          onContinue={handleContinueGame}
+          onQuit={handleQuitToMenu}
+          isMuted={isMuted}
+          onToggleMute={handleToggleMute}
+        />
+      )}
+
       {/* 2.5D Isometric Canvas Engine */}
       <GameCanvas engine={engine} onEngineTick={handleEngineTick} />
 
@@ -69,7 +108,7 @@ export const App: React.FC = () => {
         engine={engine}
         onOpenInventory={() => setShowInventory(true)}
         onOpenCharacterSheet={() => setShowCharacterSheet(true)}
-        onResetGame={handleResetGame}
+        onOpenMenu={() => setIsPausedMenu(true)}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
       />
@@ -81,7 +120,7 @@ export const App: React.FC = () => {
       <CombatLog logs={engine.state.combatLogs} />
 
       {/* Beginner Guide Overlay Banner */}
-      {showHelpGuide && (
+      {showHelpGuide && !isInMainMenu && (
         <aside
           id="controls-guide"
           className="pointer-events-auto absolute top-20 left-4 z-20 max-w-xs bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-2xl p-4 shadow-2xl text-xs text-slate-300"
