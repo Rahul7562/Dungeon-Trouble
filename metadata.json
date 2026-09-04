@@ -1,0 +1,8 @@
+{
+  "name": "Dungeon Trouble",
+  "description": "2.5D Isometric Action RPG game engine and dungeon crawler featuring real-time isometric rendering, player combat, abilities, loot drops, inventory, and procedural dungeons.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
