@@ -15,18 +15,38 @@ import {
   PlayerStats,
   BossTelegraph,
   StatusEffectInstance,
+  CharacterClass,
+  ZoneType,
+  NPCEntity,
+  SummonEntity,
+  AbilityDef,
 } from './types';
 import { TileMap, generateDungeonLevel, TileFlags } from './world';
+import { generateTownLevel, GeneratedTown } from './town';
+import { CLASS_DEFINITIONS, getClassDefinition } from './classes';
 import { computeTotalStats, getStatName } from './stats';
 import { resolveDamagePipeline, DAMAGE_FLAGS, getSchoolColor } from './combat';
 import { rollLoot } from './loot';
 import { getItemDef, createItemStack } from './items';
 import { PLAYER_ABILITIES } from './abilities';
 import { sound } from './audio';
-import { saveFloorCheckpoint, loadFloorCheckpoint } from './checkpoint';
+import {
+  saveGameState,
+  loadGameState,
+  hasSavedGame,
+  getLastPlayerName,
+  setLastPlayerName,
+  saveFloorCheckpoint,
+  loadFloorCheckpoint,
+} from './checkpoint';
 
 export interface GameEngineState {
+  playerName: string;
+  selectedClass: CharacterClass;
+  currentZone: ZoneType;
   currentFloor: number;
+  highestFloorUnlocked: number;
+  clearedFloors: number[];
   player: {
     x: number;
     y: number;
@@ -40,6 +60,7 @@ export interface GameEngineState {
   playerStats: PlayerStats;
   equipment: EquipmentState;
   inventory: (ItemStack | null)[];
+  storage: (ItemStack | null)[];
   enemies: EnemyEntity[];
   projectiles: Projectile[];
   lootDrops: LootDropEntity[];
@@ -50,49 +71,81 @@ export interface GameEngineState {
   telegraphs: BossTelegraph[];
   screenShake: number;
   dungeon: ReturnType<typeof generateDungeonLevel>;
+  townLevel: GeneratedTown;
+  activeNPC: NPCEntity | null;
+  summons: SummonEntity[];
   isGameOver: boolean;
   isVictory: boolean;
   unallocatedStatPoints: number;
   floorCleared: boolean;
 }
 
+export const FLOOR_BOSS_DEFS: Record<
+  number,
+  { name: string; health: number; attackPower: number; armor: number; color: string; size: number; xp: number }
+> = {
+  1: { name: 'Groth the Bone-Crusher', health: 420, attackPower: 26, armor: 20, color: '#f87171', size: 24, xp: 180 },
+  2: { name: 'Skeletal Champion Vesper', health: 560, attackPower: 32, armor: 26, color: '#fb923c', size: 26, xp: 240 },
+  3: { name: 'Mortis the Undying (Crypt Lord)', health: 750, attackPower: 40, armor: 32, color: '#c084fc', size: 28, xp: 350 },
+  4: { name: 'Catacomb Defiler Kaelen', health: 950, attackPower: 48, armor: 38, color: '#34d399', size: 28, xp: 450 },
+  5: { name: 'Sunken Dreadnought Azgora', health: 1200, attackPower: 56, armor: 46, color: '#38bdf8', size: 30, xp: 580 },
+  6: { name: 'Malakor the Void Weaver', health: 1550, attackPower: 66, armor: 54, color: '#a855f7', size: 32, xp: 750 },
+  7: { name: 'Magma Brute Volkan', health: 1900, attackPower: 78, armor: 62, color: '#f97316', size: 32, xp: 950 },
+  8: { name: 'Abyssal Pyroclast Thalor', health: 2300, attackPower: 90, armor: 70, color: '#ef4444', size: 34, xp: 1200 },
+  9: { name: 'Shadow Archon Gorgoroth', health: 2800, attackPower: 105, armor: 80, color: '#818cf8', size: 34, xp: 1500 },
+  10: { name: 'Ignis Rex - Supreme Lord of the Cataclysm', health: 3800, attackPower: 125, armor: 95, color: '#dc2626', size: 36, xp: 2500 },
+};
+
 export class GameEngine {
-  public state: GameEngineState;
+  public state!: GameEngineState;
   public isPaused: boolean = false;
+  public onInteract?: () => void;
+  public onInteractPortal?: () => void;
   private keyState: Record<string, boolean> = {};
   public mousePos = { x: 0, y: 0 };
+  public worldMousePos = { x: 0, y: 0 };
   public camera = { x: 0, y: 0 };
   private nextEntityId = 1;
 
   constructor() {
-    this.state = this.initializeNewGame();
+    this.isPaused = true;
+    if (hasSavedGame() && this.loadSavedGame()) {
+      // Successfully loaded existing saved game profile
+    } else {
+      // Clean default initialization for preview WITHOUT overwriting storage with a phantom Swordsman
+      this.state = this.initializeNewGame('swordsman', getLastPlayerName(), true, 1, false);
+    }
   }
 
-  public initializeNewGame(startFloor = 1): GameEngineState {
-    const dungeon = generateDungeonLevel(startFloor);
+  public initializeNewGame(
+    characterClass: CharacterClass | number = 'swordsman',
+    playerName: string = getLastPlayerName(),
+    startInTown: boolean = true,
+    startFloor: number = 1,
+    shouldAutoSave: boolean = true
+  ): GameEngineState {
+    // Gracefully handle legacy numeric startFloor parameter
+    let selectedClassKey: CharacterClass = 'swordsman';
+    let targetFloor = startFloor;
 
-    const initialAttributes: Record<AttributeType, number> = {
-      [AttributeType.STR]: 12,
-      [AttributeType.DEX]: 10,
-      [AttributeType.INT]: 8,
-      [AttributeType.VIT]: 12,
-    };
+    if (typeof characterClass === 'number') {
+      targetFloor = characterClass;
+      selectedClassKey = 'swordsman';
+    } else if (typeof characterClass === 'string' && CLASS_DEFINITIONS[characterClass]) {
+      selectedClassKey = characterClass;
+    }
 
-    const initialEquipment: EquipmentState = {
-      [EquipSlot.None]: null,
-      [EquipSlot.Head]: null,
-      [EquipSlot.Chest]: createItemStack(2, 1), // Reinforced Iron Armor
-      [EquipSlot.Legs]: null,
-      [EquipSlot.Boots]: null,
-      [EquipSlot.MainHand]: createItemStack(1, 1), // Rusty Shortsword
-      [EquipSlot.OffHand]: null,
-      [EquipSlot.Ring]: null,
-      [EquipSlot.Amulet]: null,
-    };
+    const classDef = getClassDefinition(selectedClassKey);
+    const resolvedPlayerName = (playerName && playerName.trim()) || 'Valerius';
+    setLastPlayerName(resolvedPlayerName);
 
-    const initialInventory: (ItemStack | null)[] = new Array(20).fill(null);
-    initialInventory[0] = createItemStack(10, 3); // 3 Health Potions
-    initialInventory[1] = createItemStack(11, 2); // 2 Mana Flasks
+    const townLevel = generateTownLevel();
+    const dungeon = generateDungeonLevel(targetFloor);
+
+    const initialAttributes = { ...classDef.baseAttributes };
+    const initialEquipment = classDef.getStartingEquipment();
+    const initialInventory = classDef.getStartingInventory();
+    const initialStorage = new Array(24).fill(null);
 
     const calculatedStats = computeTotalStats(initialAttributes, initialEquipment);
 
@@ -104,14 +157,21 @@ export class GameEngine {
       level: 1,
       xp: 0,
       xpToNextLevel: 100,
-      gold: 50,
+      gold: 100,
     };
 
+    const initialSpawn = startInTown ? townLevel.playerSpawn : dungeon.playerSpawn;
+
     const state: GameEngineState = {
-      currentFloor: startFloor,
+      playerName: resolvedPlayerName,
+      selectedClass: selectedClassKey,
+      currentZone: startInTown ? 'town' : 'dungeon',
+      currentFloor: targetFloor,
+      highestFloorUnlocked: 1,
+      clearedFloors: [],
       player: {
-        x: dungeon.playerSpawn.x,
-        y: dungeon.playerSpawn.y,
+        x: initialSpawn.x,
+        y: initialSpawn.y,
         vx: 0,
         vy: 0,
         facingAngle: 0,
@@ -122,6 +182,7 @@ export class GameEngine {
       playerStats,
       equipment: initialEquipment,
       inventory: initialInventory,
+      storage: initialStorage,
       enemies: [],
       projectiles: [],
       lootDrops: [],
@@ -129,8 +190,10 @@ export class GameEngine {
       floatingTexts: [],
       combatLogs: [
         {
-          id: 'init-1',
-          text: `Entered Dungeon Chamber - Floor ${startFloor}. Slay foes and seek the portal.`,
+          id: `init-${this.nextEntityId++}`,
+          text: startInTown
+            ? `Welcome to Town-1, ${resolvedPlayerName}! Visit the Elder and merchants to prepare.`
+            : `Entered Dungeon Chamber - Floor ${targetFloor}. Slay foes and seek the portal.`,
           type: 'system',
           timestamp: new Date().toLocaleTimeString(),
         },
@@ -139,43 +202,137 @@ export class GameEngine {
       telegraphs: [],
       screenShake: 0,
       dungeon,
+      townLevel,
+      activeNPC: null,
+      summons: [],
       isGameOver: false,
       isVictory: false,
       unallocatedStatPoints: 0,
       floorCleared: false,
     };
 
-    this.spawnFloorEnemies(state, dungeon, startFloor);
-    saveFloorCheckpoint(startFloor, playerStats, initialEquipment, initialInventory, 0);
+    this.camera.x = ((initialSpawn.x - initialSpawn.y) / 64) * 32;
+    this.camera.y = ((initialSpawn.x + initialSpawn.y) / 64) * 16;
+
+    if (!startInTown) {
+      this.spawnFloorEnemies(state, dungeon, targetFloor);
+    }
+
+    this.state = state;
+    if (shouldAutoSave) {
+      this.autoSave();
+    }
     return state;
   }
 
-  public loadCheckpointGame(): boolean {
-    const cp = loadFloorCheckpoint();
-    if (!cp) return false;
+  public autoSave(): void {
+    const state = this.state;
+    if (!state) return;
+    saveGameState({
+      playerName: state.playerName,
+      selectedClass: state.selectedClass,
+      currentZone: state.currentZone,
+      currentFloor: state.currentFloor,
+      highestFloorUnlocked: state.highestFloorUnlocked,
+      clearedFloors: state.clearedFloors,
+      playerX: state.player.x,
+      playerY: state.player.y,
+      playerStats: state.playerStats,
+      equipment: state.equipment,
+      inventory: state.inventory,
+      storage: state.storage,
+      unallocatedStatPoints: state.unallocatedStatPoints,
+    });
+  }
 
-    const dungeon = generateDungeonLevel(cp.currentFloor);
-    this.camera.x = ((dungeon.playerSpawn.x - dungeon.playerSpawn.y) / 64) * 32;
-    this.camera.y = ((dungeon.playerSpawn.x + dungeon.playerSpawn.y) / 64) * 16;
+  public healPlayerFull(): void {
+    const maxHp = this.state.playerStats.calculated[StatType.MaxHealth];
+    const maxMp = this.state.playerStats.calculated[StatType.MaxMana];
+    this.state.playerStats.health = maxHp;
+    this.state.playerStats.mana = maxMp;
+    this.state.player.statusEffects = [];
+    this.addCombatLog('Sister Althea has blessed you with full Health and Mana restoration!', 'heal');
+    this.autoSave();
+  }
 
-    const calculatedStats = computeTotalStats(cp.playerStats.attributes, cp.equipment);
+  public upgradeEquipmentItem(slot: EquipSlot): void {
+    const item = this.state.equipment[slot];
+    if (!item) return;
+    const def = getItemDef(item.itemDefId);
+    if (!def || !def.equipModifiers) return;
+
+    for (const mod of def.equipModifiers) {
+      mod.value = Math.round(mod.value * 1.15 + 2);
+    }
+    this.recalculatePlayerStats();
+    this.addCombatLog(`Torvald tempered your ${def.name}! All stats enhanced!`, 'system');
+    this.autoSave();
+  }
+
+  public transitionToZone(zone: ZoneType, floor: number = 1): void {
+    const state = this.state;
+    state.currentZone = zone;
+    state.player.statusEffects = [];
+    state.telegraphs = [];
+    state.projectiles = [];
+    state.lootDrops = [];
+    state.particles = [];
+    state.floatingTexts = [];
+    state.screenShake = 0;
+
+    if (zone === 'town') {
+      state.enemies = [];
+      state.player.x = state.townLevel.playerSpawn.x;
+      state.player.y = state.townLevel.playerSpawn.y;
+      this.camera.x = ((state.player.x - state.player.y) / 64) * 32;
+      this.camera.y = ((state.player.x + state.player.y) / 64) * 16;
+      this.addCombatLog(`Entered Town-1 Sanctuary. You are in safe territory.`, 'system');
+    } else {
+      state.currentFloor = Math.max(1, Math.min(10, floor));
+      state.dungeon = generateDungeonLevel(state.currentFloor);
+      state.player.x = state.dungeon.playerSpawn.x;
+      state.player.y = state.dungeon.playerSpawn.y;
+      this.camera.x = ((state.player.x - state.player.y) / 64) * 32;
+      this.camera.y = ((state.player.x + state.player.y) / 64) * 16;
+      state.floorCleared = false;
+      this.spawnFloorEnemies(state, state.dungeon, state.currentFloor);
+      this.addCombatLog(`Delved into Floor ${state.currentFloor} of the Dungeon Ruin!`, 'system');
+    }
+    this.autoSave();
+  }
+
+  public loadSavedGame(): boolean {
+    const save = loadGameState();
+    if (!save) return false;
+
+    const townLevel = generateTownLevel();
+    const dungeon = generateDungeonLevel(save.currentFloor);
+    const calculatedStats = computeTotalStats(save.playerStats.attributes, save.equipment);
 
     const playerStats: PlayerStats = {
-      attributes: { ...cp.playerStats.attributes },
+      attributes: { ...save.playerStats.attributes },
       calculated: calculatedStats,
-      health: Math.min(calculatedStats[StatType.MaxHealth], Math.max(20, cp.playerStats.health)),
-      mana: Math.min(calculatedStats[StatType.MaxMana], cp.playerStats.mana),
-      level: cp.playerStats.level,
-      xp: cp.playerStats.xp,
-      xpToNextLevel: cp.playerStats.xpToNextLevel,
-      gold: cp.playerStats.gold,
+      health: Math.min(calculatedStats[StatType.MaxHealth], Math.max(20, save.playerStats.health)),
+      mana: Math.min(calculatedStats[StatType.MaxMana], save.playerStats.mana),
+      level: save.playerStats.level,
+      xp: save.playerStats.xp,
+      xpToNextLevel: save.playerStats.xpToNextLevel,
+      gold: save.playerStats.gold,
     };
 
+    const isTown = save.currentZone === 'town';
+    const initialSpawn = isTown ? townLevel.playerSpawn : dungeon.playerSpawn;
+
     this.state = {
-      currentFloor: cp.currentFloor,
+      playerName: save.playerName || 'Valerius',
+      selectedClass: save.selectedClass || 'swordsman',
+      currentZone: save.currentZone || 'town',
+      currentFloor: save.currentFloor || 1,
+      highestFloorUnlocked: save.highestFloorUnlocked || 1,
+      clearedFloors: save.clearedFloors || [],
       player: {
-        x: dungeon.playerSpawn.x,
-        y: dungeon.playerSpawn.y,
+        x: isTown ? (save.player?.x || initialSpawn.x) : dungeon.playerSpawn.x,
+        y: isTown ? (save.player?.y || initialSpawn.y) : dungeon.playerSpawn.y,
         vx: 0,
         vy: 0,
         facingAngle: 0,
@@ -184,8 +341,9 @@ export class GameEngine {
         statusEffects: [],
       },
       playerStats,
-      equipment: { ...cp.equipment },
-      inventory: cp.inventory.map((slot) => (slot ? { ...slot } : null)),
+      equipment: { ...save.equipment },
+      inventory: save.inventory.map((slot) => (slot ? { ...slot } : null)),
+      storage: (save.storage || new Array(24).fill(null)).map((slot) => (slot ? { ...slot } : null)),
       enemies: [],
       projectiles: [],
       lootDrops: [],
@@ -193,8 +351,8 @@ export class GameEngine {
       floatingTexts: [],
       combatLogs: [
         {
-          id: 'load-cp',
-          text: `Loaded checkpoint: Floor ${cp.currentFloor} (Level ${playerStats.level} Hero).`,
+          id: `load-${this.nextEntityId++}`,
+          text: `Loaded profile: ${save.playerName} (${save.selectedClass.toUpperCase()} Lv.${playerStats.level}).`,
           type: 'system',
           timestamp: new Date().toLocaleTimeString(),
         },
@@ -203,15 +361,28 @@ export class GameEngine {
       telegraphs: [],
       screenShake: 0,
       dungeon,
+      townLevel,
+      activeNPC: null,
+      summons: [],
       isGameOver: false,
       isVictory: false,
-      unallocatedStatPoints: cp.unallocatedStatPoints,
+      unallocatedStatPoints: save.unallocatedStatPoints || 0,
       floorCleared: false,
     };
 
-    this.spawnFloorEnemies(this.state, dungeon, cp.currentFloor);
+    this.camera.x = ((this.state.player.x - this.state.player.y) / 64) * 32;
+    this.camera.y = ((this.state.player.x + this.state.player.y) / 64) * 16;
+
+    if (!isTown) {
+      this.spawnFloorEnemies(this.state, dungeon, save.currentFloor);
+    }
+
     this.recalculatePlayerStats();
     return true;
+  }
+
+  public loadCheckpointGame(): boolean {
+    return this.loadSavedGame();
   }
 
   private spawnFloorEnemies(state: GameEngineState, dungeon: ReturnType<typeof generateDungeonLevel>, floor: number) {
@@ -312,27 +483,36 @@ export class GameEngine {
     // Spawn Boss in the final room
     const lastRoom = dungeon.rooms[dungeon.rooms.length - 1];
     const bossSpawn = dungeon.map.tileToWorldCenter(lastRoom.centerX, lastRoom.centerY - 2);
+    const bossDef = FLOOR_BOSS_DEFS[floor] || {
+      name: `Floor ${floor} Overseer`,
+      health: 350 + floor * 180,
+      attackPower: 26 + floor * 9,
+      armor: 22 + floor * 5,
+      color: '#dc2626',
+      size: 26,
+      xp: 140 + floor * 60,
+    };
 
     enemies.push({
       id: `boss-${this.nextEntityId++}`,
       archetype: 'dungeon_lord',
-      name: floor === 3 ? 'Malakor, Lord of Ruin' : `Floor ${floor} Overseer`,
+      name: bossDef.name,
       x: bossSpawn.x,
       y: bossSpawn.y,
       z: 0,
       vx: 0,
       vy: 0,
-      health: 300 + floor * 150,
-      maxHealth: 300 + floor * 150,
-      attackPower: 26 + floor * 8,
-      armor: 24 + floor * 4,
+      health: bossDef.health,
+      maxHealth: bossDef.health,
+      attackPower: bossDef.attackPower,
+      armor: bossDef.armor,
       moveSpeed: 75,
-      attackRange: 70,
+      attackRange: 75,
       attackCooldown: 1.8,
       attackTimer: 0.5,
-      xpReward: 120 + floor * 50,
-      color: '#dc2626',
-      size: 26,
+      xpReward: bossDef.xp,
+      color: bossDef.color,
+      size: bossDef.size,
       facingAngle: 0,
       statusEffects: [],
       isHitFlashTimer: 0,
@@ -345,6 +525,62 @@ export class GameEngine {
     state.enemies = enemies;
   }
 
+  public canInteract(): boolean {
+    const state = this.state;
+    if (state.currentZone === 'town') {
+      if (state.activeNPC) return true;
+      const portalPos = state.townLevel.dungeonPortalPos;
+      if (portalPos && Math.hypot(state.player.x - portalPos.x, state.player.y - portalPos.y) <= 90) {
+        return true;
+      }
+    } else {
+      if (state.floorCleared && state.dungeon?.exitTile) {
+        const exitPos = state.dungeon.map.tileToWorldCenter(
+          state.dungeon.exitTile.x,
+          state.dungeon.exitTile.y
+        );
+        if (Math.hypot(state.player.x - exitPos.x, state.player.y - exitPos.y) <= 90) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  public interact(): void {
+    const state = this.state;
+    if (state.currentZone === 'town') {
+      if (state.activeNPC) {
+        sound.playEquip();
+        this.onInteract?.();
+        return;
+      }
+      const portalPos = state.townLevel.dungeonPortalPos;
+      if (portalPos && Math.hypot(state.player.x - portalPos.x, state.player.y - portalPos.y) <= 90) {
+        sound.playPortal();
+        this.onInteractPortal?.();
+        return;
+      }
+    } else {
+      if (state.floorCleared && state.dungeon?.exitTile) {
+        const exitPos = state.dungeon.map.tileToWorldCenter(
+          state.dungeon.exitTile.x,
+          state.dungeon.exitTile.y
+        );
+        if (Math.hypot(state.player.x - exitPos.x, state.player.y - exitPos.y) <= 90) {
+          if (state.currentFloor >= 10) {
+            state.isVictory = true;
+            this.addCombatLog('👑 YOU HAVE CONQUERED THE ABYSS! SUPREME VICTORY!', 'system');
+          } else {
+            sound.playPortal();
+            this.advanceToNextFloor();
+          }
+          return;
+        }
+      }
+    }
+  }
+
   public handleKeyDown(key: string, code?: string) {
     if (this.isPaused || this.state.isGameOver || this.state.isVictory) return;
     const k = key.toLowerCase();
@@ -353,11 +589,23 @@ export class GameEngine {
       this.keyState[code.toLowerCase()] = true;
     }
 
+    if (k === 'e' || k === 'f' || code === 'KeyE' || code === 'KeyF') {
+      if (this.canInteract()) {
+        this.interact();
+        return;
+      }
+      // If pressing 'e' and nothing to interact with, trigger Ability 3
+      if (k === 'e' || code === 'KeyE') {
+        this.triggerAbility(3);
+        return;
+      }
+    }
+
     if (k === '1' || code === 'Digit1') {
       this.triggerAbility(1);
     } else if (k === '2' || k === 'q' || code === 'Digit2' || code === 'KeyQ') {
       this.triggerAbility(2);
-    } else if (k === '3' || k === 'e' || code === 'Digit3' || code === 'KeyE') {
+    } else if (k === '3' || k === 'r' || code === 'Digit3' || code === 'KeyR') {
       this.triggerAbility(3);
     } else if (k === '4' || k === ' ' || code === 'Digit4' || code === 'Space') {
       this.triggerAbility(4);
@@ -390,12 +638,19 @@ export class GameEngine {
     }
   }
 
-  public triggerAbility(abilityId: number) {
+  public triggerAbility(slotOrId: number) {
     const state = this.state;
     if (state.isGameOver || state.isVictory) return;
 
-    const ability = PLAYER_ABILITIES.find((a) => a.id === abilityId);
+    const classDef = CLASS_DEFINITIONS[state.selectedClass || 'swordsman'];
+    let ability =
+      slotOrId >= 1 && slotOrId <= 4
+        ? classDef?.abilities[slotOrId - 1]
+        : classDef?.abilities.find((a) => a.id === slotOrId) ||
+          PLAYER_ABILITIES.find((a) => a.id === slotOrId);
+
     if (!ability) return;
+    const abilityId = ability.id;
 
     // Check cooldown
     if ((state.abilityCooldowns[abilityId] || 0) > 0) return;
@@ -411,79 +666,308 @@ export class GameEngine {
 
     // Calculate Cooldown with CDR stat
     const cdr = state.playerStats.calculated[StatType.CooldownReduction] || 0;
-    const cooldownSec = ability.cooldownSec ?? (ability.cooldownTicks !== undefined ? ability.cooldownTicks / 30 : 1.0);
+    const cooldownSec =
+      ability.cooldownSec ??
+      (ability.cooldownTicks !== undefined ? ability.cooldownTicks / 30 : 1.0);
     const effectiveCooldown = cooldownSec * (1 - Math.min(60, cdr) / 100);
     state.abilityCooldowns[abilityId] = effectiveCooldown;
 
-    // Execute ability
+    const currentMap = state.currentZone === 'town' ? state.townLevel.map : state.dungeon.map;
     const px = state.player.x;
     const py = state.player.y;
     const aimAngle = state.player.facingAngle;
 
-    if (ability.id === 1) {
-      // Twin Slash: Melee cleave in arc
+    // 1. Swordsman Abilities (101..104 or generic fallback 1)
+    if (ability.id === 101 || ability.id === 1) {
+      // Twin Slash: Melee frontal cleave in generous arc
       sound.playSwing();
       state.player.isAttacking = true;
       state.player.attackAnimTimer = 0.25;
 
-      const cleaveArc = 1.8; // Generous ~100-degree frontal cleave
-      const hitRadius = ability.range + 10;
-      const pointBlankProximity = 36; // Foes right next to player always get hit
+      const cleaveArc = 1.9; // ~110-degree frontal cleave
+      const hitRadius = ability.range + 16;
+      const pointBlank = 36;
 
       for (const enemy of state.enemies) {
         const dx = enemy.x - px;
         const dy = enemy.y - py;
         const dist = Math.hypot(dx, dy);
 
-        // Point-blank check
-        if (dist <= pointBlankProximity) {
+        if (dist <= pointBlank) {
           this.applyPlayerDamageToEnemy(enemy, ability);
           continue;
         }
 
         if (dist <= hitRadius + enemy.size) {
           const angleToEnemy = Math.atan2(dy, dx);
-          let angleDiff = angleToEnemy - aimAngle;
-          const normalizedDiff = Math.abs(Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)));
-
-          if (normalizedDiff <= cleaveArc / 2) {
+          const angleDiff = Math.abs(
+            Math.atan2(Math.sin(angleToEnemy - aimAngle), Math.cos(angleToEnemy - aimAngle))
+          );
+          if (angleDiff <= cleaveArc / 2) {
             this.applyPlayerDamageToEnemy(enemy, ability);
           }
         }
       }
-    } else if (ability.id === 2) {
-      // Inferno Burst: Ranged explosion
-      sound.playFireball();
-      const targetX = px + Math.cos(aimAngle) * ability.range;
-      const targetY = py + Math.sin(aimAngle) * ability.range;
+    } else if (ability.id === 102) {
+      // Heavy Strike: Crushing blow + Stun
+      sound.playHit(true);
+      state.player.isAttacking = true;
+      state.player.attackAnimTimer = 0.35;
+      state.screenShake = 5;
 
-      // Spawn Fire projectile that travels to target and detonates
+      for (const enemy of state.enemies) {
+        const dist = Math.hypot(enemy.x - px, enemy.y - py);
+        if (dist <= 75 + enemy.size) {
+          this.applyPlayerDamageToEnemy(enemy, ability);
+          enemy.statusEffects = enemy.statusEffects.filter((s) => s.id !== 'stun');
+          enemy.statusEffects.push({
+            id: 'stun',
+            name: 'Stunned',
+            durationLeft: 1.2,
+            totalDuration: 1.2,
+            icon: 'Hammer',
+            color: '#f59e0b',
+            tickTimer: 0,
+            speedMultiplier: 0,
+          });
+        }
+      }
+    } else if (ability.id === 103) {
+      // Iron Bulwark: Defensive Fortify
+      sound.playEquip();
+      state.player.statusEffects = state.player.statusEffects.filter((s) => s.name !== 'Iron Bulwark');
+      state.player.statusEffects.push({
+        id: `bulwark-${this.nextEntityId++}`,
+        name: 'Iron Bulwark',
+        kind: 'buff',
+        totalDuration: 5.0,
+        durationLeft: 5.0,
+        tickTimer: 0,
+        icon: 'Shield',
+        color: '#eab308',
+      });
+      // Golden shield particles
+      for (let p = 0; p < 16; p++) {
+        const a = (p / 16) * Math.PI * 2;
+        state.particles.push({
+          x: px + Math.cos(a) * 24,
+          y: py + Math.sin(a) * 24,
+          vx: Math.cos(a) * 20,
+          vy: Math.sin(a) * 20,
+          color: '#facc15',
+          size: 4,
+          life: 0.5,
+          maxLife: 0.5,
+        });
+      }
+      this.addCombatLog('Iron Bulwark activated! Incoming damage reduced by 40%!', 'heal');
+    } else if (ability.id === 104) {
+      // Whirlwind: 360 AoE Spin
+      sound.playSwing();
+      state.player.isAttacking = true;
+      state.player.attackAnimTimer = 0.4;
+      state.screenShake = 3;
+
+      for (let p = 0; p < 24; p++) {
+        const a = (p / 24) * Math.PI * 2;
+        state.particles.push({
+          x: px + Math.cos(a) * 30,
+          y: py + Math.sin(a) * 30,
+          vx: Math.cos(a + 1.2) * 140,
+          vy: Math.sin(a + 1.2) * 140,
+          color: '#e2e8f0',
+          size: 3,
+          life: 0.35,
+          maxLife: 0.35,
+        });
+      }
+
+      for (const enemy of state.enemies) {
+        const dist = Math.hypot(enemy.x - px, enemy.y - py);
+        if (dist <= 130 + enemy.size) {
+          this.applyPlayerDamageToEnemy(enemy, ability);
+        }
+      }
+    }
+    // 2. Archer Abilities (201..204)
+    else if (ability.id === 201) {
+      // Quick Shot: Fast piercing arrow
+      sound.playSwing();
+      state.projectiles.push({
+        id: `arrow-${this.nextEntityId++}`,
+        sourceId: 'player',
+        x: px,
+        y: py,
+        vx: Math.cos(aimAngle) * 520,
+        vy: Math.sin(aimAngle) * 520,
+        speed: 520,
+        damage: ability.baseDamage,
+        school: DamageSchool.Physical,
+        flags: ability.damageFlags,
+        radius: 4,
+        rangeLeft: 340,
+        color: '#facc15',
+      });
+    } else if (ability.id === 202) {
+      // Multi-Shot: 5-arrow fan spread
+      sound.playSwing();
+      const spreadAngles = [-0.32, -0.16, 0, 0.16, 0.32];
+      for (const offset of spreadAngles) {
+        const a = aimAngle + offset;
+        state.projectiles.push({
+          id: `m-arrow-${this.nextEntityId++}`,
+          sourceId: 'player',
+          x: px,
+          y: py,
+          vx: Math.cos(a) * 480,
+          vy: Math.sin(a) * 480,
+          speed: 480,
+          damage: ability.baseDamage,
+          school: DamageSchool.Physical,
+          flags: ability.damageFlags,
+          radius: 4,
+          rangeLeft: 300,
+          color: '#fbbf24',
+        });
+      }
+    } else if (ability.id === 203) {
+      // Rain of Arrows: Targeted barrage at cursor with slow
+      sound.playFrost();
+      let tx = this.worldMousePos.x;
+      let ty = this.worldMousePos.y;
+      const distFromPlayer = Math.hypot(tx - px, ty - py);
+      if (distFromPlayer > 260) {
+        tx = px + ((tx - px) / distFromPlayer) * 260;
+        ty = py + ((ty - py) / distFromPlayer) * 260;
+      }
+
+      for (let p = 0; p < 22; p++) {
+        const rx = tx + (Math.random() - 0.5) * 110;
+        const ry = ty + (Math.random() - 0.5) * 110;
+        state.particles.push({
+          x: rx,
+          y: ry - 40,
+          vx: (Math.random() - 0.5) * 10,
+          vy: 200,
+          color: '#38bdf8',
+          size: 3,
+          life: 0.3,
+          maxLife: 0.3,
+        });
+      }
+
+      for (const enemy of state.enemies) {
+        const dist = Math.hypot(enemy.x - tx, enemy.y - ty);
+        if (dist <= 110 + enemy.size) {
+          this.applyPlayerDamageToEnemy(enemy, ability);
+          enemy.statusEffects = enemy.statusEffects.filter((s) => s.id !== 'pinned');
+          enemy.statusEffects.push({
+            id: 'pinned',
+            name: 'Pinned',
+            durationLeft: 2.5,
+            totalDuration: 2.5,
+            icon: 'Crosshair',
+            color: '#38bdf8',
+            tickTimer: 0,
+            speedMultiplier: 0.5,
+          });
+        }
+      }
+    } else if (ability.id === 204) {
+      // Evasive Vault: Dash + Speed boost
+      sound.playDash();
+      const dashDist = 200;
+      const steps = 8;
+      const stepDist = dashDist / steps;
+      let currX = px;
+      let currY = py;
+
+      for (let s = 0; s < steps; s++) {
+        const stepDx = Math.cos(aimAngle) * stepDist;
+        const stepDy = Math.sin(aimAngle) * stepDist;
+        const next = currentMap.resolveCircleMovement(currX, currY, stepDx, stepDy, 14);
+        currX = next.x;
+        currY = next.y;
+      }
+
+      for (let s = 0; s < 12; s++) {
+        const rx = px + (currX - px) * (s / 12);
+        const ry = py + (currY - py) * (s / 12);
+        state.particles.push({
+          x: rx,
+          y: ry,
+          vx: (Math.random() - 0.5) * 30,
+          vy: (Math.random() - 0.5) * 30,
+          color: '#34d399',
+          size: 4,
+          life: 0.3,
+          maxLife: 0.3,
+        });
+      }
+
+      state.player.x = currX;
+      state.player.y = currY;
+
+      state.player.statusEffects = state.player.statusEffects.filter((s) => s.name !== 'Windwalk');
+      state.player.statusEffects.push({
+        id: `wind-${this.nextEntityId++}`,
+        name: 'Windwalk',
+        kind: 'buff',
+        totalDuration: 2.5,
+        durationLeft: 2.5,
+        tickTimer: 0,
+        speedMultiplier: 1.45,
+        icon: 'Wind',
+        color: '#34d399',
+      });
+    }
+    // 3. Mage Abilities (301..304 or generic fallback 2, 3, 4)
+    else if (ability.id === 301) {
+      // Arcane Bolt: Fast arcane projectile
+      sound.playFrost();
+      state.projectiles.push({
+        id: `arcane-${this.nextEntityId++}`,
+        sourceId: 'player',
+        x: px,
+        y: py,
+        vx: Math.cos(aimAngle) * 440,
+        vy: Math.sin(aimAngle) * 440,
+        speed: 440,
+        damage: ability.baseDamage,
+        school: DamageSchool.Arcane,
+        flags: ability.damageFlags,
+        radius: 7,
+        rangeLeft: 320,
+        color: '#38bdf8',
+      });
+    } else if (ability.id === 302 || ability.id === 2) {
+      // Fireball: Explosive fire sphere
+      sound.playFireball();
       state.projectiles.push({
         id: `fire-${this.nextEntityId++}`,
         sourceId: 'player',
         x: px,
         y: py,
-        vx: Math.cos(aimAngle) * 350,
-        vy: Math.sin(aimAngle) * 350,
-        speed: 350,
+        vx: Math.cos(aimAngle) * 360,
+        vy: Math.sin(aimAngle) * 360,
+        speed: 360,
         damage: ability.baseDamage,
         school: DamageSchool.Fire,
         flags: ability.damageFlags,
-        radius: 8,
-        rangeLeft: ability.range,
+        radius: 9,
+        rangeLeft: 300,
         color: '#f97316',
       });
-    } else if (ability.id === 3) {
-      // Frost Nova: Radial cold blast
+    } else if (ability.id === 303 || ability.id === 3) {
+      // Frost Nova: Radial cold freeze blast
       sound.playFrost();
-      // Particles
       for (let i = 0; i < 24; i++) {
-        const angle = (Math.PI * 2 * i) / 24;
+        const a = (Math.PI * 2 * i) / 24;
         state.particles.push({
           x: px,
           y: py,
-          vx: Math.cos(angle) * 160,
-          vy: Math.sin(angle) * 160,
+          vx: Math.cos(a) * 160,
+          vy: Math.sin(a) * 160,
           color: '#38bdf8',
           size: 4,
           life: 0.45,
@@ -493,9 +977,8 @@ export class GameEngine {
 
       for (const enemy of state.enemies) {
         const dist = Math.hypot(enemy.x - px, enemy.y - py);
-        if (dist <= ability.radius!) {
+        if (dist <= 160 + enemy.size) {
           this.applyPlayerDamageToEnemy(enemy, ability);
-          // Apply chill status
           enemy.statusEffects = enemy.statusEffects.filter((s) => s.id !== 'chill');
           enemy.statusEffects.push({
             id: 'chill',
@@ -509,27 +992,26 @@ export class GameEngine {
           });
         }
       }
-    } else if (ability.id === 4) {
-      // Aether Dash: Rapid dash with continuous sliding collision
+    } else if (ability.id === 304 || ability.id === 4) {
+      // Aether Blink / Dash: Instant teleport with continuous sliding
       sound.playDash();
-      const dashDist = ability.range;
+      const blinkDist = ability.range || 220;
       const steps = 8;
-      const stepDist = dashDist / steps;
+      const stepDist = blinkDist / steps;
       let currX = px;
       let currY = py;
 
       for (let s = 0; s < steps; s++) {
         const stepDx = Math.cos(aimAngle) * stepDist;
         const stepDy = Math.sin(aimAngle) * stepDist;
-        const next = state.dungeon.map.resolveCircleMovement(currX, currY, stepDx, stepDy, 14);
+        const next = currentMap.resolveCircleMovement(currX, currY, stepDx, stepDy, 14);
         currX = next.x;
         currY = next.y;
       }
 
-      // Dash trail particles
-      for (let s = 0; s < 10; s++) {
-        const tx = px + (currX - px) * (s / 10);
-        const ty = py + (currY - py) * (s / 10);
+      for (let s = 0; s < 14; s++) {
+        const tx = px + (currX - px) * (s / 14);
+        const ty = py + (currY - py) * (s / 14);
         state.particles.push({
           x: tx,
           y: ty,
@@ -544,22 +1026,161 @@ export class GameEngine {
       state.player.x = currX;
       state.player.y = currY;
 
-      // Damage enemies passed through
       for (const enemy of state.enemies) {
         const dist = Math.hypot(enemy.x - currX, enemy.y - currY);
-        if (dist <= ability.radius!) {
+        if (dist <= 75 + enemy.size) {
           this.applyPlayerDamageToEnemy(enemy, ability);
         }
       }
     }
+    // 4. Necromancer Abilities (401..404)
+    else if (ability.id === 401) {
+      // Shadow Bolt: Screaming skull bolt
+      sound.playFrost();
+      state.projectiles.push({
+        id: `shadow-${this.nextEntityId++}`,
+        sourceId: 'player',
+        x: px,
+        y: py,
+        vx: Math.cos(aimAngle) * 400,
+        vy: Math.sin(aimAngle) * 400,
+        speed: 400,
+        damage: ability.baseDamage,
+        school: DamageSchool.Shadow,
+        flags: ability.damageFlags,
+        radius: 8,
+        rangeLeft: 300,
+        color: '#c084fc',
+      });
+    } else if (ability.id === 402) {
+      // Life Drain: Siphons life from enemy to heal player
+      let target: EnemyEntity | null = null;
+      let minAngleDiff = 0.9;
+      for (const enemy of state.enemies) {
+        const dx = enemy.x - px;
+        const dy = enemy.y - py;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= 220) {
+          const a = Math.atan2(dy, dx);
+          const diff = Math.abs(Math.atan2(Math.sin(a - aimAngle), Math.cos(a - aimAngle)));
+          if (diff < minAngleDiff) {
+            minAngleDiff = diff;
+            target = enemy;
+          }
+        }
+      }
+
+      if (target) {
+        sound.playPotion();
+        this.applyPlayerDamageToEnemy(target, ability);
+        const maxHp = state.playerStats.calculated[StatType.MaxHealth];
+        const healAmt = 35;
+        state.playerStats.health = Math.min(maxHp, state.playerStats.health + healAmt);
+
+        for (let p = 0; p < 12; p++) {
+          const t = p / 12;
+          state.particles.push({
+            x: target.x + (px - target.x) * t,
+            y: target.y + (py - target.y) * t,
+            vx: (Math.random() - 0.5) * 20,
+            vy: (Math.random() - 0.5) * 20,
+            color: '#a855f7',
+            size: 4,
+            life: 0.35,
+            maxLife: 0.35,
+          });
+        }
+        this.addCombatLog(`Drained essence from ${target.name} (+${healAmt} HP)!`, 'heal');
+      } else {
+        this.addCombatLog('No enemy in range for Life Drain!', 'system');
+      }
+    } else if (ability.id === 403) {
+      // Summon Skeleton: Spawns faithful minion
+      sound.playFrost();
+      if (state.summons.length >= 3) {
+        state.summons.shift(); // Max 3 minions
+      }
+
+      const summon: SummonEntity = {
+        id: `summon-${this.nextEntityId++}`,
+        name: 'Skeletal Warrior',
+        x: px + (Math.random() - 0.5) * 40,
+        y: py + (Math.random() - 0.5) * 40,
+        health: 180,
+        maxHealth: 180,
+        attackPower: 22 + state.playerStats.level * 3,
+        attackRange: 40,
+        attackCooldown: 1.2,
+        attackTimer: 0.3,
+        moveSpeed: 110,
+        durationLeft: 45,
+        maxDuration: 45,
+        facingAngle: aimAngle,
+        color: '#94a3b8',
+      };
+      state.summons.push(summon);
+
+      for (let p = 0; p < 14; p++) {
+        state.particles.push({
+          x: summon.x,
+          y: summon.y,
+          vx: (Math.random() - 0.5) * 60,
+          vy: (Math.random() - 0.5) * 60,
+          color: '#c084fc',
+          size: 4,
+          life: 0.4,
+          maxLife: 0.4,
+        });
+      }
+      this.addCombatLog('A Skeletal Warrior rises to fight at your command!', 'system');
+    } else if (ability.id === 404) {
+      // Bone Armor: Revolving bone barrier + AoE shadow pulse
+      sound.playEquip();
+      state.player.statusEffects = state.player.statusEffects.filter((s) => s.name !== 'Bone Armor');
+      state.player.statusEffects.push({
+        id: `bone-${this.nextEntityId++}`,
+        name: 'Bone Armor',
+        kind: 'buff',
+        totalDuration: 6.0,
+        durationLeft: 6.0,
+        tickTimer: 0,
+        icon: 'Shield',
+        color: '#cbd5e1',
+      });
+
+      for (const enemy of state.enemies) {
+        const dist = Math.hypot(enemy.x - px, enemy.y - py);
+        if (dist <= 85 + enemy.size) {
+          this.applyPlayerDamageToEnemy(enemy, ability);
+        }
+      }
+
+      for (let p = 0; p < 18; p++) {
+        const a = (p / 18) * Math.PI * 2;
+        state.particles.push({
+          x: px + Math.cos(a) * 26,
+          y: py + Math.sin(a) * 26,
+          vx: Math.cos(a) * 30,
+          vy: Math.sin(a) * 30,
+          color: '#e2e8f0',
+          size: 4,
+          life: 0.4,
+          maxLife: 0.4,
+        });
+      }
+      this.addCombatLog('Bone Armor activated! Defense fortified!', 'heal');
+    }
   }
 
-  private applyPlayerDamageToEnemy(enemy: EnemyEntity, ability: typeof PLAYER_ABILITIES[0]) {
+  private applyPlayerDamageToEnemy(
+    enemy: EnemyEntity,
+    ability: { baseDamage: number; school: DamageSchool; damageFlags?: number; [key: string]: any }
+  ) {
     const state = this.state;
     const calc = resolveDamagePipeline({
       baseAmount: ability.baseDamage,
       school: ability.school,
-      flags: ability.damageFlags,
+      flags: ability.damageFlags ?? 0,
       attackerAttackPower: state.playerStats.calculated[StatType.AttackPower],
       attackerSpellPower: state.playerStats.calculated[StatType.SpellPower],
       attackerCritChance: state.playerStats.calculated[StatType.CritChance],
@@ -626,6 +1247,7 @@ export class GameEngine {
       this.recalculatePlayerStats();
       state.playerStats.health = state.playerStats.calculated[StatType.MaxHealth];
       state.playerStats.mana = state.playerStats.calculated[StatType.MaxMana];
+      this.autoSave();
     }
 
     // Roll Loot
@@ -645,7 +1267,15 @@ export class GameEngine {
 
     if (enemy.archetype === 'dungeon_lord') {
       state.floorCleared = true;
-      this.addCombatLog(`Floor Boss slain! The portal to the next depth has been unlocked!`, 'system');
+      state.screenShake = 14;
+      sound.playBossDeath();
+      state.highestFloorUnlocked = Math.max(state.highestFloorUnlocked, state.currentFloor + 1);
+      this.autoSave();
+      if (state.currentFloor >= 10) {
+        this.addCombatLog(`👑 IGNIS REX SLAIN! The Abyss is conquered! Enter the Portal to finalize victory!`, 'system');
+      } else {
+        this.addCombatLog(`👑 ${enemy.name} slain! The Portal to Floor ${state.currentFloor + 1} has unlocked!`, 'system');
+      }
     }
   }
 
@@ -670,54 +1300,94 @@ export class GameEngine {
     }
 
     // 3. Player Movement
-    let mx = 0;
-    let my = 0;
-    if (this.isMoveActive('up')) my -= 1;
-    if (this.isMoveActive('down')) my += 1;
-    if (this.isMoveActive('left')) mx -= 1;
-    if (this.isMoveActive('right')) mx += 1;
+    // Translate screen directions to 2.5D isometric world coordinates:
+    // Screen Up (sy < 0): wx < 0, wy < 0
+    // Screen Down (sy > 0): wx > 0, wy > 0
+    // Screen Left (sx < 0): wx < 0, wy > 0
+    // Screen Right (sx > 0): wx > 0, wy < 0
+    let sx = 0;
+    let sy = 0;
+    if (this.isMoveActive('up')) sy -= 1;
+    if (this.isMoveActive('down')) sy += 1;
+    if (this.isMoveActive('left')) sx -= 1;
+    if (this.isMoveActive('right')) sx += 1;
 
-    if (mx !== 0 && my !== 0) {
-      const invLen = 1 / Math.SQRT2;
-      mx *= invLen;
-      my *= invLen;
+    let wx = 0;
+    let wy = 0;
+    if (sx !== 0 || sy !== 0) {
+      wx = 2 * sy + sx;
+      wy = 2 * sy - sx;
+      const len = Math.hypot(wx, wy);
+      if (len > 0) {
+        wx /= len;
+        wy /= len;
+      }
     }
 
     const moveSpeedStat = state.playerStats.calculated[StatType.MoveSpeed];
     let actualSpeed = 175 * (moveSpeedStat / 100);
+
+    for (const eff of state.player.statusEffects) {
+      if (eff.speedMultiplier) {
+        actualSpeed *= eff.speedMultiplier;
+      }
+    }
+
     const playerRadius = 14;
+    const currentMap = state.currentZone === 'town' ? state.townLevel.map : state.dungeon.map;
 
-    // Environmental Hazards interaction
-    const playerTile = state.dungeon.map.worldToTile(state.player.x, state.player.y);
-    const tileUnderPlayer = state.dungeon.map.get(playerTile.x, playerTile.y);
+    // Environmental Hazards & Interactive Terrain
+    const playerTile = currentMap.worldToTile(state.player.x, state.player.y);
+    const tileUnderPlayer = currentMap.get(playerTile.x, playerTile.y);
 
-    if (tileUnderPlayer === TileType.Water) {
-      // Water tile: 45% movement slowdown
-      actualSpeed *= 0.55;
-    } else if (tileUnderPlayer === TileType.Lava) {
-      // Lava pool: applies ticking Fire Burn
-      if (!state.player.statusEffects.some((e) => e.name === 'Lava Burn')) {
-        state.player.statusEffects.push({
-          id: `lava-${this.nextEntityId++}`,
-          name: 'Lava Burn',
-          kind: 'dot',
-          damagePerTick: 12,
-          school: DamageSchool.Fire,
-          totalDuration: 1.5,
-          durationLeft: 1.5,
-          tickTimer: 0,
-          icon: 'Flame',
-          color: '#f97316',
-        });
-        sound.playHit(false);
+    if (state.currentZone === 'town') {
+      // Fountain regeneration in town
+      const fountain = state.townLevel.fountainPos;
+      if (fountain && Math.hypot(state.player.x - fountain.x, state.player.y - fountain.y) <= 80) {
+        const maxHp = state.playerStats.calculated[StatType.MaxHealth];
+        const maxMp = state.playerStats.calculated[StatType.MaxMana];
+        state.playerStats.health = Math.min(maxHp, state.playerStats.health + 35 * dt);
+        state.playerStats.mana = Math.min(maxMp, state.playerStats.mana + 30 * dt);
+      }
+      // Active NPC detection
+      let closestNpc: NPCEntity | null = null;
+      let closestDist = 85;
+      for (const npc of state.townLevel.npcs) {
+        const d = Math.hypot(state.player.x - npc.x, state.player.y - npc.y);
+        if (d < closestDist) {
+          closestDist = d;
+          closestNpc = npc;
+        }
+      }
+      state.activeNPC = closestNpc;
+    } else {
+      state.activeNPC = null;
+      if (tileUnderPlayer === TileType.Water) {
+        actualSpeed *= 0.55;
+      } else if (tileUnderPlayer === TileType.Lava) {
+        if (!state.player.statusEffects.some((e) => e.name === 'Lava Burn')) {
+          state.player.statusEffects.push({
+            id: `lava-${this.nextEntityId++}`,
+            name: 'Lava Burn',
+            kind: 'dot',
+            damagePerTick: 12,
+            school: DamageSchool.Fire,
+            totalDuration: 1.5,
+            durationLeft: 1.5,
+            tickTimer: 0,
+            icon: 'Flame',
+            color: '#f97316',
+          });
+          sound.playHit(false);
+        }
       }
     }
 
     // Robust continuous collision resolution with smooth wall sliding
-    if (mx !== 0 || my !== 0) {
-      const dx = mx * actualSpeed * dt;
-      const dy = my * actualSpeed * dt;
-      const resolved = state.dungeon.map.resolveCircleMovement(
+    if (wx !== 0 || wy !== 0) {
+      const dx = wx * actualSpeed * dt;
+      const dy = wy * actualSpeed * dt;
+      const resolved = currentMap.resolveCircleMovement(
         state.player.x,
         state.player.y,
         dx,
@@ -729,14 +1399,14 @@ export class GameEngine {
     }
 
     // Smooth Camera Follow
-    // Target isometric screen coordinates of player
     const cellX = state.player.x / 64;
     const cellY = state.player.y / 64;
     const targetCamX = (cellX - cellY) * 32;
     const targetCamY = (cellX + cellY) * 16;
 
-    this.camera.x += (targetCamX - this.camera.x) * (dt * 6);
-    this.camera.y += (targetCamY - this.camera.y) * (dt * 6);
+    const camFactor = 1 - Math.exp(-12 * dt);
+    this.camera.x += (targetCamX - this.camera.x) * camFactor;
+    this.camera.y += (targetCamY - this.camera.y) * camFactor;
 
     // Natural Mana & Health Regen
     state.playerStats.mana = Math.min(
@@ -941,7 +1611,7 @@ export class GameEngine {
           const edx = dirX * currentSpeed * dt;
           const edy = dirY * currentSpeed * dt;
 
-          const resolved = state.dungeon.map.resolveCircleMovement(
+          const resolved = currentMap.resolveCircleMovement(
             enemy.x,
             enemy.y,
             edx,
@@ -954,7 +1624,7 @@ export class GameEngine {
           // Attack in range - only if line of sight is clear (cannot shoot/attack through walls)
           enemy.attackTimer -= dt;
           if (enemy.attackTimer <= 0) {
-            if (state.dungeon.map.hasLineOfSight(enemy.x, enemy.y, state.player.x, state.player.y)) {
+            if (currentMap.hasLineOfSight(enemy.x, enemy.y, state.player.x, state.player.y)) {
               enemy.attackTimer = enemy.attackCooldown;
               this.enemyAttack(enemy);
             }
@@ -976,14 +1646,113 @@ export class GameEngine {
           const push = (minDist - sepDist) * 0.5;
           const nx = (sepX / sepDist) * push;
           const ny = (sepY / sepDist) * push;
-          if (state.dungeon.map.isCircleWalkable(e1.x - nx, e1.y - ny, e1.size * 0.5)) {
+          if (currentMap.isCircleWalkable(e1.x - nx, e1.y - ny, e1.size * 0.5)) {
             e1.x -= nx;
             e1.y -= ny;
           }
-          if (state.dungeon.map.isCircleWalkable(e2.x + nx, e2.y + ny, e2.size * 0.5)) {
+          if (currentMap.isCircleWalkable(e2.x + nx, e2.y + ny, e2.size * 0.5)) {
             e2.x += nx;
             e2.y += ny;
           }
+        }
+      }
+    }
+
+    // 4.5 Update Minion Summons
+    for (let i = state.summons.length - 1; i >= 0; i--) {
+      const summon = state.summons[i];
+      summon.durationLeft -= dt;
+      if (summon.durationLeft <= 0 || summon.health <= 0) {
+        for (let p = 0; p < 8; p++) {
+          state.particles.push({
+            x: summon.x,
+            y: summon.y,
+            vx: (Math.random() - 0.5) * 40,
+            vy: (Math.random() - 0.5) * 40,
+            color: '#64748b',
+            size: 3,
+            life: 0.3,
+            maxLife: 0.3,
+          });
+        }
+        state.summons.splice(i, 1);
+        continue;
+      }
+
+      if (summon.attackTimer > 0) {
+        summon.attackTimer -= dt;
+      }
+
+      // Find nearest enemy
+      let nearestEnemy: EnemyEntity | null = null;
+      let minEnemyDist = 380;
+      for (const enemy of state.enemies) {
+        const d = Math.hypot(enemy.x - summon.x, enemy.y - summon.y);
+        if (d < minEnemyDist) {
+          minEnemyDist = d;
+          nearestEnemy = enemy;
+        }
+      }
+
+      if (nearestEnemy) {
+        const edx = nearestEnemy.x - summon.x;
+        const edy = nearestEnemy.y - summon.y;
+        summon.facingAngle = Math.atan2(edy, edx);
+
+        if (minEnemyDist > summon.attackRange) {
+          const step = summon.moveSpeed * dt;
+          const next = currentMap.resolveCircleMovement(
+            summon.x,
+            summon.y,
+            (edx / minEnemyDist) * step,
+            (edy / minEnemyDist) * step,
+            12
+          );
+          summon.x = next.x;
+          summon.y = next.y;
+        } else if (summon.attackTimer <= 0) {
+          summon.attackTimer = summon.attackCooldown;
+          sound.playSwing();
+          this.applyPlayerDamageToEnemy(nearestEnemy, {
+            id: 99,
+            name: 'Skeletal Strike',
+            key: '',
+            description: '',
+            icon: '',
+            baseDamage: summon.attackPower,
+            school: DamageSchool.Shadow,
+            damageFlags: 0,
+            cooldownSec: 0,
+            manaCost: 0,
+            range: summon.attackRange,
+          });
+          state.particles.push({
+            x: nearestEnemy.x,
+            y: nearestEnemy.y,
+            vx: (Math.random() - 0.5) * 30,
+            vy: (Math.random() - 0.5) * 30,
+            color: '#c084fc',
+            size: 4,
+            life: 0.25,
+            maxLife: 0.25,
+          });
+        }
+      } else {
+        const pdx = state.player.x - summon.x;
+        const pdy = state.player.y - summon.y;
+        const pdist = Math.hypot(pdx, pdy);
+        if (pdist > 65) {
+          summon.facingAngle = Math.atan2(pdy, pdx);
+          const step = summon.moveSpeed * dt;
+          const next = currentMap.resolveCircleMovement(
+            summon.x,
+            summon.y,
+            (pdx / pdist) * step,
+            (pdy / pdist) * step,
+            12
+          );
+          summon.x = next.x;
+          summon.y = next.y;
         }
       }
     }
@@ -1009,8 +1778,8 @@ export class GameEngine {
       });
 
       // Wall collision
-      const t = state.dungeon.map.worldToTile(proj.x, proj.y);
-      if (TileFlags.blocksProjectiles(state.dungeon.map.get(t.x, t.y))) {
+      const t = currentMap.worldToTile(proj.x, proj.y);
+      if (TileFlags.blocksProjectiles(currentMap.get(t.x, t.y))) {
         if (proj.school === DamageSchool.Fire && proj.sourceId === 'player') {
           for (const splash of state.enemies) {
             if (Math.hypot(splash.x - proj.x, splash.y - proj.y) <= 85) {
@@ -1121,40 +1890,45 @@ export class GameEngine {
     }
 
     // 7. Chest interaction
-    for (let cIdx = state.dungeon.chestLocations.length - 1; cIdx >= 0; cIdx--) {
-      const chestPos = state.dungeon.chestLocations[cIdx];
-      const distToChest = Math.hypot(state.player.x - chestPos.x, state.player.y - chestPos.y);
-      if (distToChest < 48) {
-        const ct = state.dungeon.map.worldToTile(chestPos.x, chestPos.y);
-        state.dungeon.map.set(ct.x, ct.y, TileType.Floor);
-        sound.playLootDrop();
-        const drops = rollLoot('chest');
-        for (const d of drops) {
-          state.lootDrops.push({
-            id: `chest-${this.nextEntityId++}`,
-            x: chestPos.x + (Math.random() - 0.5) * 40,
-            y: chestPos.y + (Math.random() - 0.5) * 40,
-            item: d,
-            creationTime: Date.now(),
-          });
+    if (state.currentZone === 'dungeon' && state.dungeon) {
+      for (let cIdx = state.dungeon.chestLocations.length - 1; cIdx >= 0; cIdx--) {
+        const chestPos = state.dungeon.chestLocations[cIdx];
+        const distToChest = Math.hypot(state.player.x - chestPos.x, state.player.y - chestPos.y);
+        if (distToChest < 48) {
+          const ct = state.dungeon.map.worldToTile(chestPos.x, chestPos.y);
+          state.dungeon.map.set(ct.x, ct.y, TileType.Floor);
+          sound.playLootDrop();
+          const drops = rollLoot('chest');
+          for (const d of drops) {
+            state.lootDrops.push({
+              id: `chest-${this.nextEntityId++}`,
+              x: chestPos.x + (Math.random() - 0.5) * 40,
+              y: chestPos.y + (Math.random() - 0.5) * 40,
+              item: d,
+              creationTime: Date.now(),
+            });
+          }
+          this.addCombatLog('Opened an Ancient Treasure Chest!', 'loot');
+          state.dungeon.chestLocations.splice(cIdx, 1);
         }
-        this.addCombatLog('Opened an Ancient Treasure Chest!', 'loot');
-        state.dungeon.chestLocations.splice(cIdx, 1);
       }
     }
 
-    // 8. Exit Portal interaction
-    const exitPos = state.dungeon.map.tileToWorldCenter(
-      state.dungeon.exitTile.x,
-      state.dungeon.exitTile.y
-    );
-    const distToExit = Math.hypot(state.player.x - exitPos.x, state.player.y - exitPos.y);
-    if (distToExit < 44 && state.floorCleared) {
-      if (state.currentFloor >= 3) {
-        state.isVictory = true;
-        this.addCombatLog('YOU HAVE CONQUERED THE ABYSS! VICTORY!', 'system');
-      } else {
-        this.advanceToNextFloor();
+    // 8. Exit Portal interaction (walking onto portal tile after clearing floor)
+    if (state.currentZone === 'dungeon' && state.dungeon?.exitTile) {
+      const exitPos = state.dungeon.map.tileToWorldCenter(
+        state.dungeon.exitTile.x,
+        state.dungeon.exitTile.y
+      );
+      const distToExit = Math.hypot(state.player.x - exitPos.x, state.player.y - exitPos.y);
+      if (distToExit < 30 && state.floorCleared) {
+        if (state.currentFloor >= 10) {
+          state.isVictory = true;
+          this.addCombatLog('👑 YOU HAVE CONQUERED THE ABYSS! SUPREME VICTORY!', 'system');
+        } else {
+          sound.playPortal();
+          this.advanceToNextFloor();
+        }
       }
     }
 
@@ -1296,12 +2070,17 @@ export class GameEngine {
       return;
     }
 
-    state.playerStats.health -= calc.damage;
+    let finalDamage = calc.damage;
+    if (state.player.statusEffects.some((e) => e.name === 'Iron Bulwark' || e.name === 'Bone Armor')) {
+      finalDamage = Math.max(1, Math.round(finalDamage * 0.6));
+    }
+
+    state.playerStats.health -= finalDamage;
     sound.playHit(false);
 
     state.floatingTexts.push({
       id: `p-hit-${this.nextEntityId++}`,
-      text: `-${calc.damage}`,
+      text: `-${finalDamage}`,
       x: state.player.x,
       y: state.player.y,
       color: '#ef4444',
@@ -1328,6 +2107,8 @@ export class GameEngine {
     this.state.dungeon = newDungeon;
     this.state.player.x = newDungeon.playerSpawn.x;
     this.state.player.y = newDungeon.playerSpawn.y;
+    this.camera.x = ((newDungeon.playerSpawn.x - newDungeon.playerSpawn.y) / 64) * 32;
+    this.camera.y = ((newDungeon.playerSpawn.x + newDungeon.playerSpawn.y) / 64) * 16;
     this.state.floorCleared = false;
     this.state.player.statusEffects = [];
     this.state.telegraphs = [];
@@ -1342,13 +2123,7 @@ export class GameEngine {
     this.state.playerStats = prevStats;
 
     this.spawnFloorEnemies(this.state, newDungeon, nextFloor);
-    saveFloorCheckpoint(
-      nextFloor,
-      this.state.playerStats,
-      this.state.equipment,
-      this.state.inventory,
-      this.state.unallocatedStatPoints
-    );
+    this.autoSave();
     this.addCombatLog(`Descended into Floor ${nextFloor}! Be on your guard!`, 'system');
   }
 
@@ -1368,6 +2143,7 @@ export class GameEngine {
       this.recalculatePlayerStats();
       this.addCombatLog(`Equipped ${def.name}.`, 'system');
       sound.playPotion();
+      this.autoSave();
     } else {
       // Consumable
       if (def.id === 10) {
@@ -1404,6 +2180,7 @@ export class GameEngine {
       } else {
         state.inventory[index] = null;
       }
+      this.autoSave();
     }
   }
 
@@ -1417,6 +2194,7 @@ export class GameEngine {
       this.recalculatePlayerStats();
       const def = getItemDef(equipped.itemDefId);
       this.addCombatLog(`Unequipped ${def?.name || 'gear'}.`, 'system');
+      this.autoSave();
     } else {
       this.addCombatLog('Inventory full!', 'system');
     }
@@ -1428,6 +2206,7 @@ export class GameEngine {
     this.state.playerStats.attributes[attr]++;
     this.recalculatePlayerStats();
     this.addCombatLog(`Increased ${AttributeType[attr]} to ${this.state.playerStats.attributes[attr]}!`, 'system');
+    this.autoSave();
   }
 
   public recalculatePlayerStats() {

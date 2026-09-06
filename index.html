@@ -11,6 +11,40 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Suppress unhandled rejections and errors originating from browser extensions (e.g. MetaMask, web3 injectors)
+      (function() {
+        var isExtensionError = function(msg, src) {
+          if (!msg && !src) return false;
+          var text = String(msg || '') + ' ' + String(src || '');
+          return (
+            text.includes('MetaMask') ||
+            text.includes('ethereum') ||
+            text.includes('chrome-extension://') ||
+            text.includes('moz-extension://') ||
+            text.includes('safari-web-extension://')
+          );
+        };
+
+        window.addEventListener('error', function(e) {
+          if (isExtensionError(e.message, e.filename)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = e.reason;
+          var msg = (reason && (reason.message || reason.stack || String(reason))) || '';
+          if (isExtensionError(msg, '')) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body class="h-full overflow-hidden select-none bg-slate-950 text-slate-100 font-sans">
     <div id="root" class="h-full w-full"></div>

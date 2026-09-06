@@ -82,8 +82,8 @@ export const MainMenuModal: React.FC<MainMenuModalProps> = ({
               <span>Continue</span>
             </div>
             {savedData && (
-              <span className="text-xs font-mono font-normal opacity-85">
-                Floor {savedData.currentFloor} (Lv.{savedData.playerStats.level})
+              <span className="text-xs font-mono font-medium opacity-90 capitalize">
+                {savedData.selectedClass} • Floor {savedData.currentFloor} (Lv.{savedData.playerStats.level})
               </span>
             )}
           </button>

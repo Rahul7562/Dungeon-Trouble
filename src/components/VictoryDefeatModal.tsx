@@ -1,9 +1,11 @@
 import React from 'react';
-import { RotateCcw, Trophy, Skull } from 'lucide-react';
+import { RotateCcw, Trophy, Skull, Sparkles } from 'lucide-react';
 
 interface VictoryDefeatModalProps {
   isVictory: boolean;
   onRestart: () => void;
+  onSelectClass?: () => void;
+  onMainMenu?: () => void;
   level: number;
   gold: number;
 }
@@ -11,11 +13,13 @@ interface VictoryDefeatModalProps {
 export const VictoryDefeatModal: React.FC<VictoryDefeatModalProps> = ({
   isVictory,
   onRestart,
+  onSelectClass,
+  onMainMenu,
   level,
   gold,
 }) => {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 select-none">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
         <div className="flex justify-center mb-4">
           {isVictory ? (
@@ -50,14 +54,37 @@ export const VictoryDefeatModal: React.FC<VictoryDefeatModalProps> = ({
           </div>
         </div>
 
-        <button
-          id="restart-run-btn"
-          onClick={onRestart}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold font-cinzel text-base flex items-center justify-center gap-2 shadow-lg transition active:scale-98"
-        >
-          <RotateCcw className="w-5 h-5" />
-          <span>{isVictory ? 'Begin New Conquest' : 'Try Again'}</span>
-        </button>
+        <div className="flex flex-col gap-2.5">
+          <button
+            id="restart-run-btn"
+            onClick={onRestart}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold font-cinzel text-base flex items-center justify-center gap-2 shadow-lg transition active:scale-98 cursor-pointer"
+          >
+            <RotateCcw className="w-5 h-5" />
+            <span>{isVictory ? 'Begin New Conquest' : 'Try Again'}</span>
+          </button>
+
+          {onSelectClass && (
+            <button
+              id="change-class-btn"
+              onClick={onSelectClass}
+              className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 font-bold font-cinzel text-xs flex items-center justify-center gap-2 transition active:scale-98 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span>Select Different Class / Hero</span>
+            </button>
+          )}
+
+          {onMainMenu && (
+            <button
+              id="defeat-main-menu-btn"
+              onClick={onMainMenu}
+              className="w-full py-2 rounded-xl bg-transparent hover:bg-slate-800/50 text-slate-400 hover:text-slate-200 font-cinzel text-xs transition cursor-pointer"
+            >
+              Return to Title Menu
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

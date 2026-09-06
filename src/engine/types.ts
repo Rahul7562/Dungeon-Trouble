@@ -341,3 +341,68 @@ export interface CombatLogEntry {
   type: 'damage' | 'heal' | 'loot' | 'system' | 'kill';
   timestamp: string;
 }
+
+export type CharacterClass = 'swordsman' | 'archer' | 'mage' | 'necromancer';
+export type ZoneType = 'town' | 'dungeon';
+
+export type NPCRole = 'elder' | 'healer' | 'storage' | 'shop' | 'blacksmith' | 'guide';
+
+export interface NPCEntity {
+  id: string;
+  name: string;
+  title: string;
+  role: NPCRole;
+  x: number;
+  y: number;
+  dialogue: string[];
+  color: string;
+  facingAngle: number;
+}
+
+export interface SummonEntity {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  health: number;
+  maxHealth: number;
+  attackPower: number;
+  attackRange: number;
+  attackCooldown: number;
+  attackTimer: number;
+  moveSpeed: number;
+  durationLeft: number;
+  maxDuration: number;
+  targetId?: string;
+  facingAngle: number;
+  color: string;
+}
+
+export interface SavedGameState {
+  version: number;
+  playerName: string;
+  selectedClass: CharacterClass;
+  currentZone: ZoneType;
+  currentFloor: number;
+  highestFloorUnlocked: number;
+  clearedFloors: number[];
+  player: {
+    x: number;
+    y: number;
+  };
+  playerStats: {
+    attributes: Record<AttributeType, number>;
+    calculated: Record<StatType, number>;
+    health: number;
+    mana: number;
+    level: number;
+    xp: number;
+    xpToNextLevel: number;
+    gold: number;
+  };
+  equipment: EquipmentState;
+  inventory: (ItemStack | null)[];
+  storage: (ItemStack | null)[];
+  unallocatedStatPoints: number;
+  savedAt: string;
+}

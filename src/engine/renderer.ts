@@ -7,6 +7,8 @@ import {
   EnemyEntity,
   ItemRarity,
   BossTelegraph,
+  NPCEntity,
+  SummonEntity,
 } from './types';
 import { TileMap } from './world';
 import { getItemDef } from './items';
@@ -74,6 +76,8 @@ export class IsometricRenderer {
       attackAnimTimer: number;
       health: number;
       maxHealth: number;
+      playerName?: string;
+      playerClass?: string;
     },
     enemies: EnemyEntity[],
     projectiles: Projectile[],
@@ -81,7 +85,11 @@ export class IsometricRenderer {
     particles: Particle[],
     floatingTexts: FloatingCombatText[],
     gameTime: number,
-    telegraphs: BossTelegraph[] = []
+    telegraphs: BossTelegraph[] = [],
+    npcs: NPCEntity[] = [],
+    activeNPC: NPCEntity | null = null,
+    summons: SummonEntity[] = [],
+    fountainPos: { x: number; y: number } | null = null
   ) {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
@@ -204,6 +212,34 @@ export class IsometricRenderer {
       depthList.push({
         depth: enemy.x + enemy.y,
         draw: () => this.drawEnemy(ctx, pos.x, pos.y, enemy, gameTime),
+      });
+    }
+
+    // NPCs
+    for (const npc of npcs) {
+      const pos = this.worldToScreen(npc.x, npc.y, 0, camera);
+      const isNear = activeNPC !== null && activeNPC.id === npc.id;
+      depthList.push({
+        depth: npc.x + npc.y,
+        draw: () => this.drawNPC(ctx, pos.x, pos.y, npc, isNear, gameTime),
+      });
+    }
+
+    // Summons
+    for (const summon of summons) {
+      const pos = this.worldToScreen(summon.x, summon.y, 0, camera);
+      depthList.push({
+        depth: summon.x + summon.y,
+        draw: () => this.drawSummon(ctx, pos.x, pos.y, summon, gameTime),
+      });
+    }
+
+    // Town Central Fountain
+    if (fountainPos) {
+      const pos = this.worldToScreen(fountainPos.x, fountainPos.y, 0, camera);
+      depthList.push({
+        depth: fountainPos.x + fountainPos.y,
+        draw: () => this.drawFountain(ctx, pos.x, pos.y, gameTime),
       });
     }
 
@@ -728,6 +764,164 @@ export class IsometricRenderer {
     ctx.beginPath();
     ctx.arc(x, y, proj.radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+  }
+
+  private drawNPC(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    npc: NPCEntity,
+    isNear: boolean,
+    gameTime: number
+  ) {
+    ctx.save();
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 4, 14, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Interaction Ring if player is near
+    if (isNear) {
+      const ringPulse = Math.sin(gameTime * 6) * 3;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(x, y + 4, 22 + ringPulse, 11 + ringPulse / 2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Floating "[E] Talk" prompt
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 12px "Cinzel", serif';
+      ctx.textAlign = 'center';
+      const promptY = y - 48 + Math.sin(gameTime * 4) * 2;
+      ctx.fillText('[E] Talk', x, promptY);
+    }
+
+    // NPC Robe / Body
+    const bob = Math.sin(gameTime * 2 + x) * 1;
+    const bodyY = y - 10 + bob;
+
+    ctx.fillStyle = npc.color;
+    ctx.beginPath();
+    ctx.arc(x, bodyY - 8, 8, 0, Math.PI * 2); // Head
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x, bodyY);
+    ctx.lineTo(x - 9, bodyY + 14);
+    ctx.lineTo(x + 9, bodyY + 14);
+    ctx.closePath();
+    ctx.fill();
+
+    // Gold collar / trim
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Floating Name & Title
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 11px "Cinzel", serif';
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillText(npc.name, x, y - 32);
+
+    ctx.font = '9px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(npc.title, x, y - 22);
+
+    ctx.restore();
+  }
+
+  private drawSummon(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    summon: SummonEntity,
+    gameTime: number
+  ) {
+    ctx.save();
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 2, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Minion Body (Pale bone with ethereal glow)
+    const bob = Math.sin(gameTime * 4 + x) * 2;
+    const my = y - 8 + bob;
+
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.arc(x, my - 6, 6, 0, Math.PI * 2); // Skull
+    ctx.fill();
+
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(x - 5, my, 10, 10); // Ribcage
+
+    // Ethereal green eye wisps
+    ctx.fillStyle = '#4ade80';
+    ctx.beginPath();
+    ctx.arc(x - 2, my - 6, 1.5, 0, Math.PI * 2);
+    ctx.arc(x + 2, my - 6, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Mini Health Bar
+    const hpPct = Math.max(0, summon.health / summon.maxHealth);
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(x - 12, y - 24, 24, 3);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(x - 12, y - 24, 24 * hpPct, 3);
+
+    ctx.restore();
+  }
+
+  private drawFountain(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    gameTime: number
+  ) {
+    ctx.save();
+
+    // Stone Basin Outer Rim
+    ctx.fillStyle = '#334155';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 42, 21, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Water Surface
+    const wave = Math.sin(gameTime * 3) * 0.1;
+    ctx.fillStyle = `rgba(14, 165, 233, ${0.75 + wave})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 36, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Center Pedestal
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(x - 6, y - 18, 12, 18);
+    ctx.strokeStyle = '#64748b';
+    ctx.strokeRect(x - 6, y - 18, 12, 18);
+
+    // Glowing Fountain Crystal
+    const bob = Math.sin(gameTime * 4) * 2;
+    const crystalY = y - 28 + bob;
+    ctx.fillStyle = '#38bdf8';
+    ctx.shadowColor = '#0284c7';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(x, crystalY - 10);
+    ctx.lineTo(x + 7, crystalY);
+    ctx.lineTo(x, crystalY + 10);
+    ctx.lineTo(x - 7, crystalY);
+    ctx.closePath();
+    ctx.fill();
+
     ctx.restore();
   }
 

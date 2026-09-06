@@ -16,8 +16,9 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { dungeon, player, enemies } = engine.state;
-    const map = dungeon.map;
+    const isTown = engine.state.currentZone === 'town';
+    const map = isTown ? engine.state.townLevel.map : engine.state.dungeon.map;
+    const { player, enemies } = engine.state;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -33,7 +34,7 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
       for (let x = 0; x < map.width; x++) {
         const type = map.get(x, y);
         if (type === TileType.Floor) {
-          ctx.fillStyle = '#1e293b';
+          ctx.fillStyle = isTown ? '#1e293b' : '#1e293b';
           ctx.fillRect(x * scaleX, y * scaleY, scaleX, scaleY);
         } else if (type === TileType.Exit) {
           ctx.fillStyle = '#a855f7';
@@ -45,13 +46,24 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
       }
     }
 
-    // Draw enemies as red dots
-    ctx.fillStyle = '#ef4444';
-    for (const enemy of enemies) {
-      const et = map.worldToTile(enemy.x, enemy.y);
-      ctx.beginPath();
-      ctx.arc(et.x * scaleX, et.y * scaleY, 2, 0, Math.PI * 2);
-      ctx.fill();
+    // In town: draw NPCs as amber dots
+    if (isTown) {
+      ctx.fillStyle = '#fbbf24';
+      for (const npc of engine.state.townLevel.npcs) {
+        const nt = map.worldToTile(npc.x, npc.y);
+        ctx.beginPath();
+        ctx.arc(nt.x * scaleX, nt.y * scaleY, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      // In dungeon: draw enemies as red dots
+      ctx.fillStyle = '#ef4444';
+      for (const enemy of enemies) {
+        const et = map.worldToTile(enemy.x, enemy.y);
+        ctx.beginPath();
+        ctx.arc(et.x * scaleX, et.y * scaleY, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Draw player as bright cyan dot
@@ -60,16 +72,26 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
     ctx.beginPath();
     ctx.arc(pt.x * scaleX, pt.y * scaleY, 3, 0, Math.PI * 2);
     ctx.fill();
-  }, [engine, engine.state.player.x, engine.state.player.y, engine.state.enemies.length]);
+  }, [
+    engine,
+    engine.state.currentZone,
+    engine.state.player.x,
+    engine.state.player.y,
+    engine.state.enemies.length,
+  ]);
+
+  const isTown = engine.state.currentZone === 'town';
 
   return (
     <div className="pointer-events-auto absolute bottom-4 right-4 z-20 bg-slate-950/85 backdrop-blur border border-slate-800 rounded-2xl p-2 shadow-2xl select-none">
       <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-1.5 px-1">
         <div className="flex items-center gap-1.5">
           <Compass className="w-3.5 h-3.5 text-amber-400" />
-          <span>Chamber Radar</span>
+          <span>{isTown ? 'Sanctuary Map' : 'Chamber Radar'}</span>
         </div>
-        <span className="font-mono text-[10px] text-slate-500">Floor {engine.state.currentFloor}</span>
+        <span className="font-mono text-[10px] text-slate-500">
+          {isTown ? 'Town-1' : `Floor ${engine.state.currentFloor}`}
+        </span>
       </div>
       <canvas
         id="minimap-canvas"

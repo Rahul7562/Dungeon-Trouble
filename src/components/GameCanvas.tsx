@@ -125,8 +125,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           x: engine.camera.x + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0),
           y: engine.camera.y + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0),
         };
+        const currentMap =
+          engine.state.currentZone === 'town'
+            ? engine.state.townLevel.map
+            : engine.state.dungeon.map;
+        const npcs = engine.state.currentZone === 'town' ? engine.state.townLevel.npcs : [];
+        const fountainPos =
+          engine.state.currentZone === 'town' ? engine.state.townLevel.fountainPos : null;
+
         rendererRef.current.render(
-          engine.state.dungeon.map,
+          currentMap,
           shakenCamera,
           {
             x: engine.state.player.x,
@@ -136,6 +144,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
             attackAnimTimer: engine.state.player.attackAnimTimer,
             health: engine.state.playerStats.health,
             maxHealth: maxHp,
+            playerName: engine.state.playerName,
+            playerClass: engine.state.selectedClass,
           },
           engine.state.enemies,
           engine.state.projectiles,
@@ -143,7 +153,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           engine.state.particles,
           engine.state.floatingTexts,
           now / 1000,
-          engine.state.telegraphs || []
+          engine.state.telegraphs || [],
+          npcs,
+          engine.state.activeNPC,
+          engine.state.summons || [],
+          fountainPos
         );
       }
 

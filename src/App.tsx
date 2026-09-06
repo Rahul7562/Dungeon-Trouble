@@ -8,6 +8,16 @@ import { CombatLog } from './components/CombatLog';
 import { Minimap } from './components/Minimap';
 import { VictoryDefeatModal } from './components/VictoryDefeatModal';
 import { MainMenuModal } from './components/MainMenuModal';
+import { ClassSelectModal } from './components/ClassSelectModal';
+import {
+  NPCModal,
+  StorageModal,
+  ShopModal,
+  BlacksmithModal,
+  DungeonPortalModal,
+} from './components/TownModals';
+import { CharacterClass } from './engine/types';
+import { hasSavedCheckpoint } from './engine/checkpoint';
 import { sound } from './engine/audio';
 import { Info, X } from 'lucide-react';
 
@@ -19,12 +29,22 @@ export const App: React.FC = () => {
   const [, setTick] = useState(0);
   const [isInMainMenu, setIsInMainMenu] = useState(true);
   const [isPausedMenu, setIsPausedMenu] = useState(false);
+  const [showClassSelect, setShowClassSelect] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showCharacterSheet, setShowCharacterSheet] = useState(false);
+  const [activeTownModal, setActiveTownModal] = useState<
+    'npc' | 'storage' | 'shop' | 'blacksmith' | 'portal' | null
+  >(null);
   const [showHelpGuide, setShowHelpGuide] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
 
-  const isAnyModalOpen = isInMainMenu || isPausedMenu || showInventory || showCharacterSheet;
+  const isAnyModalOpen =
+    isInMainMenu ||
+    isPausedMenu ||
+    showClassSelect ||
+    showInventory ||
+    showCharacterSheet ||
+    activeTownModal !== null;
 
   useEffect(() => {
     engine.isPaused = isAnyModalOpen;
@@ -32,6 +52,17 @@ export const App: React.FC = () => {
       engine.clearInput();
     }
   }, [engine, isAnyModalOpen]);
+
+  useEffect(() => {
+    engine.onInteract = () => {
+      if (engine.state.activeNPC) {
+        setActiveTownModal('npc');
+      }
+    };
+    engine.onInteractPortal = () => {
+      setActiveTownModal('portal');
+    };
+  }, [engine]);
 
   const handleEngineTick = useCallback(() => {
     // Force re-render periodically for HUD numbers
@@ -44,12 +75,39 @@ export const App: React.FC = () => {
     setIsMuted(!nextState);
   };
 
-  const handleResetGame = () => {
-    engine.state = engine.initializeNewGame(1);
+  const handleOpenClassSelect = () => {
+    setShowClassSelect(true);
+  };
+
+  const handleStartNewGame = (selectedClass: CharacterClass, playerName: string) => {
+    engine.state = engine.initializeNewGame(selectedClass, playerName, true, 1);
     setIsInMainMenu(false);
     setIsPausedMenu(false);
+    setShowClassSelect(false);
     setShowInventory(false);
     setShowCharacterSheet(false);
+    setActiveTownModal(null);
+    setShowHelpGuide(true);
+    setTick((t) => (t + 1) % 10000);
+  };
+
+  const handleTryAgain = () => {
+    const currentClass = engine.state.selectedClass || 'swordsman';
+    const currentName = engine.state.playerName || 'Valerius';
+    engine.state = engine.initializeNewGame(currentClass, currentName, true, 1);
+    setIsInMainMenu(false);
+    setIsPausedMenu(false);
+    setShowClassSelect(false);
+    setShowInventory(false);
+    setShowCharacterSheet(false);
+    setActiveTownModal(null);
+    setShowHelpGuide(true);
+    sound.playRespawn();
+    setTick((t) => (t + 1) % 10000);
+  };
+
+  const handleResetGame = () => {
+    handleOpenClassSelect();
   };
 
   const handleContinueGame = () => {
@@ -57,18 +115,26 @@ export const App: React.FC = () => {
     if (loaded) {
       setIsInMainMenu(false);
       setIsPausedMenu(false);
+      setShowClassSelect(false);
       setShowInventory(false);
       setShowCharacterSheet(false);
+      setActiveTownModal(null);
+      sound.playPortal();
+      setTick((t) => (t + 1) % 10000);
     } else {
-      handleResetGame();
+      handleOpenClassSelect();
     }
   };
 
   const handleQuitToMenu = () => {
+    engine.autoSave();
     setIsInMainMenu(true);
     setIsPausedMenu(false);
+    setShowClassSelect(false);
     setShowInventory(false);
     setShowCharacterSheet(false);
+    setActiveTownModal(null);
+    setTick((t) => (t + 1) % 10000);
   };
 
   // Global key bindings for UI
@@ -82,7 +148,17 @@ export const App: React.FC = () => {
         setShowCharacterSheet((prev) => !prev);
       } else if (k === 'm') {
         handleToggleMute();
+      } else if (k === 'h') {
+        setShowHelpGuide((prev) => !prev);
       } else if (k === 'escape') {
+        if (activeTownModal) {
+          setActiveTownModal(null);
+          return;
+        }
+        if (showClassSelect) {
+          setShowClassSelect(false);
+          return;
+        }
         setShowInventory(false);
         setShowCharacterSheet(false);
         setShowHelpGuide(false);
@@ -92,7 +168,7 @@ export const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [isInMainMenu]);
+  }, [isInMainMenu, activeTownModal, showClassSelect]);
 
   return (
     <main id="dungeon-trouble-app" className="relative w-full h-full overflow-hidden bg-slate-950 font-sans">
@@ -129,10 +205,14 @@ export const App: React.FC = () => {
       <CombatLog logs={engine.state.combatLogs} />
 
       {/* Beginner Guide Overlay Banner */}
-      {showHelpGuide && !isInMainMenu && (
+      {!isInMainMenu && (
         <aside
           id="controls-guide"
-          className="pointer-events-auto absolute top-20 left-4 z-20 max-w-xs bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-2xl p-4 shadow-2xl text-xs text-slate-300"
+          className={`absolute top-20 left-4 z-20 max-w-xs bg-slate-900/90 backdrop-blur border border-slate-700/80 hover:border-amber-500/50 rounded-2xl p-4 shadow-2xl text-xs text-slate-300 transition-opacity transition-transform transition-colors duration-300 ${
+            showHelpGuide
+              ? 'opacity-100 translate-y-0 pointer-events-auto'
+              : 'opacity-0 -translate-y-2 pointer-events-none'
+          }`}
         >
           <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-800">
             <div className="flex items-center gap-1.5 font-cinzel font-bold text-amber-400">
@@ -186,11 +266,69 @@ export const App: React.FC = () => {
         <CharacterSheetModal engine={engine} onClose={() => setShowCharacterSheet(false)} />
       )}
 
+      {/* Class Selection & Character Name Modal */}
+      {showClassSelect && (
+        <ClassSelectModal
+          initialPlayerName={engine.state.playerName || 'Valerius'}
+          currentClass={engine.state.selectedClass || 'swordsman'}
+          onSelectClass={handleStartNewGame}
+          onClose={() => setShowClassSelect(false)}
+          hasExistingSave={hasSavedCheckpoint()}
+        />
+      )}
+
+      {/* Town NPC Modal */}
+      {activeTownModal === 'npc' && engine.state.activeNPC && (
+        <NPCModal
+          engine={engine}
+          npc={engine.state.activeNPC}
+          onClose={() => setActiveTownModal(null)}
+          onOpenFacility={(role) => {
+            if (role === 'storage' || role === 'shop' || role === 'blacksmith' || role === 'portal') {
+              setActiveTownModal(role);
+            }
+          }}
+        />
+      )}
+
+      {/* Town Storage Facility Modal */}
+      {activeTownModal === 'storage' && (
+        <StorageModal engine={engine} onClose={() => setActiveTownModal(null)} />
+      )}
+
+      {/* Town Shop Vendor Modal */}
+      {activeTownModal === 'shop' && (
+        <ShopModal engine={engine} onClose={() => setActiveTownModal(null)} />
+      )}
+
+      {/* Town Blacksmith Upgrade Modal */}
+      {activeTownModal === 'blacksmith' && (
+        <BlacksmithModal engine={engine} onClose={() => setActiveTownModal(null)} />
+      )}
+
+      {/* Dungeon Portal Gateway Modal */}
+      {activeTownModal === 'portal' && (
+        <DungeonPortalModal
+          engine={engine}
+          onClose={() => setActiveTownModal(null)}
+          onDelveToFloor={(floor) => {
+            engine.transitionToZone('dungeon', floor);
+            setActiveTownModal(null);
+          }}
+          onReturnToTown={() => {
+            engine.transitionToZone('town', 1);
+            setActiveTownModal(null);
+          }}
+        />
+      )}
+
       {/* Game Over / Victory Modal */}
-      {(engine.state.isGameOver || engine.state.isVictory) && (
+      {(engine.state.isGameOver || engine.state.isVictory) && !showClassSelect && !isInMainMenu && (
         <VictoryDefeatModal
           isVictory={engine.state.isVictory}
-          onRestart={handleResetGame}
+          onRestart={handleTryAgain}
+          onSelectClass={handleOpenClassSelect}
+          onMainMenu={handleQuitToMenu}
           level={engine.state.playerStats.level}
           gold={engine.state.playerStats.gold}
         />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameEngine } from '../engine/gameEngine';
 import { StatType } from '../engine/types';
-import { PLAYER_ABILITIES } from '../engine/abilities';
+import { CLASS_DEFINITIONS } from '../engine/classes';
 import {
   Sword,
   Flame,
@@ -12,8 +12,19 @@ import {
   Volume2,
   VolumeX,
   Menu,
+  Crosshair,
+  Split,
+  CloudRain,
+  Wind,
+  Sparkles,
+  Ghost,
+  Skull,
+  Hammer,
+  Shield,
+  RotateCw,
+  MessageSquare,
+  DoorOpen,
 } from 'lucide-react';
-import { sound } from '../engine/audio';
 
 interface HUDProps {
   engine: GameEngine;
@@ -22,6 +33,8 @@ interface HUDProps {
   onOpenMenu: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  onInteract?: () => void;
+  onInteractPortal?: () => void;
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -31,9 +44,19 @@ export const HUD: React.FC<HUDProps> = ({
   onOpenMenu,
   isMuted,
   onToggleMute,
+  onInteract,
+  onInteractPortal,
 }) => {
-  const { playerStats, currentFloor, abilityCooldowns, unallocatedStatPoints, floorCleared } =
-    engine.state;
+  const {
+    playerStats,
+    currentFloor,
+    currentZone,
+    activeNPC,
+    selectedClass,
+    abilityCooldowns,
+    unallocatedStatPoints,
+    floorCleared,
+  } = engine.state;
   const maxHp = playerStats.calculated[StatType.MaxHealth] || 1;
   const maxMp = playerStats.calculated[StatType.MaxMana] || 1;
 
@@ -41,18 +64,62 @@ export const HUD: React.FC<HUDProps> = ({
   const mpPct = Math.max(0, Math.min(100, (playerStats.mana / maxMp) * 100));
   const xpPct = Math.max(0, Math.min(100, (playerStats.xp / playerStats.xpToNextLevel) * 100));
 
-  const getAbilityIcon = (id: number) => {
-    switch (id) {
-      case 1:
+  const isTown = currentZone === 'town';
+  const classDef =
+    CLASS_DEFINITIONS[selectedClass || 'swordsman'] || CLASS_DEFINITIONS.swordsman;
+  const activeAbilities = classDef.abilities;
+
+  // Check proximity to town portal or dungeon exit
+  const dungeonExitWorldPos = engine.state.dungeon?.exitTile
+    ? engine.state.dungeon.map.tileToWorldCenter(
+        engine.state.dungeon.exitTile.x,
+        engine.state.dungeon.exitTile.y
+      )
+    : { x: 0, y: 0 };
+
+  const isNearPortal = isTown
+    ? Math.hypot(
+        engine.state.player.x - (engine.state.townLevel.dungeonPortalPos?.x || 0),
+        engine.state.player.y - (engine.state.townLevel.dungeonPortalPos?.y || 0)
+      ) <= 90
+    : floorCleared &&
+      Math.hypot(
+        engine.state.player.x - dungeonExitWorldPos.x,
+        engine.state.player.y - dungeonExitWorldPos.y
+      ) <= 90;
+
+  const renderIcon = (iconName?: string) => {
+    switch (iconName) {
+      case 'Sword':
         return <Sword className="w-6 h-6 text-amber-300" />;
-      case 2:
-        return <Flame className="w-6 h-6 text-orange-400" />;
-      case 3:
+      case 'Hammer':
+        return <Hammer className="w-6 h-6 text-orange-400" />;
+      case 'Shield':
+        return <Shield className="w-6 h-6 text-yellow-300" />;
+      case 'RotateCw':
+        return <RotateCw className="w-6 h-6 text-emerald-300" />;
+      case 'Crosshair':
+        return <Crosshair className="w-6 h-6 text-emerald-400" />;
+      case 'Split':
+        return <Split className="w-6 h-6 text-teal-300" />;
+      case 'CloudRain':
+        return <CloudRain className="w-6 h-6 text-sky-400" />;
+      case 'Wind':
+        return <Wind className="w-6 h-6 text-indigo-300" />;
+      case 'Sparkles':
+        return <Sparkles className="w-6 h-6 text-cyan-300" />;
+      case 'Flame':
+        return <Flame className="w-6 h-6 text-orange-500" />;
+      case 'Snowflake':
         return <Snowflake className="w-6 h-6 text-sky-400" />;
-      case 4:
+      case 'Zap':
         return <Zap className="w-6 h-6 text-purple-400" />;
+      case 'Ghost':
+        return <Ghost className="w-6 h-6 text-purple-400" />;
+      case 'Skull':
+        return <Skull className="w-6 h-6 text-lime-400" />;
       default:
-        return null;
+        return <Sword className="w-6 h-6 text-amber-300" />;
     }
   };
 
@@ -64,19 +131,23 @@ export const HUD: React.FC<HUDProps> = ({
         <div className="pointer-events-auto bg-slate-900/85 backdrop-blur border border-slate-800 rounded-xl px-4 py-3 shadow-xl">
           <div className="flex items-center gap-2">
             <span className="font-cinzel font-bold text-amber-400 text-lg">
-              Floor {currentFloor}
+              {isTown ? 'Town-1: Sanctuary' : `Floor ${currentFloor}`}
             </span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-              Depth {currentFloor * 100}m
+              {isTown ? 'Safe Haven' : `Depth ${currentFloor * 100}m`}
             </span>
           </div>
           <p className="text-xs text-slate-300 mt-1">
-            {floorCleared ? (
+            {isTown ? (
+              <span className="text-amber-300">
+                Rest, stash loot with Brom, visit Garrick's shop, forge gear with Torvald, or enter the Portal.
+              </span>
+            ) : floorCleared ? (
               <span className="text-emerald-400 font-medium animate-pulse">
-                ✓ Floor Boss Slain! Portal Active!
+                ✓ Chamber Guardian Slain! Portal to Next Depth Active!
               </span>
             ) : (
-              'Defeat the chamber Overseer to open the portal.'
+              'Defeat the chamber Overseer to break the seal on the portal.'
             )}
           </p>
         </div>
@@ -141,7 +212,7 @@ export const HUD: React.FC<HUDProps> = ({
           />
         </div>
         <div className="text-[11px] text-amber-400/90 font-mono">
-          Level {playerStats.level} Hero • {playerStats.xp} / {playerStats.xpToNextLevel} XP •{' '}
+          {engine.state.playerName || 'Hero'} • Level {playerStats.level} {classDef.name} • {playerStats.xp} / {playerStats.xpToNextLevel} XP •{' '}
           {playerStats.gold} Gold
         </div>
 
@@ -162,6 +233,29 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         )}
 
+        {/* On-Screen Context Interaction Prompts */}
+        {activeNPC && (
+          <button
+            id="npc-interaction-prompt"
+            onClick={onInteract}
+            className="pointer-events-auto flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-cinzel font-bold text-xs shadow-xl border border-amber-300 animate-bounce active:scale-95 transition"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>[E] Talk to {activeNPC.name} ({activeNPC.title})</span>
+          </button>
+        )}
+
+        {!activeNPC && isNearPortal && (
+          <button
+            id="portal-interaction-prompt"
+            onClick={onInteractPortal}
+            className="pointer-events-auto flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-cinzel font-bold text-xs shadow-xl border border-purple-400 animate-pulse active:scale-95 transition"
+          >
+            <DoorOpen className="w-4 h-4" />
+            <span>[E] {isTown ? 'Enter Dungeon Gateway' : 'Access Floor Portal'}</span>
+          </button>
+        )}
+
         {/* Central HUD Panel */}
         <div className="pointer-events-auto flex items-center gap-4 bg-slate-900/90 backdrop-blur-md border border-slate-800/90 px-6 py-3 rounded-2xl shadow-2xl">
           {/* Health Bar / Stat */}
@@ -180,9 +274,9 @@ export const HUD: React.FC<HUDProps> = ({
             </div>
           </div>
 
-          {/* Skill Bar (4 Abilities) */}
+          {/* Skill Bar (4 Class-Specific Abilities) */}
           <div className="flex items-center gap-2">
-            {PLAYER_ABILITIES.map((ability) => {
+            {activeAbilities.map((ability) => {
               const cd = abilityCooldowns[ability.id] || 0;
               const hasMana = playerStats.mana >= ability.manaCost;
               const isOnCd = cd > 0;
@@ -202,7 +296,7 @@ export const HUD: React.FC<HUDProps> = ({
                   }`}
                   title={`${ability.name} (${ability.key})\n${ability.description}\nMana: ${ability.manaCost}`}
                 >
-                  {getAbilityIcon(ability.id)}
+                  {renderIcon(ability.icon)}
 
                   {/* Keybinding badge */}
                   <span className="absolute top-1 left-1.5 text-[9px] font-mono px-1 rounded bg-slate-950/80 text-slate-300">
