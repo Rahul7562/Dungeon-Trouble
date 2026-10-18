@@ -37,6 +37,87 @@ export const App: React.FC = () => {
   >(null);
   const [showHelpGuide, setShowHelpGuide] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
+  const [isDraggingGuide, setIsDraggingGuide] = useState(false);
+  const controlsGuideRef = useRef<HTMLElement | null>(null);
+  const guideDragRef = useRef<{
+    active: boolean;
+    pointerId: number | null;
+    startClientX: number;
+    startClientY: number;
+    originX: number;
+    originY: number;
+    currentX: number;
+    currentY: number;
+  }>({
+    active: false,
+    pointerId: null,
+    startClientX: 0,
+    startClientY: 0,
+    originX: 16,
+    originY: 80,
+    currentX: 16,
+    currentY: 80,
+  });
+
+  const handleGuidePointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('#dismiss-guide-btn')) return;
+    e.stopPropagation();
+
+    const el = controlsGuideRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    guideDragRef.current.active = true;
+    guideDragRef.current.pointerId = e.pointerId;
+    guideDragRef.current.startClientX = e.clientX;
+    guideDragRef.current.startClientY = e.clientY;
+    guideDragRef.current.originX = rect.left;
+    guideDragRef.current.originY = rect.top;
+    guideDragRef.current.currentX = rect.left;
+    guideDragRef.current.currentY = rect.top;
+
+    setIsDraggingGuide(true);
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore pointer capture errors on synthetic events
+    }
+  };
+
+  const handleGuidePointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (!guideDragRef.current.active) return;
+    e.stopPropagation();
+
+    const el = controlsGuideRef.current;
+    if (!el) return;
+
+    const dx = e.clientX - guideDragRef.current.startClientX;
+    const dy = e.clientY - guideDragRef.current.startClientY;
+    const maxX = Math.max(8, window.innerWidth - el.offsetWidth - 8);
+    const maxY = Math.max(8, window.innerHeight - el.offsetHeight - 8);
+
+    const nextX = Math.max(8, Math.min(maxX, guideDragRef.current.originX + dx));
+    const nextY = Math.max(8, Math.min(maxY, guideDragRef.current.originY + dy));
+
+    guideDragRef.current.currentX = nextX;
+    guideDragRef.current.currentY = nextY;
+    el.style.setProperty('--guide-x', `${Math.round(nextX)}px`);
+    el.style.setProperty('--guide-y', `${Math.round(nextY)}px`);
+  };
+
+  const handleGuidePointerUp = (e: React.PointerEvent<HTMLElement>) => {
+    if (!guideDragRef.current.active) return;
+    e.stopPropagation();
+    guideDragRef.current.active = false;
+    guideDragRef.current.pointerId = null;
+    setIsDraggingGuide(false);
+    try {
+      controlsGuideRef.current?.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore pointer capture release errors
+    }
+  };
 
   const isAnyModalOpen =
     isInMainMenu ||
@@ -208,49 +289,52 @@ export const App: React.FC = () => {
       {!isInMainMenu && (
         <aside
           id="controls-guide"
-          className={`absolute top-20 left-4 z-20 max-w-xs bg-slate-900/90 backdrop-blur border border-slate-700/80 hover:border-amber-500/50 rounded-2xl p-4 shadow-2xl text-xs text-slate-300 transition-opacity transition-transform transition-colors duration-300 ${
-            showHelpGuide
-              ? 'opacity-100 translate-y-0 pointer-events-auto'
-              : 'opacity-0 -translate-y-2 pointer-events-none'
-          }`}
+          ref={controlsGuideRef}
+          onPointerDown={handleGuidePointerDown}
+          onPointerMove={handleGuidePointerMove}
+          onPointerUp={handleGuidePointerUp}
+          onPointerCancel={handleGuidePointerUp}
+          className={`absolute z-20 max-w-xs backdrop-blur-md rounded-xl p-4 text-xs ${
+            showHelpGuide ? 'controls-guide-enter pointer-events-auto' : 'controls-guide-hidden'
+          } ${isDraggingGuide ? 'controls-guide-dragging' : ''}`}
         >
-          <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-800">
-            <div className="flex items-center gap-1.5 font-cinzel font-bold text-amber-400">
-              <Info className="w-4 h-4" />
+          <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-amber-700/40">
+            <div className="flex items-center gap-1.5 font-cinzel font-bold text-amber-300 tracking-wide">
+              <Info className="w-4 h-4 text-amber-400" />
               <span>Dungeon Delver Controls</span>
             </div>
             <button
               id="dismiss-guide-btn"
               onClick={() => setShowHelpGuide(false)}
-              className="text-slate-400 hover:text-slate-100 p-0.5 rounded transition"
+              className="text-amber-200/70 hover:text-amber-100 p-0.5 rounded transition"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
-          <ul className="space-y-1.5 text-[11px]">
+          <ul className="space-y-1.5 text-[11px] text-amber-100/90 leading-relaxed">
             <li>
-              <b className="text-slate-100">WASD / Arrow Keys</b>: Move Hero
+              <b className="text-amber-200 font-semibold">WASD / Arrow Keys</b>: Move Hero
             </li>
             <li>
-              <b className="text-slate-100">Mouse</b>: Aim direction & weapon facing
+              <b className="text-amber-200 font-semibold">Mouse</b>: Aim direction & weapon facing
             </li>
             <li>
-              <b className="text-slate-100">Left Click / 1</b>: Twin Cleave
+              <b className="text-amber-200 font-semibold">Left Click / 1</b>: Twin Cleave
             </li>
             <li>
-              <b className="text-slate-100">Right Click / 2 (Q)</b>: Inferno Burst
+              <b className="text-amber-200 font-semibold">Right Click / 2 (Q)</b>: Inferno Burst
             </li>
             <li>
-              <b className="text-slate-100">3 (E)</b>: Frost Nova (AoE Chill)
+              <b className="text-amber-200 font-semibold">3 (E)</b>: Frost Nova (AoE Chill)
             </li>
             <li>
-              <b className="text-slate-100">Space / 4</b>: Aether Dash
+              <b className="text-amber-200 font-semibold">Space / 4</b>: Aether Dash
             </li>
             <li>
-              <b className="text-slate-100">I / B</b>: Open Inventory & Gear
+              <b className="text-amber-200 font-semibold">I / B</b>: Open Inventory & Gear
             </li>
             <li>
-              <b className="text-slate-100">C</b>: Open Hero Sheet & Attributes
+              <b className="text-amber-200 font-semibold">C</b>: Open Hero Sheet & Attributes
             </li>
           </ul>
         </aside>

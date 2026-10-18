@@ -27,3 +27,62 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.8);
 }
+
+@keyframes controlsGuideFadeSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+#controls-guide {
+  left: var(--guide-x, 1rem);
+  top: var(--guide-y, 5rem);
+  touch-action: none;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(217, 119, 6, 0.16), transparent 70%),
+    linear-gradient(165deg, rgba(44, 33, 22, 0.95) 0%, rgba(28, 21, 15, 0.96) 55%, rgba(19, 14, 10, 0.97) 100%);
+  border: 1px solid rgba(217, 119, 6, 0.55);
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.78),
+    0 0 18px rgba(245, 158, 11, 0.22),
+    inset 0 0 24px rgba(120, 53, 15, 0.28),
+    inset 0 1px 0 rgba(253, 230, 138, 0.25);
+  color: #f3e8d2;
+}
+
+#controls-guide.controls-guide-dragging {
+  cursor: grabbing;
+  border-color: rgba(251, 191, 36, 0.9);
+  box-shadow:
+    0 20px 42px rgba(0, 0, 0, 0.88),
+    0 0 28px rgba(245, 158, 11, 0.42),
+    inset 0 0 26px rgba(120, 53, 15, 0.34),
+    inset 0 1px 0 rgba(253, 230, 138, 0.4);
+}
+
+#controls-guide:hover {
+  border-color: rgba(251, 191, 36, 0.8);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.82),
+    0 0 24px rgba(245, 158, 11, 0.34),
+    inset 0 0 26px rgba(120, 53, 15, 0.34),
+    inset 0 1px 0 rgba(253, 230, 138, 0.35);
+}
+
+#controls-guide.controls-guide-enter {
+  animation: controlsGuideFadeSlideUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+#controls-guide.controls-guide-hidden {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+

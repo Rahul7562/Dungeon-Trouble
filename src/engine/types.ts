@@ -89,6 +89,7 @@ export interface ItemStack {
   itemDefId: number;
   defId?: number; // alias for C++ tests
   count: number;
+  upgradeLevel?: number;
 }
 
 export type EquipmentState = Record<EquipSlot, ItemStack | null>;
@@ -233,6 +234,61 @@ export interface StatusEffectInstance {
   statModifier?: StatModifier;
 }
 
+export type EnemyArchetype =
+  | 'skeleton_warrior'
+  | 'shadow_stalker'
+  | 'goblin_archer'
+  | 'abyssal_brute'
+  | 'necromancer'
+  | 'dungeon_lord';
+
+export type EnemyAIState =
+  | 'idle'
+  | 'patrol'
+  | 'pursuit'
+  | 'positioning'
+  | 'windup'
+  | 'attack'
+  | 'recovery'
+  | 'reposition'
+  | 'stunned'
+  | 'dead';
+
+export type DungeonThemeId =
+  | 'forgotten_catacombs'
+  | 'frozen_depths'
+  | 'corrupted_temple'
+  | 'ember_crypt';
+
+export type DungeonPropKind =
+  | 'torch'
+  | 'pillar'
+  | 'sarcophagus'
+  | 'brazier'
+  | 'crystal'
+  | 'altar'
+  | 'banner'
+  | 'rubble'
+  | 'barrel'
+  | 'crate'
+  | 'bones'
+  | 'chains'
+  | 'statue'
+  | 'cobweb'
+  | 'arch';
+
+export interface DungeonProp {
+  id: string;
+  kind: DungeonPropKind;
+  x: number;
+  y: number;
+  solid: boolean;
+  radius: number;
+  variant?: number;
+  lightColor?: string;
+  lightRadius?: number;
+}
+
 export interface BossTelegraph {
   id: string;
   x: number;
@@ -242,6 +298,9 @@ export interface BossTelegraph {
   maxDuration: number;
   damage: number;
   school: DamageSchool;
+  shape?: 'circle' | 'ring' | 'cone' | 'line';
+  angle?: number;
+  sourceName?: string;
 }
 
 export interface FloatingCombatText {
@@ -258,12 +317,32 @@ export interface FloatingCombatText {
 export interface Particle {
   x: number;
   y: number;
+  z?: number;
   vx: number;
   vy: number;
+  vz?: number;
   color: string;
+  secondaryColor?: string;
   size: number;
   life: number;
   maxLife: number;
+  kind?:
+    | 'spark'
+    | 'smoke'
+    | 'rune'
+    | 'slash'
+    | 'ring'
+    | 'shard'
+    | 'ember'
+    | 'frost_nova'
+    | 'scorch'
+    | 'afterimage'
+    | 'blood'
+    | 'bone_frag'
+    | 'shockwave';
+  angle?: number;
+  scale?: number;
+  playerClass?: string;
 }
 
 export interface LootDropEntity {
@@ -272,6 +351,7 @@ export interface LootDropEntity {
   y: number;
   item: ItemStack;
   creationTime: number;
+  pickedUp?: boolean;
 }
 
 export interface Projectile {
@@ -289,9 +369,9 @@ export interface Projectile {
   rangeLeft: number;
   color: string;
   isPiercing?: boolean;
+  hitEntityIds?: string[];
+  appliesStatus?: string;
 }
-
-export type EnemyArchetype = 'skeleton_warrior' | 'goblin_archer' | 'necromancer' | 'dungeon_lord';
 
 export interface EnemyEntity {
   id: string;
@@ -300,10 +380,14 @@ export interface EnemyEntity {
   x: number;
   y: number;
   z: number;
+  spawnX?: number;
+  spawnY?: number;
   targetX?: number;
   targetY?: number;
   vx: number;
   vy: number;
+  knockbackVx?: number;
+  knockbackVy?: number;
   health: number;
   maxHealth: number;
   attackPower: number;
@@ -312,16 +396,27 @@ export interface EnemyEntity {
   attackRange: number;
   attackCooldown: number;
   attackTimer: number;
+  windupTimer?: number;
+  maxWindupTimer?: number;
+  recoveryTimer?: number;
+  aiState?: EnemyAIState;
+  patrolTimer?: number;
+  patrolAngle?: number;
   xpReward: number;
   color: string;
   size: number;
   facingAngle: number;
   statusEffects: StatusEffectInstance[];
   isHitFlashTimer: number;
+  isElite?: boolean;
+  eliteModifier?: 'Vampiric' | 'Molten' | 'Frozen' | 'Arcane' | 'Berserker';
+  isDead?: boolean;
+  rewardClaimed?: boolean;
   phase?: number;
   isEnraged?: boolean;
   specialAttackTimer?: number;
   summonTimer?: number;
+  novaTimer?: number;
 }
 
 export interface PlayerStats {
@@ -378,6 +473,15 @@ export interface SummonEntity {
   color: string;
 }
 
+export interface AudioSettings {
+  muted: boolean;
+  masterVolume: number;
+  sfxVolume: number;
+  musicVolume: number;
+}
+
+export type RenderQuality = 'high' | 'medium' | 'low';
+
 export interface SavedGameState {
   version: number;
   playerName: string;
@@ -404,5 +508,8 @@ export interface SavedGameState {
   inventory: (ItemStack | null)[];
   storage: (ItemStack | null)[];
   unallocatedStatPoints: number;
+  audioSettings?: AudioSettings;
+  renderQuality?: RenderQuality;
   savedAt: string;
 }
+

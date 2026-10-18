@@ -195,10 +195,16 @@ export function computeTotalStats(
     const def = getItemDef(stack.itemDefId);
     if (!def || !def.equipModifiers) continue;
 
+    const upgradeLevel = stack.upgradeLevel || 0;
     const sourceId = 1000000 + Number(slotKey);
     for (const mod of def.equipModifiers) {
+      let scaledValue = mod.value;
+      for (let u = 0; u < upgradeLevel; u++) {
+        scaledValue = Math.round(scaledValue * 1.15 + 2);
+      }
       StatCalculator.AddModifier(sheet, {
         ...mod,
+        value: scaledValue,
         sourceId,
       });
     }

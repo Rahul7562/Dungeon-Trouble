@@ -163,3 +163,4 @@ describe('World Tests', () => {
     expect(registry.Register(dupDef).IsError()).toBe(true);
   });
 });
+

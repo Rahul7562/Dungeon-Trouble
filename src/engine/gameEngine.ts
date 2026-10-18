@@ -55,6 +55,7 @@ export interface GameEngineState {
     facingAngle: number;
     isAttacking: boolean;
     attackAnimTimer: number;
+    hitFlashTimer?: number;
     statusEffects: StatusEffectInstance[];
   };
   playerStats: PlayerStats;
@@ -261,11 +262,9 @@ export class GameEngine {
     const def = getItemDef(item.itemDefId);
     if (!def || !def.equipModifiers) return;
 
-    for (const mod of def.equipModifiers) {
-      mod.value = Math.round(mod.value * 1.15 + 2);
-    }
+    item.upgradeLevel = (item.upgradeLevel || 0) + 1;
     this.recalculatePlayerStats();
-    this.addCombatLog(`Torvald tempered your ${def.name}! All stats enhanced!`, 'system');
+    this.addCombatLog(`Torvald tempered your ${def.name} to +${item.upgradeLevel}! All stats enhanced!`, 'system');
     this.autoSave();
   }
 
@@ -282,6 +281,7 @@ export class GameEngine {
 
     if (zone === 'town') {
       state.enemies = [];
+      state.summons = [];
       state.player.x = state.townLevel.playerSpawn.x;
       state.player.y = state.townLevel.playerSpawn.y;
       this.camera.x = ((state.player.x - state.player.y) / 64) * 32;
@@ -296,7 +296,8 @@ export class GameEngine {
       this.camera.y = ((state.player.x + state.player.y) / 64) * 16;
       state.floorCleared = false;
       this.spawnFloorEnemies(state, state.dungeon, state.currentFloor);
-      this.addCombatLog(`Delved into Floor ${state.currentFloor} of the Dungeon Ruin!`, 'system');
+      const themeName = state.dungeon.theme?.name || 'Dungeon Ruin';
+      this.addCombatLog(`Delved into Floor ${state.currentFloor}: ${themeName}!`, 'system');
     }
     this.autoSave();
   }
@@ -387,94 +388,182 @@ export class GameEngine {
 
   private spawnFloorEnemies(state: GameEngineState, dungeon: ReturnType<typeof generateDungeonLevel>, floor: number) {
     const enemies: EnemyEntity[] = [];
+    const eliteModifiers: Array<'Vampiric' | 'Molten' | 'Frozen' | 'Arcane' | 'Berserker'> = [
+      'Vampiric',
+      'Molten',
+      'Frozen',
+      'Arcane',
+      'Berserker',
+    ];
 
-    // Spawn regular enemies in intermediate rooms
+    // Spawn regular and elite enemies in intermediate rooms
     for (let r = 1; r < dungeon.rooms.length - 1; r++) {
       const room = dungeon.rooms[r];
       const count = Math.floor(Math.random() * 3) + 2;
 
       for (let i = 0; i < count; i++) {
-        const tx = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
-        const ty = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
+        const tx = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+        const ty = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
         const spawn = dungeon.map.tileToWorldCenter(tx, ty);
 
-        const isArcher = Math.random() > 0.6;
-        const isNecromancer = floor >= 2 && Math.random() > 0.75;
+        const roll = Math.random();
+        const isElite = floor >= 2 && i === 0 && Math.random() < 0.28;
+        const eliteMod = isElite ? eliteModifiers[(r + floor) % eliteModifiers.length] : undefined;
+        const hpMult = isElite ? 1.55 : 1.0;
+        const dmgMult = isElite ? 1.25 : 1.0;
+        const xpMult = isElite ? 2.2 : 1.0;
+        const sizeBonus = isElite ? 3 : 0;
 
-        if (isNecromancer) {
+        if (floor >= 3 && roll > 0.82) {
+          const baseHp = Math.round((130 + floor * 28) * hpMult);
+          enemies.push({
+            id: `enemy-${this.nextEntityId++}`,
+            archetype: 'abyssal_brute',
+            name: isElite ? `${eliteMod} Abyssal Juggernaut` : 'Abyssal Brute',
+            x: spawn.x,
+            y: spawn.y,
+            spawnX: spawn.x,
+            spawnY: spawn.y,
+            z: 0,
+            vx: 0,
+            vy: 0,
+            health: baseHp,
+            maxHealth: baseHp,
+            attackPower: Math.round((20 + floor * 5) * dmgMult),
+            armor: 18 + floor * 2,
+            moveSpeed: 68,
+            attackRange: 55,
+            attackCooldown: 1.9,
+            attackTimer: Math.random() * 1.2,
+            xpReward: Math.round((42 + floor * 6) * xpMult),
+            color: '#dc2626',
+            size: 19 + sizeBonus,
+            facingAngle: 0,
+            statusEffects: [],
+            isHitFlashTimer: 0,
+            isElite,
+            eliteModifier: eliteMod,
+          });
+        } else if (floor >= 2 && roll > 0.66) {
+          const baseHp = Math.round((90 + floor * 20) * hpMult);
           enemies.push({
             id: `enemy-${this.nextEntityId++}`,
             archetype: 'necromancer',
-            name: 'Crypt Necromancer',
+            name: isElite ? `${eliteMod} Crypt Lich` : 'Crypt Necromancer',
             x: spawn.x,
             y: spawn.y,
+            spawnX: spawn.x,
+            spawnY: spawn.y,
             z: 0,
             vx: 0,
             vy: 0,
-            health: 90 + floor * 20,
-            maxHealth: 90 + floor * 20,
-            attackPower: 16 + floor * 4,
-            armor: 8,
-            moveSpeed: 60,
+            health: baseHp,
+            maxHealth: baseHp,
+            attackPower: Math.round((16 + floor * 4) * dmgMult),
+            armor: 8 + floor,
+            moveSpeed: 62,
             attackRange: 240,
             attackCooldown: 2.2,
             attackTimer: Math.random() * 1.5,
-            xpReward: 35,
+            summonTimer: 9.0,
+            xpReward: Math.round((35 + floor * 5) * xpMult),
             color: '#7e22ce',
-            size: 16,
+            size: 16 + sizeBonus,
             facingAngle: 0,
             statusEffects: [],
             isHitFlashTimer: 0,
+            isElite,
+            eliteModifier: eliteMod,
           });
-        } else if (isArcher) {
+        } else if (floor >= 2 && roll > 0.48) {
+          const baseHp = Math.round((68 + floor * 16) * hpMult);
+          enemies.push({
+            id: `enemy-${this.nextEntityId++}`,
+            archetype: 'shadow_stalker',
+            name: isElite ? `${eliteMod} Nightblade Stalker` : 'Shadow Stalker',
+            x: spawn.x,
+            y: spawn.y,
+            spawnX: spawn.x,
+            spawnY: spawn.y,
+            z: 0,
+            vx: 0,
+            vy: 0,
+            health: baseHp,
+            maxHealth: baseHp,
+            attackPower: Math.round((16 + floor * 4) * dmgMult),
+            armor: 7 + floor,
+            moveSpeed: 122,
+            attackRange: 44,
+            attackCooldown: 0.95,
+            attackTimer: Math.random() * 0.8,
+            xpReward: Math.round((28 + floor * 4) * xpMult),
+            color: '#6366f1',
+            size: 14 + sizeBonus,
+            facingAngle: 0,
+            statusEffects: [],
+            isHitFlashTimer: 0,
+            isElite,
+            eliteModifier: eliteMod,
+          });
+        } else if (roll > 0.28) {
+          const baseHp = Math.round((60 + floor * 15) * hpMult);
           enemies.push({
             id: `enemy-${this.nextEntityId++}`,
             archetype: 'goblin_archer',
-            name: 'Sentry Archer',
+            name: isElite ? `${eliteMod} Deadeye Marksman` : 'Sentry Archer',
             x: spawn.x,
             y: spawn.y,
+            spawnX: spawn.x,
+            spawnY: spawn.y,
             z: 0,
             vx: 0,
             vy: 0,
-            health: 60 + floor * 15,
-            maxHealth: 60 + floor * 15,
-            attackPower: 12 + floor * 3,
-            armor: 5,
-            moveSpeed: 85,
-            attackRange: 200,
-            attackCooldown: 1.6,
+            health: baseHp,
+            maxHealth: baseHp,
+            attackPower: Math.round((12 + floor * 3) * dmgMult),
+            armor: 5 + floor,
+            moveSpeed: 88,
+            attackRange: 210,
+            attackCooldown: 1.55,
             attackTimer: Math.random() * 1.2,
-            xpReward: 25,
+            xpReward: Math.round((25 + floor * 3) * xpMult),
             color: '#15803d',
-            size: 14,
+            size: 14 + sizeBonus,
             facingAngle: 0,
             statusEffects: [],
             isHitFlashTimer: 0,
+            isElite,
+            eliteModifier: eliteMod,
           });
         } else {
+          const baseHp = Math.round((80 + floor * 18) * hpMult);
           enemies.push({
             id: `enemy-${this.nextEntityId++}`,
             archetype: 'skeleton_warrior',
-            name: 'Skeleton Marauder',
+            name: isElite ? `${eliteMod} Bone Vanguard` : 'Skeleton Marauder',
             x: spawn.x,
             y: spawn.y,
+            spawnX: spawn.x,
+            spawnY: spawn.y,
             z: 0,
             vx: 0,
             vy: 0,
-            health: 80 + floor * 18,
-            maxHealth: 80 + floor * 18,
-            attackPower: 14 + floor * 3,
-            armor: 12,
+            health: baseHp,
+            maxHealth: baseHp,
+            attackPower: Math.round((14 + floor * 3) * dmgMult),
+            armor: 12 + floor,
             moveSpeed: 95,
-            attackRange: 45,
+            attackRange: 46,
             attackCooldown: 1.2,
             attackTimer: Math.random() * 1.0,
-            xpReward: 20,
+            xpReward: Math.round((20 + floor * 3) * xpMult),
             color: '#e2e8f0',
-            size: 15,
+            size: 15 + sizeBonus,
             facingAngle: 0,
             statusEffects: [],
             isHitFlashTimer: 0,
+            isElite,
+            eliteModifier: eliteMod,
           });
         }
       }
@@ -499,6 +588,8 @@ export class GameEngine {
       name: bossDef.name,
       x: bossSpawn.x,
       y: bossSpawn.y,
+      spawnX: bossSpawn.x,
+      spawnY: bossSpawn.y,
       z: 0,
       vx: 0,
       vy: 0,
@@ -506,7 +597,7 @@ export class GameEngine {
       maxHealth: bossDef.health,
       attackPower: bossDef.attackPower,
       armor: bossDef.armor,
-      moveSpeed: 75,
+      moveSpeed: 76,
       attackRange: 75,
       attackCooldown: 1.8,
       attackTimer: 0.5,
@@ -519,7 +610,8 @@ export class GameEngine {
       phase: 1,
       isEnraged: false,
       specialAttackTimer: 4.0,
-      summonTimer: 6.0,
+      summonTimer: 7.0,
+      novaTimer: 6.5,
     });
 
     state.enemies = enemies;
@@ -601,6 +693,15 @@ export class GameEngine {
       }
     }
 
+    if (k === 'h' || k === 'z' || code === 'KeyH' || code === 'KeyZ') {
+      this.useQuickPotion('health');
+      return;
+    }
+    if (k === 'm' || k === 'x' || code === 'KeyM' || code === 'KeyX') {
+      this.useQuickPotion('mana');
+      return;
+    }
+
     if (k === '1' || code === 'Digit1') {
       this.triggerAbility(1);
     } else if (k === '2' || k === 'q' || code === 'Digit2' || code === 'KeyQ') {
@@ -609,6 +710,27 @@ export class GameEngine {
       this.triggerAbility(3);
     } else if (k === '4' || k === ' ' || code === 'Digit4' || code === 'Space') {
       this.triggerAbility(4);
+    }
+  }
+
+  public useQuickPotion(type: 'health' | 'mana'): boolean {
+    const inv = this.state.inventory;
+    if (type === 'health') {
+      const idx = inv.findIndex((s) => s && (s.itemDefId === 10 || s.itemDefId === 26 || s.itemDefId === 14));
+      if (idx !== -1) {
+        this.useItem(idx);
+        return true;
+      }
+      this.addCombatLog('No Health Elixirs remaining in bag!', 'system');
+      return false;
+    } else {
+      const idx = inv.findIndex((s) => s && (s.itemDefId === 11 || s.itemDefId === 27));
+      if (idx !== -1) {
+        this.useItem(idx);
+        return true;
+      }
+      this.addCombatLog('No Mana Flasks remaining in bag!', 'system');
+      return false;
     }
   }
 
@@ -682,7 +804,22 @@ export class GameEngine {
       // Twin Slash: Melee frontal cleave in generous arc
       sound.playSwing();
       state.player.isAttacking = true;
-      state.player.attackAnimTimer = 0.25;
+      state.player.attackAnimTimer = 0.28;
+
+      // Twin Cleave sweeping blade wave + directional sparks
+      state.particles.push({
+        x: px + Math.cos(aimAngle) * 26,
+        y: py + Math.sin(aimAngle) * 26,
+        vx: Math.cos(aimAngle) * 45,
+        vy: Math.sin(aimAngle) * 45,
+        color: '#fef08a',
+        secondaryColor: '#f97316',
+        size: 52,
+        life: 0.24,
+        maxLife: 0.24,
+        kind: 'slash',
+        angle: aimAngle,
+      });
 
       const cleaveArc = 1.9; // ~110-degree frontal cleave
       const hitRadius = ability.range + 16;
@@ -714,6 +851,18 @@ export class GameEngine {
       state.player.isAttacking = true;
       state.player.attackAnimTimer = 0.35;
       state.screenShake = 5;
+
+      state.particles.push({
+        x: px + Math.cos(aimAngle) * 22,
+        y: py + Math.sin(aimAngle) * 22,
+        vx: 0,
+        vy: 0,
+        color: '#f59e0b',
+        size: 75,
+        life: 0.32,
+        maxLife: 0.32,
+        kind: 'shockwave',
+      });
 
       for (const enemy of state.enemies) {
         const dist = Math.hypot(enemy.x - px, enemy.y - py);
@@ -890,6 +1039,23 @@ export class GameEngine {
         currY = next.y;
       }
 
+      for (let s = 1; s <= 4; s++) {
+        const t = s / 5;
+        state.particles.push({
+          x: px + (currX - px) * t,
+          y: py + (currY - py) * t,
+          vx: 0,
+          vy: 0,
+          color: '#34d399',
+          size: 16,
+          life: 0.28 + s * 0.04,
+          maxLife: 0.35,
+          kind: 'afterimage',
+          angle: aimAngle,
+          playerClass: state.selectedClass,
+        });
+      }
+
       for (let s = 0; s < 12; s++) {
         const rx = px + (currX - px) * (s / 12);
         const ry = py + (currY - py) * (s / 12);
@@ -925,6 +1091,8 @@ export class GameEngine {
     else if (ability.id === 301) {
       // Arcane Bolt: Fast arcane projectile
       sound.playFrost();
+      state.player.isAttacking = true;
+      state.player.attackAnimTimer = 0.22;
       state.projectiles.push({
         id: `arcane-${this.nextEntityId++}`,
         sourceId: 'player',
@@ -941,8 +1109,21 @@ export class GameEngine {
         color: '#38bdf8',
       });
     } else if (ability.id === 302 || ability.id === 2) {
-      // Fireball: Explosive fire sphere
+      // Inferno Burst / Fireball: Activation cue + Explosive fire sphere
       sound.playFireball();
+      state.player.isAttacking = true;
+      state.player.attackAnimTimer = 0.26;
+      state.particles.push({
+        x: px,
+        y: py,
+        vx: 0,
+        vy: 0,
+        color: '#fb923c',
+        size: 36,
+        life: 0.26,
+        maxLife: 0.26,
+        kind: 'ring',
+      });
       state.projectiles.push({
         id: `fire-${this.nextEntityId++}`,
         sourceId: 'player',
@@ -959,19 +1140,35 @@ export class GameEngine {
         color: '#f97316',
       });
     } else if (ability.id === 303 || ability.id === 3) {
-      // Frost Nova: Radial cold freeze blast
+      // Frost Nova: Radial freezing wave + Crystalline ground glyph + Icy shards
       sound.playFrost();
+      state.player.isAttacking = true;
+      state.player.attackAnimTimer = 0.28;
+      state.particles.push({
+        x: px,
+        y: py,
+        vx: 0,
+        vy: 0,
+        color: '#38bdf8',
+        size: 160,
+        life: 0.65,
+        maxLife: 0.65,
+        kind: 'frost_nova',
+      });
+
       for (let i = 0; i < 24; i++) {
         const a = (Math.PI * 2 * i) / 24;
         state.particles.push({
           x: px,
           y: py,
-          vx: Math.cos(a) * 160,
-          vy: Math.sin(a) * 160,
-          color: '#38bdf8',
-          size: 4,
+          vx: Math.cos(a) * 165,
+          vy: Math.sin(a) * 165,
+          color: i % 2 === 0 ? '#bae6fd' : '#38bdf8',
+          size: 5,
           life: 0.45,
           maxLife: 0.45,
+          kind: 'shard',
+          angle: a,
         });
       }
 
@@ -993,7 +1190,7 @@ export class GameEngine {
         }
       }
     } else if (ability.id === 304 || ability.id === 4) {
-      // Aether Blink / Dash: Instant teleport with continuous sliding
+      // Aether Blink / Dash: Instant teleport with hero afterimages & warp rings
       sound.playDash();
       const blinkDist = ability.range || 220;
       const steps = 8;
@@ -1007,6 +1204,50 @@ export class GameEngine {
         const next = currentMap.resolveCircleMovement(currX, currY, stepDx, stepDy, 14);
         currX = next.x;
         currY = next.y;
+      }
+
+      // Origin & Destination warp rings
+      state.particles.push(
+        {
+          x: px,
+          y: py,
+          vx: 0,
+          vy: 0,
+          color: '#38bdf8',
+          size: 42,
+          life: 0.32,
+          maxLife: 0.32,
+          kind: 'shockwave',
+        },
+        {
+          x: currX,
+          y: currY,
+          vx: 0,
+          vy: 0,
+          color: '#c084fc',
+          size: 54,
+          life: 0.36,
+          maxLife: 0.36,
+          kind: 'shockwave',
+        }
+      );
+
+      // 4 Fading Hero Silhouette Afterimages along the dash path
+      for (let s = 1; s <= 4; s++) {
+        const t = s / 5;
+        state.particles.push({
+          x: px + (currX - px) * t,
+          y: py + (currY - py) * t,
+          vx: 0,
+          vy: 0,
+          color: '#c084fc',
+          size: 16,
+          life: 0.25 + s * 0.05,
+          maxLife: 0.4,
+          kind: 'afterimage',
+          angle: aimAngle,
+          playerClass: state.selectedClass,
+        });
       }
 
       for (let s = 0; s < 14; s++) {
@@ -1176,6 +1417,7 @@ export class GameEngine {
     enemy: EnemyEntity,
     ability: { baseDamage: number; school: DamageSchool; damageFlags?: number; [key: string]: any }
   ) {
+    if (enemy.isDead || enemy.health <= 0) return;
     const state = this.state;
     const calc = resolveDamagePipeline({
       baseAmount: ability.baseDamage,
@@ -1190,7 +1432,21 @@ export class GameEngine {
     });
 
     enemy.health -= calc.damage;
-    enemy.isHitFlashTimer = 0.12;
+    enemy.isHitFlashTimer = 0.14;
+
+    // Apply subtle knockback away from player for non-boss enemies
+    if (enemy.archetype !== 'dungeon_lord') {
+      const kdx = enemy.x - state.player.x;
+      const kdy = enemy.y - state.player.y;
+      const kdist = Math.hypot(kdx, kdy) || 1;
+      const kbStrength = calc.isCrit ? 120 : 65;
+      enemy.knockbackVx = (kdx / kdist) * kbStrength;
+      enemy.knockbackVy = (kdy / kdist) * kbStrength;
+    }
+
+    if (calc.isCrit) {
+      state.screenShake = Math.max(state.screenShake, 3.5);
+    }
 
     sound.playHit(calc.isCrit);
 
@@ -1206,17 +1462,33 @@ export class GameEngine {
       maxLifetime: 0.9,
     });
 
-    // Particle splash
-    for (let p = 0; p < 6; p++) {
+    // Particle splash + directional slash on crit/melee
+    const hitColor = getSchoolColor(ability.school);
+    if (calc.isCrit || ability.school === DamageSchool.Physical) {
       state.particles.push({
         x: enemy.x,
         y: enemy.y,
-        vx: (Math.random() - 0.5) * 140,
-        vy: (Math.random() - 0.5) * 140,
-        color: getSchoolColor(ability.school),
+        vx: 0,
+        vy: 0,
+        color: calc.isCrit ? '#facc15' : hitColor,
+        size: calc.isCrit ? 16 : 12,
+        life: 0.22,
+        maxLife: 0.22,
+        kind: 'slash',
+        angle: Math.atan2(enemy.y - state.player.y, enemy.x - state.player.x),
+      });
+    }
+    for (let p = 0; p < 7; p++) {
+      state.particles.push({
+        x: enemy.x,
+        y: enemy.y,
+        vx: (Math.random() - 0.5) * 155,
+        vy: (Math.random() - 0.5) * 155,
+        color: hitColor,
         size: 3,
         life: 0.3,
         maxLife: 0.3,
+        kind: 'spark',
       });
     }
 
@@ -1226,13 +1498,46 @@ export class GameEngine {
   }
 
   private handleEnemyKilled(enemy: EnemyEntity) {
+    if (enemy.rewardClaimed) return;
+    enemy.rewardClaimed = true;
+    enemy.isDead = true;
+
     const state = this.state;
     this.addCombatLog(`Slain ${enemy.name}! (+${enemy.xpReward} XP)`, 'kill');
 
     // Add XP & Gold
     state.playerStats.xp += enemy.xpReward;
-    const goldDrop = Math.floor(Math.random() * 15) + 10;
+    const goldDrop = (Math.floor(Math.random() * 15) + 10) * (enemy.isElite ? 2 : 1);
     state.playerStats.gold += goldDrop;
+
+    // Death ring + shattering bone / soul burst
+    state.particles.push({
+      x: enemy.x,
+      y: enemy.y,
+      vx: 0,
+      vy: 0,
+      color: enemy.color || '#ef4444',
+      size: enemy.size * 1.6,
+      life: 0.42,
+      maxLife: 0.42,
+      kind: 'shockwave',
+    });
+
+    for (let b = 0; b < 8; b++) {
+      const ba = (b / 8) * Math.PI * 2;
+      state.particles.push({
+        x: enemy.x,
+        y: enemy.y,
+        vx: Math.cos(ba) * (45 + Math.random() * 55),
+        vy: Math.sin(ba) * (45 + Math.random() * 55),
+        color: enemy.archetype === 'skeleton_warrior' ? '#e2e8f0' : enemy.color,
+        size: 5,
+        life: 0.45,
+        maxLife: 0.45,
+        kind: enemy.archetype === 'skeleton_warrior' ? 'bone_frag' : 'ember',
+        angle: ba,
+      });
+    }
 
     // Check level up
     while (state.playerStats.xp >= state.playerStats.xpToNextLevel) {
@@ -1251,7 +1556,12 @@ export class GameEngine {
     }
 
     // Roll Loot
-    const tableKey = enemy.archetype === 'dungeon_lord' ? 'boss' : enemy.archetype === 'necromancer' ? 'elite' : 'trash';
+    const tableKey =
+      enemy.archetype === 'dungeon_lord'
+        ? 'boss'
+        : enemy.isElite || enemy.archetype === 'necromancer' || enemy.archetype === 'abyssal_brute'
+        ? 'elite'
+        : 'trash';
     const droppedItems = rollLoot(tableKey);
 
     for (const item of droppedItems) {
@@ -1269,7 +1579,10 @@ export class GameEngine {
       state.floorCleared = true;
       state.screenShake = 14;
       sound.playBossDeath();
-      state.highestFloorUnlocked = Math.max(state.highestFloorUnlocked, state.currentFloor + 1);
+      if (!state.clearedFloors.includes(state.currentFloor)) {
+        state.clearedFloors.push(state.currentFloor);
+      }
+      state.highestFloorUnlocked = Math.max(state.highestFloorUnlocked, Math.min(10, state.currentFloor + 1));
       this.autoSave();
       if (state.currentFloor >= 10) {
         this.addCombatLog(`👑 IGNIS REX SLAIN! The Abyss is conquered! Enter the Portal to finalize victory!`, 'system');
@@ -1510,6 +1823,21 @@ export class GameEngine {
         }
       }
 
+      // Apply decaying knockback velocity
+      if (enemy.knockbackVx || enemy.knockbackVy) {
+        const kbx = (enemy.knockbackVx || 0) * dt;
+        const kby = (enemy.knockbackVy || 0) * dt;
+        const resolvedKb = currentMap.resolveCircleMovement(enemy.x, enemy.y, kbx, kby, enemy.size * 0.65);
+        enemy.x = resolvedKb.x;
+        enemy.y = resolvedKb.y;
+        enemy.knockbackVx = (enemy.knockbackVx || 0) * Math.exp(-10 * dt);
+        enemy.knockbackVy = (enemy.knockbackVy || 0) * Math.exp(-10 * dt);
+        if (Math.hypot(enemy.knockbackVx, enemy.knockbackVy) < 4) {
+          enemy.knockbackVx = 0;
+          enemy.knockbackVy = 0;
+        }
+      }
+
       // AI Behavior: Distance to player
       const dx = state.player.x - enemy.x;
       const dy = state.player.y - enemy.y;
@@ -1518,17 +1846,28 @@ export class GameEngine {
       enemy.facingAngle = Math.atan2(dy, dx);
 
       // Aggro radius
-      if (dist < 440) {
-        // Boss Mechanics: Enrage & AoE Telegraphs
+      if (dist < 460) {
+        // Boss Mechanics: Multi-phase transitions & AoE Telegraphs
         if (enemy.archetype === 'dungeon_lord') {
-          // Check Enrage transition at 50% HP
-          if (enemy.health <= enemy.maxHealth * 0.5 && !enemy.isEnraged) {
+          const hpRatio = enemy.health / enemy.maxHealth;
+
+          // Phase 2 transition at 65% HP
+          if (hpRatio <= 0.65 && (enemy.phase || 1) < 2) {
+            enemy.phase = 2;
+            state.screenShake = 8;
+            sound.playBossRoar();
+            this.addCombatLog(`🔥 ${enemy.name} enters Phase II: Arcane Nova & Cataclysm!`, 'system');
+          }
+
+          // Phase 3 Enrage transition at 50% HP
+          if (hpRatio <= 0.5 && !enemy.isEnraged) {
             enemy.isEnraged = true;
+            enemy.phase = 3;
             enemy.attackCooldown *= 0.65;
             enemy.moveSpeed += 25;
             state.screenShake = 12;
             this.addCombatLog(`⚠️ ${enemy.name.toUpperCase()} HAS ENRAGED! RUNIC HELLFIRE IMMINENT!`, 'system');
-            sound.playFireball();
+            sound.playBossRoar();
             for (let p = 0; p < 25; p++) {
               const angle = Math.random() * Math.PI * 2;
               const spd = Math.random() * 180 + 60;
@@ -1541,6 +1880,7 @@ export class GameEngine {
                 size: Math.random() * 4 + 3,
                 life: 0.6,
                 maxLife: 0.6,
+                kind: 'spark',
               });
             }
           }
@@ -1549,23 +1889,39 @@ export class GameEngine {
           if (enemy.specialAttackTimer !== undefined) {
             enemy.specialAttackTimer -= dt;
             if (enemy.specialAttackTimer <= 0) {
-              enemy.specialAttackTimer = enemy.isEnraged ? 2.5 : 4.5;
+              enemy.specialAttackTimer = enemy.isEnraged ? 2.6 : 4.4;
               state.telegraphs.push({
                 id: `tele-${this.nextEntityId++}`,
                 x: state.player.x,
                 y: state.player.y,
-                radius: enemy.isEnraged ? 65 : 50,
+                radius: enemy.isEnraged ? 65 : 52,
                 duration: 1.2,
                 maxDuration: 1.2,
-                damage: Math.round(enemy.attackPower * (enemy.isEnraged ? 1.6 : 1.2)),
+                damage: Math.round(enemy.attackPower * (enemy.isEnraged ? 1.55 : 1.2)),
                 school: DamageSchool.Fire,
               });
+              // In Phase 2/3, spawn secondary flanking ruptures
+              if ((enemy.phase || 1) >= 2) {
+                for (let k = 0; k < 2; k++) {
+                  const ang = enemy.facingAngle + (k === 0 ? 0.85 : -0.85);
+                  state.telegraphs.push({
+                    id: `tele-${this.nextEntityId++}`,
+                    x: state.player.x + Math.cos(ang) * 75,
+                    y: state.player.y + Math.sin(ang) * 75,
+                    radius: 42,
+                    duration: 1.35,
+                    maxDuration: 1.35,
+                    damage: Math.round(enemy.attackPower * 1.1),
+                    school: DamageSchool.Shadow,
+                  });
+                }
+              }
               sound.playFireball();
               this.addCombatLog(`⚠️ Ground Rupture detonating beneath you! Evade!`, 'system');
             }
           }
 
-          // Phase 1 Minion Reinforcements
+          // Phase 1/2 Minion Reinforcements
           if (!enemy.isEnraged && enemy.summonTimer !== undefined) {
             enemy.summonTimer -= dt;
             if (enemy.summonTimer <= 0 && state.enemies.length < 8) {
@@ -1583,9 +1939,9 @@ export class GameEngine {
                   z: 0,
                   vx: 0,
                   vy: 0,
-                  health: 60,
-                  maxHealth: 60,
-                  attackPower: 12,
+                  health: 60 + state.currentFloor * 10,
+                  maxHealth: 60 + state.currentFloor * 10,
+                  attackPower: 12 + state.currentFloor * 2,
                   armor: 6,
                   moveSpeed: 90,
                   attackRange: 45,
@@ -1603,7 +1959,60 @@ export class GameEngine {
           }
         }
 
+        // Necromancer periodic skeleton raise
+        if (enemy.archetype === 'necromancer' && enemy.summonTimer !== undefined) {
+          enemy.summonTimer -= dt;
+          if (enemy.summonTimer <= 0 && state.enemies.length < 10) {
+            enemy.summonTimer = 11.0;
+            const sx = enemy.x + (Math.random() - 0.5) * 48;
+            const sy = enemy.y + (Math.random() - 0.5) * 48;
+            if (currentMap.isCircleWalkable(sx, sy, 12)) {
+              state.enemies.push({
+                id: `risen-${this.nextEntityId++}`,
+                archetype: 'skeleton_warrior',
+                name: 'Risen Thrall',
+                x: sx,
+                y: sy,
+                z: 0,
+                vx: 0,
+                vy: 0,
+                health: 55 + state.currentFloor * 10,
+                maxHealth: 55 + state.currentFloor * 10,
+                attackPower: 11 + state.currentFloor * 2,
+                armor: 6,
+                moveSpeed: 92,
+                attackRange: 44,
+                attackCooldown: 1.3,
+                attackTimer: 0.6,
+                xpReward: 12,
+                color: '#cbd5e1',
+                size: 13,
+                facingAngle: enemy.facingAngle,
+                statusEffects: [],
+                isHitFlashTimer: 0,
+              });
+            }
+          }
+        }
+
+        // Ranged kiting behavior for Archers when player gets too close
+        if (enemy.archetype === 'goblin_archer' && dist < 85 && dist > 10) {
+          const dirX = -dx / dist;
+          const dirY = -dy / dist;
+          const resolved = currentMap.resolveCircleMovement(
+            enemy.x,
+            enemy.y,
+            dirX * currentSpeed * 0.75 * dt,
+            dirY * currentSpeed * 0.75 * dt,
+            enemy.size * 0.7
+          );
+          enemy.x = resolved.x;
+          enemy.y = resolved.y;
+          enemy.aiState = 'reposition';
+        }
+
         if (dist > enemy.attackRange) {
+          enemy.aiState = 'pursuit';
           // Move towards player with continuous sliding collision
           const dirX = dx / dist;
           const dirY = dy / dist;
@@ -1623,13 +2032,19 @@ export class GameEngine {
         } else {
           // Attack in range - only if line of sight is clear (cannot shoot/attack through walls)
           enemy.attackTimer -= dt;
+          if (enemy.attackTimer <= 0.35) {
+            enemy.aiState = 'windup';
+          }
           if (enemy.attackTimer <= 0) {
             if (currentMap.hasLineOfSight(enemy.x, enemy.y, state.player.x, state.player.y)) {
               enemy.attackTimer = enemy.attackCooldown;
+              enemy.aiState = 'attack';
               this.enemyAttack(enemy);
             }
           }
         }
+      } else {
+        enemy.aiState = 'idle';
       }
     }
 
@@ -1781,6 +2196,30 @@ export class GameEngine {
       const t = currentMap.worldToTile(proj.x, proj.y);
       if (TileFlags.blocksProjectiles(currentMap.get(t.x, t.y))) {
         if (proj.school === DamageSchool.Fire && proj.sourceId === 'player') {
+          state.particles.push(
+            {
+              x: proj.x,
+              y: proj.y,
+              vx: 0,
+              vy: 0,
+              color: '#f97316',
+              size: 56,
+              life: 0.65,
+              maxLife: 0.65,
+              kind: 'scorch',
+            },
+            {
+              x: proj.x,
+              y: proj.y,
+              vx: 0,
+              vy: 0,
+              color: '#fef08a',
+              size: 75,
+              life: 0.32,
+              maxLife: 0.32,
+              kind: 'shockwave',
+            }
+          );
           for (const splash of state.enemies) {
             if (Math.hypot(splash.x - proj.x, splash.y - proj.y) <= 85) {
               this.applyPlayerDamageToEnemy(splash, {
@@ -1823,8 +2262,47 @@ export class GameEngine {
               range: 0,
             });
 
-            // If fire, trigger AoE explosion
+            // If fire, trigger Inferno Burst AoE explosion + Scorch Crater + Embers
             if (proj.school === DamageSchool.Fire) {
+              state.particles.push(
+                {
+                  x: proj.x,
+                  y: proj.y,
+                  vx: 0,
+                  vy: 0,
+                  color: '#f97316',
+                  size: 62,
+                  life: 0.7,
+                  maxLife: 0.7,
+                  kind: 'scorch',
+                },
+                {
+                  x: proj.x,
+                  y: proj.y,
+                  vx: 0,
+                  vy: 0,
+                  color: '#fef08a',
+                  size: 80,
+                  life: 0.35,
+                  maxLife: 0.35,
+                  kind: 'shockwave',
+                }
+              );
+              for (let e = 0; e < 12; e++) {
+                const ea = (e / 12) * Math.PI * 2;
+                state.particles.push({
+                  x: proj.x,
+                  y: proj.y,
+                  vx: Math.cos(ea) * (50 + Math.random() * 70),
+                  vy: Math.sin(ea) * (50 + Math.random() * 70),
+                  color: '#fb923c',
+                  size: 4.5,
+                  life: 0.45,
+                  maxLife: 0.45,
+                  kind: 'ember',
+                });
+              }
+
               for (const splash of state.enemies) {
                 if (splash.id !== enemy.id && Math.hypot(splash.x - proj.x, splash.y - proj.y) <= 80) {
                   this.applyPlayerDamageToEnemy(splash, {
@@ -2000,9 +2478,20 @@ export class GameEngine {
     const py = state.player.y;
     const angle = Math.atan2(py - enemy.y, px - enemy.x);
 
-    if (enemy.archetype === 'skeleton_warrior' || enemy.archetype === 'dungeon_lord') {
+    if (
+      enemy.archetype === 'skeleton_warrior' ||
+      enemy.archetype === 'shadow_stalker' ||
+      enemy.archetype === 'abyssal_brute' ||
+      enemy.archetype === 'dungeon_lord'
+    ) {
       sound.playSwing();
-      // Melee strike
+      if (enemy.archetype === 'abyssal_brute' || enemy.archetype === 'dungeon_lord') {
+        state.screenShake = Math.max(state.screenShake, 4);
+      }
+      // Vampiric elite modifier heals enemy on hit
+      if (enemy.eliteModifier === 'Vampiric') {
+        enemy.health = Math.min(enemy.maxHealth, enemy.health + Math.round(enemy.attackPower * 0.35));
+      }
       this.applyEnemyDamageToPlayer(enemy.attackPower, DamageSchool.Physical);
     } else if (enemy.archetype === 'goblin_archer') {
       // Shoot arrow
@@ -2152,12 +2641,24 @@ export class GameEngine {
         state.playerStats.health = Math.min(maxHp, state.playerStats.health + 50);
         sound.playPotion();
         this.addCombatLog('Consumed Health Elixir (+50 HP).', 'heal');
+      } else if (def.id === 26) {
+        // Greater Health Potion (+140 HP)
+        const maxHp = state.playerStats.calculated[StatType.MaxHealth];
+        state.playerStats.health = Math.min(maxHp, state.playerStats.health + 140);
+        sound.playPotion();
+        this.addCombatLog('Consumed Greater Health Potion (+140 HP).', 'heal');
       } else if (def.id === 11) {
         // Mana Flask (+40 Mana)
         const maxMana = state.playerStats.calculated[StatType.MaxMana];
         state.playerStats.mana = Math.min(maxMana, state.playerStats.mana + 40);
         sound.playPotion();
         this.addCombatLog('Consumed Mana Flask (+40 MP).', 'heal');
+      } else if (def.id === 27) {
+        // Greater Mana Flask (+100 Mana)
+        const maxMana = state.playerStats.calculated[StatType.MaxMana];
+        state.playerStats.mana = Math.min(maxMana, state.playerStats.mana + 100);
+        sound.playPotion();
+        this.addCombatLog('Consumed Greater Mana Flask (+100 MP).', 'heal');
       } else if (def.id === 14) {
         // Elixir of Regeneration (HoT: heals 15 HP/sec for 6 sec)
         sound.playPotion();

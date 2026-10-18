@@ -275,10 +275,13 @@ export const LOOT_TABLES: Record<string, LootTableDef> = {
     name: 'Dungeon Minion Drop',
     rolls: 1,
     entries: [
-      { itemDefId: 10, minCount: 1, maxCount: 2, weight: 40 },
-      { itemDefId: 11, minCount: 1, maxCount: 1, weight: 30 },
-      { itemDefId: 1, minCount: 1, maxCount: 1, weight: 20 },
-      { itemDefId: 2, minCount: 1, maxCount: 1, weight: 10 },
+      { itemDefId: 10, minCount: 1, maxCount: 2, weight: 35 },
+      { itemDefId: 11, minCount: 1, maxCount: 2, weight: 28 },
+      { itemDefId: 1, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 31, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 2, minCount: 1, maxCount: 1, weight: 9 },
+      { itemDefId: 33, minCount: 1, maxCount: 1, weight: 9 },
+      { itemDefId: 35, minCount: 1, maxCount: 1, weight: 9 },
     ],
   },
   elite: {
@@ -286,65 +289,89 @@ export const LOOT_TABLES: Record<string, LootTableDef> = {
     name: 'Elite Champion Drop',
     rolls: 2,
     entries: [
-      { itemDefId: 2, minCount: 1, maxCount: 1, weight: 25 },
-      { itemDefId: 3, minCount: 1, maxCount: 1, weight: 25 },
-      { itemDefId: 7, minCount: 1, maxCount: 1, weight: 20 },
+      { itemDefId: 10, minCount: 1, maxCount: 2, weight: 25, guaranteed: true },
+      { itemDefId: 18, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 32, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 33, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 35, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 36, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 3, minCount: 1, maxCount: 1, weight: 15 },
+      { itemDefId: 7, minCount: 1, maxCount: 1, weight: 15 },
       { itemDefId: 8, minCount: 1, maxCount: 1, weight: 15 },
-      { itemDefId: 10, minCount: 2, maxCount: 3, weight: 30 },
+      { itemDefId: 34, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 37, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 26, minCount: 1, maxCount: 2, weight: 20 },
     ],
   },
   boss: {
     id: 3,
     name: 'Dungeon Lord Cache',
-    rolls: 4,
+    rolls: 3,
     entries: [
-      { itemDefId: 6, minCount: 1, maxCount: 1, weight: 20 },
-      { itemDefId: 12, minCount: 1, maxCount: 1, weight: 20 },
-      { itemDefId: 13, minCount: 1, maxCount: 1, weight: 20 },
-      { itemDefId: 4, minCount: 1, maxCount: 1, weight: 25 },
-      { itemDefId: 5, minCount: 1, maxCount: 1, weight: 25 },
-      { itemDefId: 9, minCount: 1, maxCount: 1, weight: 25 },
-      { itemDefId: 14, minCount: 2, maxCount: 4, weight: 40 },
+      { itemDefId: 26, minCount: 2, maxCount: 3, weight: 25, guaranteed: true },
+      { itemDefId: 4, minCount: 1, maxCount: 1, weight: 22 },
+      { itemDefId: 5, minCount: 1, maxCount: 1, weight: 22 },
+      { itemDefId: 9, minCount: 1, maxCount: 1, weight: 22 },
+      { itemDefId: 28, minCount: 1, maxCount: 1, weight: 20 },
+      { itemDefId: 29, minCount: 1, maxCount: 1, weight: 20 },
+      { itemDefId: 6, minCount: 1, maxCount: 1, weight: 15 },
+      { itemDefId: 12, minCount: 1, maxCount: 1, weight: 15 },
+      { itemDefId: 13, minCount: 1, maxCount: 1, weight: 15 },
+      { itemDefId: 30, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 38, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 39, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 14, minCount: 2, maxCount: 3, weight: 30 },
     ],
   },
   chest: {
     id: 4,
     name: 'Ancient Treasure Chest',
-    rolls: 3,
+    rolls: 2,
     entries: [
-      { itemDefId: 3, minCount: 1, maxCount: 1, weight: 30 },
-      { itemDefId: 7, minCount: 1, maxCount: 1, weight: 25 },
-      { itemDefId: 8, minCount: 1, maxCount: 1, weight: 20 },
-      { itemDefId: 9, minCount: 1, maxCount: 1, weight: 15 },
-      { itemDefId: 10, minCount: 2, maxCount: 4, weight: 40 },
-      { itemDefId: 11, minCount: 2, maxCount: 3, weight: 35 },
+      { itemDefId: 10, minCount: 2, maxCount: 3, weight: 30, guaranteed: true },
+      { itemDefId: 3, minCount: 1, maxCount: 1, weight: 20 },
+      { itemDefId: 7, minCount: 1, maxCount: 1, weight: 20 },
+      { itemDefId: 8, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 32, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 34, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 37, minCount: 1, maxCount: 1, weight: 18 },
+      { itemDefId: 9, minCount: 1, maxCount: 1, weight: 12 },
       { itemDefId: 14, minCount: 1, maxCount: 2, weight: 25 },
+      { itemDefId: 26, minCount: 1, maxCount: 2, weight: 25 },
+      { itemDefId: 27, minCount: 1, maxCount: 2, weight: 25 },
     ],
   },
 };
 
-export function rollLoot(tableKey: string): ItemStack[] {
+export function rollLoot(tableKey: string, seed?: number): ItemStack[] {
   const table = LOOT_TABLES[tableKey] || LOOT_TABLES.trash;
   const drops: ItemStack[] = [];
+  const rng = seed !== undefined ? new SimRandom(seed) : null;
+  const rand01 = () => (rng ? rng.nextFloat01() : Math.random());
 
   for (const entry of table.entries) {
     if (entry.guaranteed) {
-      const count = Math.floor(Math.random() * ((entry.maxCount || 1) - (entry.minCount || 1) + 1)) + (entry.minCount || 1);
+      const min = entry.minCount || 1;
+      const max = entry.maxCount || 1;
+      const count = rng ? rng.nextRange(min, max) : Math.floor(Math.random() * (max - min + 1)) + min;
       drops.push(createItemStack(entry.itemDefId, count));
     }
   }
 
-  const totalWeight = table.entries.reduce((sum: number, e: any) => sum + (e.weight || 0), 0);
+  const nonGuaranteed = table.entries.filter((e) => !e.guaranteed);
+  const totalWeight = nonGuaranteed.reduce((sum: number, e: any) => sum + (e.weight || 0), 0);
   if (totalWeight <= 0) return drops;
 
   for (let r = 0; r < table.rolls; r++) {
-    if (Math.random() > 0.65) continue;
+    if (tableKey === 'trash' && rand01() > 0.65) continue;
 
-    let pick = Math.random() * totalWeight;
-    for (const entry of table.entries) {
+    let pick = rand01() * totalWeight;
+    for (const entry of nonGuaranteed) {
       const w = entry.weight || 0;
       if (pick <= w) {
-        const count = Math.floor(Math.random() * ((entry.maxCount || 1) - (entry.minCount || 1) + 1)) + (entry.minCount || 1);
+        const min = entry.minCount || 1;
+        const max = entry.maxCount || 1;
+        const count = rng ? rng.nextRange(min, max) : Math.floor(Math.random() * (max - min + 1)) + min;
         drops.push(createItemStack(entry.itemDefId, count));
         break;
       }

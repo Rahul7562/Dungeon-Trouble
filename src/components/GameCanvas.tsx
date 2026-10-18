@@ -60,6 +60,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
     const updateFacing = () => {
       if (rendererRef.current) {
         const worldMouse = rendererRef.current.screenToWorld(mouseClientX, mouseClientY, engine.camera);
+        engine.worldMousePos = worldMouse;
         const dx = worldMouse.x - engine.state.player.x;
         const dy = worldMouse.y - engine.state.player.y;
         if (Math.hypot(dx, dy) > 2) {
@@ -77,10 +78,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button === 0) {
-        // Left click = Primary attack (Ability 1)
-        engine.triggerAbility(1);
+        // Left click = Primary attack (Ability 1) or interact in town
+        if (engine.state.currentZone === 'town' && engine.canInteract()) {
+          engine.interact();
+        } else {
+          engine.triggerAbility(1);
+        }
       } else if (e.button === 2) {
-        // Right click = Inferno Burst (Ability 2)
+        // Right click = Secondary ability (Ability 2)
         engine.triggerAbility(2);
       }
     };
@@ -125,13 +130,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           x: engine.camera.x + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0),
           y: engine.camera.y + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0),
         };
-        const currentMap =
-          engine.state.currentZone === 'town'
-            ? engine.state.townLevel.map
-            : engine.state.dungeon.map;
-        const npcs = engine.state.currentZone === 'town' ? engine.state.townLevel.npcs : [];
-        const fountainPos =
-          engine.state.currentZone === 'town' ? engine.state.townLevel.fountainPos : null;
+        const isTown = engine.state.currentZone === 'town';
+        const currentMap = isTown ? engine.state.townLevel.map : engine.state.dungeon.map;
+        const npcs = isTown ? engine.state.townLevel.npcs : [];
+        const fountainPos = isTown ? engine.state.townLevel.fountainPos : null;
+        const isMoving =
+          engine.isMoveActive('up') ||
+          engine.isMoveActive('down') ||
+          engine.isMoveActive('left') ||
+          engine.isMoveActive('right');
 
         rendererRef.current.render(
           currentMap,
@@ -139,6 +146,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           {
             x: engine.state.player.x,
             y: engine.state.player.y,
+            vx: isMoving ? 10 : 0,
+            vy: isMoving ? 10 : 0,
             facingAngle: engine.state.player.facingAngle,
             isAttacking: engine.state.player.isAttacking,
             attackAnimTimer: engine.state.player.attackAnimTimer,
@@ -146,6 +155,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
             maxHealth: maxHp,
             playerName: engine.state.playerName,
             playerClass: engine.state.selectedClass,
+            hitFlashTimer: engine.state.player.hitFlashTimer,
+            statusEffects: engine.state.player.statusEffects,
           },
           engine.state.enemies,
           engine.state.projectiles,
@@ -157,7 +168,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           npcs,
           engine.state.activeNPC,
           engine.state.summons || [],
-          fountainPos
+          fountainPos,
+          engine.state.dungeon?.theme,
+          isTown ? [] : engine.state.dungeon?.props || [],
+          isTown
         );
       }
 

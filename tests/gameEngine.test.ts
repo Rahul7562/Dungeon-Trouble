@@ -94,4 +94,27 @@ describe('GameEngine death and restart cycle', () => {
     expect(saved?.currentFloor).toBe(2);
     expect(saved?.selectedClass).toBe('mage');
   });
+
+  it('upgrades equipment via upgradeLevel without mutating global item definitions and consumes quick potions', () => {
+    clearSaveGame();
+
+    const engine = new GameEngine();
+    engine.initializeNewGame('swordsman', 'Valerius', true, 1, true);
+
+    const baseAtk = engine.state.playerStats.calculated[StatType.AttackPower];
+    engine.upgradeEquipmentItem(5); // EquipSlot.MainHand = 5
+    expect(engine.state.equipment[5]?.upgradeLevel).toBe(1);
+    expect(engine.state.playerStats.calculated[StatType.AttackPower]).toBeGreaterThan(baseAtk);
+
+    // Starting a new game should have un-mutated base AttackPower
+    const freshEngine = new GameEngine();
+    freshEngine.initializeNewGame('swordsman', 'Valerius', true, 1, false);
+    expect(freshEngine.state.playerStats.calculated[StatType.AttackPower]).toBe(baseAtk);
+
+    // Quick potion consumption
+    engine.state.playerStats.health = 20;
+    const usedHp = engine.useQuickPotion('health');
+    expect(usedHp).toBe(true);
+    expect(engine.state.playerStats.health).toBeGreaterThan(20);
+  });
 });

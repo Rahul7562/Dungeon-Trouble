@@ -123,6 +123,21 @@ export const HUD: React.FC<HUDProps> = ({
     }
   };
 
+  // Count available quick potions in inventory
+  const healthPotionCount = engine.state.inventory.reduce(
+    (sum, item) =>
+      item && (item.itemDefId === 10 || item.itemDefId === 26 || item.itemDefId === 14)
+        ? sum + item.count
+        : sum,
+    0
+  );
+  const manaPotionCount = engine.state.inventory.reduce(
+    (sum, item) => (item && (item.itemDefId === 11 || item.itemDefId === 27) ? sum + item.count : sum),
+    0
+  );
+
+  const themeName = engine.state.dungeon?.theme?.name || 'Forgotten Catacombs';
+
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 z-10 select-none">
       {/* Top Header: Floor, Level, Gold & Quick Menus */}
@@ -131,7 +146,7 @@ export const HUD: React.FC<HUDProps> = ({
         <div className="pointer-events-auto bg-slate-900/85 backdrop-blur border border-slate-800 rounded-xl px-4 py-3 shadow-xl">
           <div className="flex items-center gap-2">
             <span className="font-cinzel font-bold text-amber-400 text-lg">
-              {isTown ? 'Town-1: Sanctuary' : `Floor ${currentFloor}`}
+              {isTown ? 'Town-1: Sanctuary' : `Floor ${currentFloor}: ${themeName}`}
             </span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
               {isTown ? 'Safe Haven' : `Depth ${currentFloor * 100}m`}
@@ -183,7 +198,7 @@ export const HUD: React.FC<HUDProps> = ({
             id="mute-btn"
             onClick={onToggleMute}
             className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-300 transition"
-            title={isMuted ? 'Unmute SFX' : 'Mute SFX (M)'}
+            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
           >
             {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-slate-300" />}
           </button>
@@ -202,7 +217,7 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       </div>
 
-      {/* Bottom Bar: Health, Mana, XP, Skills */}
+      {/* Bottom Bar: Health, Mana, XP, Skills, Potions */}
       <div className="flex flex-col items-center gap-2">
         {/* Experience Progression Bar */}
         <div className="w-full max-w-xl bg-slate-950/80 backdrop-blur border border-slate-800/80 rounded-full h-3 p-0.5 shadow-inner">
@@ -257,20 +272,38 @@ export const HUD: React.FC<HUDProps> = ({
         )}
 
         {/* Central HUD Panel */}
-        <div className="pointer-events-auto flex items-center gap-4 bg-slate-900/90 backdrop-blur-md border border-slate-800/90 px-6 py-3 rounded-2xl shadow-2xl">
-          {/* Health Bar / Stat */}
-          <div className="w-32 flex flex-col items-end">
-            <div className="flex justify-between w-full text-xs font-semibold mb-1">
-              <span className="text-rose-400">Health</span>
-              <span className="font-mono text-slate-200">
-                {Math.round(playerStats.health)} / {Math.round(maxHp)}
-              </span>
-            </div>
-            <div className="w-full bg-slate-950 rounded-md h-4 overflow-hidden border border-rose-950">
-              <div
-                className="h-full bg-gradient-to-r from-rose-700 to-rose-500 transition-all duration-200"
-                style={{ width: `${hpPct}%` }}
-              />
+        <div className="pointer-events-auto flex items-center gap-3.5 bg-slate-900/90 backdrop-blur-md border border-slate-800/90 px-5 py-3 rounded-2xl shadow-2xl">
+          {/* Health Bar / Stat + Quick Health Potion */}
+          <div className="flex items-center gap-2.5">
+            <button
+              id="quick-hp-potion-btn"
+              onClick={() => engine.useQuickPotion('health')}
+              disabled={healthPotionCount <= 0}
+              className={`relative w-11 h-11 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 ${
+                healthPotionCount > 0
+                  ? 'bg-rose-950/60 hover:bg-rose-900/70 border-rose-500/50 text-rose-300 shadow-md'
+                  : 'bg-slate-950/70 border-slate-800 text-slate-600 opacity-50'
+              }`}
+              title="Drink Health Elixir (Hotkey: H)"
+            >
+              <span className="text-[9px] font-mono absolute top-0.5 left-1 text-rose-300/90">H</span>
+              <span className="text-xs font-bold font-cinzel text-rose-400">+HP</span>
+              <span className="text-[9px] font-mono text-slate-300">x{healthPotionCount}</span>
+            </button>
+
+            <div className="w-32 flex flex-col items-end">
+              <div className="flex justify-between w-full text-xs font-semibold mb-1">
+                <span className="text-rose-400">Health</span>
+                <span className="font-mono text-slate-200">
+                  {Math.round(playerStats.health)} / {Math.round(maxHp)}
+                </span>
+              </div>
+              <div className="w-full bg-slate-950 rounded-md h-4 overflow-hidden border border-rose-950">
+                <div
+                  className="h-full bg-gradient-to-r from-rose-700 to-rose-500 transition-all duration-200"
+                  style={{ width: `${hpPct}%` }}
+                />
+              </div>
             </div>
           </div>
 
@@ -321,20 +354,38 @@ export const HUD: React.FC<HUDProps> = ({
             })}
           </div>
 
-          {/* Mana Bar / Stat */}
-          <div className="w-32 flex flex-col items-start">
-            <div className="flex justify-between w-full text-xs font-semibold mb-1">
-              <span className="text-sky-400">Mana</span>
-              <span className="font-mono text-slate-200">
-                {Math.round(playerStats.mana)} / {Math.round(maxMp)}
-              </span>
+          {/* Mana Bar / Stat + Quick Mana Potion */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-32 flex flex-col items-start">
+              <div className="flex justify-between w-full text-xs font-semibold mb-1">
+                <span className="text-sky-400">Mana</span>
+                <span className="font-mono text-slate-200">
+                  {Math.round(playerStats.mana)} / {Math.round(maxMp)}
+                </span>
+              </div>
+              <div className="w-full bg-slate-950 rounded-md h-4 overflow-hidden border border-sky-950">
+                <div
+                  className="h-full bg-gradient-to-r from-sky-600 to-cyan-400 transition-all duration-200"
+                  style={{ width: `${mpPct}%` }}
+                />
+              </div>
             </div>
-            <div className="w-full bg-slate-950 rounded-md h-4 overflow-hidden border border-sky-950">
-              <div
-                className="h-full bg-gradient-to-r from-sky-600 to-cyan-400 transition-all duration-200"
-                style={{ width: `${mpPct}%` }}
-              />
-            </div>
+
+            <button
+              id="quick-mp-potion-btn"
+              onClick={() => engine.useQuickPotion('mana')}
+              disabled={manaPotionCount <= 0}
+              className={`relative w-11 h-11 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 ${
+                manaPotionCount > 0
+                  ? 'bg-sky-950/60 hover:bg-sky-900/70 border-sky-500/50 text-sky-300 shadow-md'
+                  : 'bg-slate-950/70 border-slate-800 text-slate-600 opacity-50'
+              }`}
+              title="Drink Mana Flask (Hotkey: M)"
+            >
+              <span className="text-[9px] font-mono absolute top-0.5 left-1 text-sky-300/90">M</span>
+              <span className="text-xs font-bold font-cinzel text-sky-400">+MP</span>
+              <span className="text-[9px] font-mono text-slate-300">x{manaPotionCount}</span>
+            </button>
           </div>
         </div>
       </div>

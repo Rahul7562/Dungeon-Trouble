@@ -6,6 +6,7 @@ import {
   ModifierOp,
   ItemStack,
   StatSheet,
+  StatModifier,
   EquipmentState,
 } from './types';
 import { StatCalculator } from './stats';
@@ -695,6 +696,128 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
       { stat: StatType.CritMultiplier, op: ModifierOp.PercentAdd, value: 45 },
     ],
   },
+  31: {
+    id: 31,
+    name: 'Iron Vanguard Helm',
+    rarity: ItemRarity.Common,
+    slot: EquipSlot.Head,
+    description: 'A sturdy kettle helm worn by catacomb sentries.',
+    icon: 'Crown',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.Armor, op: ModifierOp.Flat, value: 8 },
+      { stat: StatType.MaxHealth, op: ModifierOp.Flat, value: 20 },
+    ],
+  },
+  32: {
+    id: 32,
+    name: 'Cowl of Whispering Shadows',
+    rarity: ItemRarity.Rare,
+    slot: EquipSlot.Head,
+    description: 'Woven from dusk-silk, sharpening arcane focus and critical precision.',
+    icon: 'Crown',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 14 },
+      { stat: StatType.CritChance, op: ModifierOp.Flat, value: 8 },
+      { stat: StatType.Evasion, op: ModifierOp.Flat, value: 10 },
+    ],
+  },
+  33: {
+    id: 33,
+    name: 'Chainmail Chausses',
+    rarity: ItemRarity.Uncommon,
+    slot: EquipSlot.Legs,
+    description: 'Interlocking steel rings protecting the legs against low cleaves.',
+    icon: 'Shield',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.Armor, op: ModifierOp.Flat, value: 12 },
+      { stat: StatType.MaxHealth, op: ModifierOp.Flat, value: 30 },
+    ],
+  },
+  34: {
+    id: 34,
+    name: 'Frostweave Legguards',
+    rarity: ItemRarity.Rare,
+    slot: EquipSlot.Legs,
+    description: 'Infused with glacial rime, bolstering mana reserves and defense.',
+    icon: 'Shield',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.Armor, op: ModifierOp.Flat, value: 16 },
+      { stat: StatType.MaxMana, op: ModifierOp.Flat, value: 45 },
+      { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 12 },
+    ],
+  },
+  35: {
+    id: 35,
+    name: 'Ironclad Sabatons',
+    rarity: ItemRarity.Uncommon,
+    slot: EquipSlot.Boots,
+    description: 'Heavy plated boots that anchor the warrior against knockback.',
+    icon: 'Footprints',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.Armor, op: ModifierOp.Flat, value: 10 },
+      { stat: StatType.MoveSpeed, op: ModifierOp.PercentAdd, value: 12 },
+    ],
+  },
+  36: {
+    id: 36,
+    name: 'Signet of Ember Might',
+    rarity: ItemRarity.Uncommon,
+    slot: EquipSlot.Ring,
+    description: 'A brass ring set with a warm volcanic garnet.',
+    icon: 'CircleDot',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.AttackPower, op: ModifierOp.Flat, value: 9 },
+      { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 9 },
+    ],
+  },
+  37: {
+    id: 37,
+    name: 'Pendant of the Frozen Star',
+    rarity: ItemRarity.Rare,
+    slot: EquipSlot.Amulet,
+    description: 'Crystallized starlight that hastens spell recovery.',
+    icon: 'Gem',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.MaxMana, op: ModifierOp.Flat, value: 45 },
+      { stat: StatType.CooldownReduction, op: ModifierOp.PercentAdd, value: 10 },
+      { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 14 },
+    ],
+  },
+  38: {
+    id: 38,
+    name: 'Voidrender Longbow',
+    rarity: ItemRarity.Legendary,
+    slot: EquipSlot.MainHand,
+    description: 'Fires arrows wreathed in abyssal lightning that pierce armor.',
+    icon: 'Crosshair',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.AttackPower, op: ModifierOp.Flat, value: 44 },
+      { stat: StatType.CritChance, op: ModifierOp.Flat, value: 22 },
+      { stat: StatType.MoveSpeed, op: ModifierOp.PercentAdd, value: 15 },
+    ],
+  },
+  39: {
+    id: 39,
+    name: 'Staff of the Cosmos',
+    rarity: ItemRarity.Legendary,
+    slot: EquipSlot.MainHand,
+    description: 'Channels the primordial fury of stars and frost.',
+    icon: 'Wand',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 55 },
+      { stat: StatType.MaxMana, op: ModifierOp.Flat, value: 85 },
+      { stat: StatType.CooldownReduction, op: ModifierOp.PercentAdd, value: 20 },
+    ],
+  },
 };
 
 export const defaultItemDefTable = new ItemDefTable();
@@ -706,12 +829,38 @@ export function getItemDef(id: number): ItemDef | undefined {
   return defaultItemDefTable.Get(id);
 }
 
-export function createItemStack(itemDefId: number, count = 1): ItemStack {
+export function getScaledItemModifiers(
+  defOrStack: ItemDef | ItemStack | null | undefined,
+  upgradeLevelOverride?: number
+): StatModifier[] {
+  if (!defOrStack) return [];
+  const isItemDef = 'equipModifiers' in defOrStack || 'name' in defOrStack;
+  const def = isItemDef
+    ? (defOrStack as ItemDef)
+    : getItemDef((defOrStack as ItemStack).itemDefId);
+  if (!def || !def.equipModifiers) return [];
+  const upgradeLevel =
+    upgradeLevelOverride !== undefined
+      ? upgradeLevelOverride
+      : !isItemDef
+      ? (defOrStack as ItemStack).upgradeLevel || 0
+      : 0;
+  return def.equipModifiers.map((mod) => {
+    let val = mod.value;
+    for (let u = 0; u < upgradeLevel; u++) {
+      val = Math.round(val * 1.15 + 2);
+    }
+    return { ...mod, value: val };
+  });
+}
+
+export function createItemStack(itemDefId: number, count = 1, upgradeLevel = 0): ItemStack {
   return {
     instanceId: Math.random().toString(36).substring(2, 9),
     itemDefId,
     defId: itemDefId,
     count,
+    upgradeLevel: upgradeLevel > 0 ? upgradeLevel : undefined,
   };
 }
 
@@ -741,7 +890,7 @@ export function getRarityBadgeColor(rarity: ItemRarity = ItemRarity.Common): str
     case ItemRarity.Epic:
       return 'bg-purple-900/80 text-purple-300 border border-purple-700';
     case ItemRarity.Legendary:
-      return 'bg-amber-900/80 text-amber-300 border border-amber-600 font-bold animate-pulse';
+      return 'bg-amber-900/80 text-amber-300 border border-amber-600 font-bold';
   }
 }
 
@@ -750,7 +899,7 @@ export function getRarityName(rarity: ItemRarity = ItemRarity.Common): string {
     case ItemRarity.Common:
       return 'Common';
     case ItemRarity.Uncommon:
-      return 'Uncommon';
+      return 'Magic';
     case ItemRarity.Rare:
       return 'Rare';
     case ItemRarity.Epic:

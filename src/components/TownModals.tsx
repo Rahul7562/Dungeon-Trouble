@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { GameEngine } from '../engine/gameEngine';
 import { NPCEntity, ItemStack, EquipSlot, ItemRarity, StatType } from '../engine/types';
-import { getItemDef, getRarityBadgeColor, getRarityName, createItemStack } from '../engine/items';
+import {
+  getItemDef,
+  getRarityBadgeColor,
+  getRarityName,
+  createItemStack,
+  getScaledItemModifiers,
+} from '../engine/items';
 import { getStatName } from '../engine/stats';
 import { sound } from '../engine/audio';
 import {
@@ -340,15 +346,20 @@ interface ShopItem {
 const MERCHANT_WARES: ShopItem[] = [
   { id: 10, price: 25 }, // Health Elixir
   { id: 11, price: 20 }, // Mana Flask
+  { id: 14, price: 45 }, // Elixir of Regeneration
   { id: 26, price: 60 }, // Greater Health Potion
   { id: 27, price: 50 }, // Greater Mana Flask
   { id: 18, price: 120 }, // Steel Broadsword
   { id: 19, price: 90 }, // Ranger's Quiver
   { id: 20, price: 110 }, // Spell Tome of Sparks
   { id: 21, price: 100 }, // Skull of the Fallen
+  { id: 33, price: 95 }, // Iron Vanguard Helm
+  { id: 34, price: 155 }, // Circlet of Arcane Focus
   { id: 22, price: 180 }, // Knight's Plate Mail
   { id: 23, price: 140 }, // Hunter's Leather Tunic
   { id: 24, price: 150 }, // Silk Robes of the Magus
+  { id: 36, price: 135 }, // Stalker's Shadow Leggings
+  { id: 38, price: 145 }, // Windrunner Greaves
   { id: 28, price: 250 }, // Ring of the Dungeon Master
   { id: 29, price: 300 }, // Amulet of the Ancients
 ];
@@ -556,7 +567,7 @@ export const BlacksmithModal: React.FC<BlacksmithModalProps> = ({ engine, onClos
 
   const gold = engine.state.playerStats.gold;
 
-  // Collect all upgradable equipment items
+  // Collect all upgradable equipment items across all 8 slots
   const itemsList: { key: number; name: string; item: ItemStack; slotLabel: string }[] = [];
   const eq = engine.state.equipment;
 
@@ -576,23 +587,28 @@ export const BlacksmithModal: React.FC<BlacksmithModalProps> = ({ engine, onClos
 
   checkEquip(EquipSlot.MainHand, 'Main Hand');
   checkEquip(EquipSlot.OffHand, 'Off Hand');
+  checkEquip(EquipSlot.Head, 'Head');
   checkEquip(EquipSlot.Chest, 'Armor');
+  checkEquip(EquipSlot.Legs, 'Legs');
   checkEquip(EquipSlot.Boots, 'Boots');
   checkEquip(EquipSlot.Ring, 'Ring');
   checkEquip(EquipSlot.Amulet, 'Amulet');
 
   const activeItem = itemsList.find((i) => i.key === selectedSlotKey) || itemsList[0];
   const activeDef = activeItem ? getItemDef(activeItem.item.itemDefId) : null;
+  const currentUpgrade = activeItem?.item.upgradeLevel || 0;
 
-  const upgradeCost = 80;
+  const upgradeCost = 80 + currentUpgrade * 45;
   const canAfford = gold >= upgradeCost;
+
+  const currentMods = activeDef ? getScaledItemModifiers(activeDef, currentUpgrade) : [];
+  const nextMods = activeDef ? getScaledItemModifiers(activeDef, currentUpgrade + 1) : [];
 
   const handleUpgrade = () => {
     if (!activeItem || !canAfford) return;
     engine.state.playerStats.gold -= upgradeCost;
     engine.upgradeEquipmentItem(activeItem.key as EquipSlot);
     sound.playLevelUp();
-    engine.addCombatLog(`Torvald reforged ${activeItem.name}! Equipment power elevated.`, 'system');
     engine.autoSave();
     setTick((t) => t + 1);
   };
@@ -631,29 +647,39 @@ export const BlacksmithModal: React.FC<BlacksmithModalProps> = ({ engine, onClos
         {itemsList.length > 0 ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {itemsList.map((entry) => (
-                <button
-                  key={entry.key}
-                  onClick={() => setSelectedSlotKey(entry.key)}
-                  className={`p-3 rounded-xl border text-left transition ${
-                    activeItem.key === entry.key
-                      ? 'bg-orange-500/15 border-orange-400 shadow'
-                      : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="text-[10px] text-slate-500 uppercase font-mono">{entry.slotLabel}</div>
-                  <div className="font-cinzel text-xs font-bold text-slate-200 truncate mt-0.5">
-                    {entry.name}
-                  </div>
-                </button>
-              ))}
+              {itemsList.map((entry) => {
+                const upg = entry.item.upgradeLevel || 0;
+                return (
+                  <button
+                    key={entry.key}
+                    onClick={() => setSelectedSlotKey(entry.key)}
+                    className={`p-3 rounded-xl border text-left transition ${
+                      activeItem.key === entry.key
+                        ? 'bg-orange-500/15 border-orange-400 shadow'
+                        : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 uppercase font-mono">{entry.slotLabel}</span>
+                      {upg > 0 && (
+                        <span className="text-[10px] font-mono font-bold text-amber-400">+{upg}</span>
+                      )}
+                    </div>
+                    <div className="font-cinzel text-xs font-bold text-slate-200 truncate mt-0.5">
+                      {entry.name}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Upgrade Preview Panel */}
             {activeDef && (
               <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-                  <span className="font-cinzel font-bold text-slate-100 text-sm">{activeDef.name}</span>
+                  <span className="font-cinzel font-bold text-slate-100 text-sm">
+                    {activeDef.name} {currentUpgrade > 0 ? `+${currentUpgrade}` : ''} → +{currentUpgrade + 1}
+                  </span>
                   <span className="text-xs font-mono text-emerald-400 font-semibold">+15% Stats Tier</span>
                 </div>
                 <p className="text-xs text-slate-400 italic mb-4">{activeDef.description}</p>
@@ -662,16 +688,19 @@ export const BlacksmithModal: React.FC<BlacksmithModalProps> = ({ engine, onClos
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     Reforged Properties:
                   </div>
-                  {activeDef.equipModifiers?.map((mod, idx) => (
-                    <div key={idx} className="text-xs text-emerald-400 font-mono">
-                      • {getStatName(mod.stat)}: +{mod.value}
-                      {mod.op === 1 ? '%' : ''} →{' '}
-                      <span className="text-amber-300 font-bold">
-                        +{Math.round(mod.value * 1.15 + 2)}
-                        {mod.op === 1 ? '%' : ''}
-                      </span>
-                    </div>
-                  ))}
+                  {currentMods.map((mod, idx) => {
+                    const nextVal = nextMods[idx]?.value ?? Math.round(mod.value * 1.15 + 2);
+                    return (
+                      <div key={idx} className="text-xs text-emerald-400 font-mono">
+                        • {getStatName(mod.stat)}: +{mod.value}
+                        {mod.op === 1 ? '%' : ''} →{' '}
+                        <span className="text-amber-300 font-bold">
+                          +{nextVal}
+                          {mod.op === 1 ? '%' : ''}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="flex items-center justify-between pt-3 border-t border-slate-800">
@@ -692,7 +721,7 @@ export const BlacksmithModal: React.FC<BlacksmithModalProps> = ({ engine, onClos
                     }`}
                   >
                     <Hammer className="w-4 h-4" />
-                    <span>Reforge Weapon (+1 Tier)</span>
+                    <span>Reforge Gear (+{currentUpgrade + 1})</span>
                   </button>
                 </div>
               </div>
