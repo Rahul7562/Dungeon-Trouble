@@ -1761,8 +1761,8 @@ export class IsometricRenderer {
       lctx.globalCompositeOperation = 'source-over';
       lctx.clearRect(0, 0, lw, lh);
 
-      // Ambient darkness base (keeps player surroundings readable while giving torches real contrast)
-      lctx.fillStyle = isTown ? 'rgba(6, 10, 18, 0.34)' : 'rgba(4, 6, 12, 0.74)';
+      // Ambient darkness base (Town-1 is bright, warm, and welcoming; Dungeon is dark, gloomy, and dangerous)
+      lctx.fillStyle = isTown ? 'rgba(12, 19, 34, 0.18)' : 'rgba(3, 5, 10, 0.78)';
       lctx.fillRect(0, 0, lw, lh);
 
       // Cut out soft radial light fields using destination-out
@@ -1805,6 +1805,23 @@ export class IsometricRenderer {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
+    if (isTown) {
+      // Warm welcoming golden sunlight wash across Town-1
+      const sunGrad = ctx.createRadialGradient(
+        this.width * 0.5,
+        this.height * 0.25,
+        40,
+        this.width * 0.5,
+        this.height * 0.5,
+        Math.max(this.width, this.height) * 0.75
+      );
+      sunGrad.addColorStop(0, 'rgba(253, 224, 71, 0.08)');
+      sunGrad.addColorStop(0.6, 'rgba(56, 189, 248, 0.04)');
+      sunGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = sunGrad;
+      ctx.fillRect(0, 0, this.width, this.height);
+    }
+
     // Hero warm lantern bloom
     const heroBloom = ctx.createRadialGradient(
       playerX,
@@ -1844,12 +1861,31 @@ export class IsometricRenderer {
   }
 
   private drawAtmosphericMotes(
-    _ctx: CanvasRenderingContext2D,
+    ctx: CanvasRenderingContext2D,
     _camera: Camera,
-    _theme: DungeonThemeConfig,
-    _isTown: boolean,
-    _gameTime: number
+    theme: DungeonThemeConfig,
+    isTown: boolean,
+    gameTime: number
   ) {
-    // Disabled screen-space floating light spots for a clean, distraction-free viewport
+    if (isTown) return;
+    // Subtle atmospheric dungeon depth fog at viewport perimeter
+    ctx.save();
+    const outerRadius = Math.hypot(this.width, this.height) * 0.55;
+    const innerRadius = Math.min(this.width, this.height) * 0.34;
+    const fogGrad = ctx.createRadialGradient(
+      this.width * 0.5,
+      this.height * 0.5,
+      innerRadius,
+      this.width * 0.5,
+      this.height * 0.5,
+      outerRadius
+    );
+    const pulse = 0.24 + Math.sin(gameTime * 1.5) * 0.03;
+    fogGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    fogGrad.addColorStop(0.75, theme.fogColor || 'rgba(15, 23, 42, 0.14)');
+    fogGrad.addColorStop(1, `rgba(2, 4, 9, ${pulse.toFixed(2)})`);
+    ctx.fillStyle = fogGrad;
+    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.restore();
   }
 }

@@ -1562,7 +1562,7 @@ export class GameEngine {
         : enemy.isElite || enemy.archetype === 'necromancer' || enemy.archetype === 'abyssal_brute'
         ? 'elite'
         : 'trash';
-    const droppedItems = rollLoot(tableKey);
+    const droppedItems = rollLoot(tableKey, undefined, state.currentFloor);
 
     for (const item of droppedItems) {
       state.lootDrops.push({
@@ -2376,7 +2376,7 @@ export class GameEngine {
           const ct = state.dungeon.map.worldToTile(chestPos.x, chestPos.y);
           state.dungeon.map.set(ct.x, ct.y, TileType.Floor);
           sound.playLootDrop();
-          const drops = rollLoot('chest');
+          const drops = rollLoot('chest', undefined, state.currentFloor);
           for (const d of drops) {
             state.lootDrops.push({
               id: `chest-${this.nextEntityId++}`,

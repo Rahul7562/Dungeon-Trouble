@@ -1,5 +1,5 @@
-import { ItemStack } from './types';
-import { createItemStack, ItemDefTable, Inventory, Result } from './items';
+import { ItemStack, ItemRarity, EquipSlot } from './types';
+import { createItemStack, ItemDefTable, Inventory, Result, getItemDef } from './items';
 import { SimRandom } from './simRandom';
 import { SimContext } from './combat';
 
@@ -282,6 +282,9 @@ export const LOOT_TABLES: Record<string, LootTableDef> = {
       { itemDefId: 2, minCount: 1, maxCount: 1, weight: 9 },
       { itemDefId: 33, minCount: 1, maxCount: 1, weight: 9 },
       { itemDefId: 35, minCount: 1, maxCount: 1, weight: 9 },
+      { itemDefId: 3, minCount: 1, maxCount: 1, weight: 4 },
+      { itemDefId: 32, minCount: 1, maxCount: 1, weight: 4 },
+      { itemDefId: 36, minCount: 1, maxCount: 1, weight: 4 },
     ],
   },
   elite: {
@@ -300,6 +303,8 @@ export const LOOT_TABLES: Record<string, LootTableDef> = {
       { itemDefId: 8, minCount: 1, maxCount: 1, weight: 15 },
       { itemDefId: 34, minCount: 1, maxCount: 1, weight: 14 },
       { itemDefId: 37, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 41, minCount: 1, maxCount: 1, weight: 10 },
+      { itemDefId: 42, minCount: 1, maxCount: 1, weight: 10 },
       { itemDefId: 26, minCount: 1, maxCount: 2, weight: 20 },
     ],
   },
@@ -314,12 +319,15 @@ export const LOOT_TABLES: Record<string, LootTableDef> = {
       { itemDefId: 9, minCount: 1, maxCount: 1, weight: 22 },
       { itemDefId: 28, minCount: 1, maxCount: 1, weight: 20 },
       { itemDefId: 29, minCount: 1, maxCount: 1, weight: 20 },
+      { itemDefId: 41, minCount: 1, maxCount: 1, weight: 20 },
+      { itemDefId: 42, minCount: 1, maxCount: 1, weight: 20 },
       { itemDefId: 6, minCount: 1, maxCount: 1, weight: 15 },
       { itemDefId: 12, minCount: 1, maxCount: 1, weight: 15 },
       { itemDefId: 13, minCount: 1, maxCount: 1, weight: 15 },
       { itemDefId: 30, minCount: 1, maxCount: 1, weight: 14 },
       { itemDefId: 38, minCount: 1, maxCount: 1, weight: 14 },
       { itemDefId: 39, minCount: 1, maxCount: 1, weight: 14 },
+      { itemDefId: 40, minCount: 1, maxCount: 1, weight: 14 },
       { itemDefId: 14, minCount: 2, maxCount: 3, weight: 30 },
     ],
   },
@@ -336,6 +344,8 @@ export const LOOT_TABLES: Record<string, LootTableDef> = {
       { itemDefId: 34, minCount: 1, maxCount: 1, weight: 18 },
       { itemDefId: 37, minCount: 1, maxCount: 1, weight: 18 },
       { itemDefId: 9, minCount: 1, maxCount: 1, weight: 12 },
+      { itemDefId: 41, minCount: 1, maxCount: 1, weight: 10 },
+      { itemDefId: 42, minCount: 1, maxCount: 1, weight: 10 },
       { itemDefId: 14, minCount: 1, maxCount: 2, weight: 25 },
       { itemDefId: 26, minCount: 1, maxCount: 2, weight: 25 },
       { itemDefId: 27, minCount: 1, maxCount: 2, weight: 25 },
@@ -343,11 +353,12 @@ export const LOOT_TABLES: Record<string, LootTableDef> = {
   },
 };
 
-export function rollLoot(tableKey: string, seed?: number): ItemStack[] {
+export function rollLoot(tableKey: string, seed?: number, floorLevel = 1): ItemStack[] {
   const table = LOOT_TABLES[tableKey] || LOOT_TABLES.trash;
   const drops: ItemStack[] = [];
   const rng = seed !== undefined ? new SimRandom(seed) : null;
   const rand01 = () => (rng ? rng.nextFloat01() : Math.random());
+  const clampedFloor = Math.max(1, Math.min(10, floorLevel));
 
   for (const entry of table.entries) {
     if (entry.guaranteed) {
@@ -359,20 +370,47 @@ export function rollLoot(tableKey: string, seed?: number): ItemStack[] {
   }
 
   const nonGuaranteed = table.entries.filter((e) => !e.guaranteed);
-  const totalWeight = nonGuaranteed.reduce((sum: number, e: any) => sum + (e.weight || 0), 0);
+  const getScaledWeight = (entry: LootEntry): number => {
+    const baseWeight = entry.weight || 0;
+    if (clampedFloor <= 1) return baseWeight;
+    const def = getItemDef(entry.itemDefId);
+    if (!def) return baseWeight;
+    // Scale rare, epic, and legendary item weights progressively with dungeon floor depth
+    const depthFactor = clampedFloor - 1; // 0 to 9
+    if (def.rarity === ItemRarity.Legendary) {
+      return baseWeight * (1 + depthFactor * 0.35);
+    }
+    if (def.rarity === ItemRarity.Epic) {
+      return baseWeight * (1 + depthFactor * 0.25);
+    }
+    if (def.rarity === ItemRarity.Rare) {
+      return baseWeight * (1 + depthFactor * 0.15);
+    }
+    return baseWeight;
+  };
+
+  const totalWeight = nonGuaranteed.reduce((sum: number, e: LootEntry) => sum + getScaledWeight(e), 0);
   if (totalWeight <= 0) return drops;
 
-  for (let r = 0; r < table.rolls; r++) {
-    if (tableKey === 'trash' && rand01() > 0.65) continue;
+  // Deep floor bosses (Floor 6+) grant an extra bonus loot roll
+  const bonusRolls = tableKey === 'boss' && clampedFloor >= 6 ? 1 : 0;
+  const totalRolls = table.rolls + bonusRolls;
+
+  for (let r = 0; r < totalRolls; r++) {
+    if (tableKey === 'trash' && rand01() > 0.65 + clampedFloor * 0.02) continue;
 
     let pick = rand01() * totalWeight;
     for (const entry of nonGuaranteed) {
-      const w = entry.weight || 0;
+      const w = getScaledWeight(entry);
       if (pick <= w) {
         const min = entry.minCount || 1;
         const max = entry.maxCount || 1;
         const count = rng ? rng.nextRange(min, max) : Math.floor(Math.random() * (max - min + 1)) + min;
-        drops.push(createItemStack(entry.itemDefId, count));
+        // Items dropped on very deep floors (Floor 7+) have a chance to drop pre-tempered (+1)
+        const def = getItemDef(entry.itemDefId);
+        const canUpgrade = def && def.slot !== EquipSlot.None;
+        const upgradeBonus = canUpgrade && clampedFloor >= 7 && rand01() < 0.25 ? 1 : 0;
+        drops.push(createItemStack(entry.itemDefId, count, upgradeBonus));
         break;
       }
       pick -= w;
@@ -381,3 +419,4 @@ export function rollLoot(tableKey: string, seed?: number): ItemStack[] {
 
   return drops;
 }
+

@@ -818,6 +818,49 @@ export const ITEM_REGISTRY: Record<number, ItemDef> = {
       { stat: StatType.CooldownReduction, op: ModifierOp.PercentAdd, value: 20 },
     ],
   },
+  40: {
+    id: 40,
+    name: 'Soulreaper Scythe of the Lich',
+    rarity: ItemRarity.Legendary,
+    slot: EquipSlot.MainHand,
+    description: 'An abyssal bone-forged scythe that harvests the life force of fallen dungeon lords.',
+    icon: 'Skull',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 48 },
+      { stat: StatType.AttackPower, op: ModifierOp.Flat, value: 24 },
+      { stat: StatType.MaxHealth, op: ModifierOp.Flat, value: 95 },
+      { stat: StatType.CooldownReduction, op: ModifierOp.PercentAdd, value: 18 },
+    ],
+  },
+  41: {
+    id: 41,
+    name: 'Frostfire Warbow',
+    rarity: ItemRarity.Epic,
+    slot: EquipSlot.MainHand,
+    description: 'Twin-stringed recurve bow tempered in glacial ice and volcanic embers.',
+    icon: 'Crosshair',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.AttackPower, op: ModifierOp.Flat, value: 28 },
+      { stat: StatType.CritChance, op: ModifierOp.Flat, value: 14 },
+      { stat: StatType.MoveSpeed, op: ModifierOp.PercentAdd, value: 10 },
+    ],
+  },
+  42: {
+    id: 42,
+    name: 'Netherbane Grimoire',
+    rarity: ItemRarity.Epic,
+    slot: EquipSlot.OffHand,
+    description: 'Bound in shadow-drake hide, amplifying both elemental and necrotic spellcraft.',
+    icon: 'BookOpen',
+    maxStack: 1,
+    equipModifiers: [
+      { stat: StatType.SpellPower, op: ModifierOp.Flat, value: 26 },
+      { stat: StatType.MaxMana, op: ModifierOp.Flat, value: 55 },
+      { stat: StatType.CritChance, op: ModifierOp.Flat, value: 10 },
+    ],
+  },
 };
 
 export const defaultItemDefTable = new ItemDefTable();

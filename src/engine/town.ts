@@ -1,5 +1,5 @@
 import { TileType, TileMap, WorldCoord } from './world';
-import { NPCEntity } from './types';
+import { NPCEntity, DungeonProp } from './types';
 
 export interface GeneratedTown {
   map: TileMap;
@@ -7,6 +7,7 @@ export interface GeneratedTown {
   fountainPos: WorldCoord;
   dungeonPortalPos: WorldCoord;
   npcs: NPCEntity[];
+  props: DungeonProp[];
 }
 
 export function generateTownLevel(): GeneratedTown {
@@ -27,11 +28,6 @@ export function generateTownLevel(): GeneratedTown {
       }
     }
   }
-
-  // Carve Cobblestone Crossroads:
-  // North-South main thoroughfare from y=2 to y=30 at x=15, 16
-  // East-West main thoroughfare from x=2 to x=30 at y=15, 16
-  // (In isometric rendering, Floor tile with cobblestone pattern is used)
 
   // Houses / Building Footprints:
   // 1. Elder's Sanctuary (North-West: x: 5..10, y: 5..9)
@@ -80,19 +76,18 @@ export function generateTownLevel(): GeneratedTown {
     }
   }
 
-  // Central Fountain: 3x3 circle at center (15, 15) to (17, 17)
-  // Center tile is decorative fountain water
+  // Central Fountain: decorative healing water at town center (16, 16)
   map.set(16, 16, TileType.Water);
   const fountainPos = map.tileToWorldCenter(16, 16);
 
-  // Player spawns near the fountain in town center
+  // Player spawns right beside the central town fountain
   const playerSpawn = map.tileToWorldCenter(16, 18);
 
   // Dungeon Gate Portal at North (x=16, y=2)
   map.set(16, 2, TileType.Exit);
   const dungeonPortalPos = map.tileToWorldCenter(16, 2);
 
-  // Trees and vegetation clusters along perimeter
+  // Trees and vegetation clusters along perimeter and plazas
   const treeTiles = [
     { x: 3, y: 3 }, { x: 4, y: 3 }, { x: 3, y: 4 },
     { x: 27, y: 3 }, { x: 28, y: 3 }, { x: 28, y: 4 },
@@ -105,6 +100,53 @@ export function generateTownLevel(): GeneratedTown {
     map.set(t.x, t.y, TileType.Wall); // Tree trunks block movement
   }
 
+  // Handcrafted Town Environmental Props (lantern braziers, statues, banners, crates, barrels)
+  const props: DungeonProp[] = [];
+  let propId = 1;
+  const addTownProp = (
+    tx: number,
+    ty: number,
+    kind: DungeonProp['kind'],
+    opts?: { lightColor?: string; lightRadius?: number; offsetX?: number; offsetY?: number }
+  ) => {
+    const wc = map.tileToWorldCenter(tx, ty);
+    props.push({
+      id: `town-prop-${propId++}`,
+      kind,
+      x: wc.x + (opts?.offsetX ?? 0),
+      y: wc.y + (opts?.offsetY ?? 0),
+      solid: false,
+      radius: 14,
+      variant: (tx + ty) % 4,
+      lightColor: opts?.lightColor,
+      lightRadius: opts?.lightRadius,
+    });
+  };
+
+  // Fountain Plaza Corner Braziers
+  addTownProp(13, 13, 'brazier', { lightColor: '#fbbf24', lightRadius: 190 });
+  addTownProp(19, 13, 'brazier', { lightColor: '#fbbf24', lightRadius: 190 });
+  addTownProp(13, 19, 'brazier', { lightColor: '#fbbf24', lightRadius: 190 });
+  addTownProp(19, 19, 'brazier', { lightColor: '#fbbf24', lightRadius: 190 });
+
+  // Dungeon Entrance Gateway Statues & Braziers
+  addTownProp(14, 2, 'statue');
+  addTownProp(18, 2, 'statue');
+  addTownProp(15, 3, 'brazier', { lightColor: '#c084fc', lightRadius: 180 });
+  addTownProp(17, 3, 'brazier', { lightColor: '#c084fc', lightRadius: 180 });
+
+  // Building Facade Props (Vault crates, Blacksmith barrels/brazier, Healer crystal, Elder banners)
+  addTownProp(7, 10, 'banner', { offsetY: -12 });
+  addTownProp(9, 10, 'banner', { offsetY: -12 });
+  addTownProp(22, 10, 'crystal', { lightColor: '#38bdf8', lightRadius: 160 });
+  addTownProp(24, 10, 'crystal', { lightColor: '#38bdf8', lightRadius: 160 });
+  addTownProp(7, 20, 'crate');
+  addTownProp(9, 20, 'barrel');
+  addTownProp(22, 20, 'brazier', { lightColor: '#f97316', lightRadius: 180 });
+  addTownProp(24, 20, 'barrel');
+  addTownProp(20, 14, 'crate');
+  addTownProp(20, 16, 'barrel');
+
   // NPCs stationed around town
   const npcs: NPCEntity[] = [
     {
@@ -115,11 +157,11 @@ export function generateTownLevel(): GeneratedTown {
       x: map.tileToWorldCenter(14, 15).x,
       y: map.tileToWorldCenter(14, 15).y,
       dialogue: [
-        'Welcome to Town-1, {PLAYERNAME}. Our peaceful haven stands beside an ominous rift.',
-        'Below our quiet streets lies a perilous labyrinth of 10 treacherous dungeon floors.',
-        'Vile beasts and 3 ancient lords rule the deep. The deeper you delve, the deadlier they become.',
-        'Speak to Sister Althea to tend your wounds, visit Brom to store your precious loot, and consult Torvald to temper your blades.',
-        'May the light guide your blade, brave {CLASS}. Conquer Floor 10 and purge the evil from our lands!',
+        'Welcome to Town-1, {PLAYERNAME}. You stand in our last sunlit sanctuary beside the northern rift.',
+        'Beyond the northern gateway lies a treacherous dungeon of 10 progressive floors teeming with monsters, traps, and ancient bosses.',
+        'Each floor is guarded by a deadly Overseer, culminating on Floor 10 where Ignis Rex, Supreme Lord of the Cataclysm, rules the abyss.',
+        'Speak with Sister Althea to restore your Health and Mana, visit Brom to store valuable items in the persistent vault, and trade with Garrick or Torvald.',
+        'Steel your resolve, brave {CLASS} {PLAYERNAME}. Clear all 10 floors and bring peace to our realm!',
       ],
       color: '#38bdf8',
       facingAngle: 0.8,
@@ -132,9 +174,9 @@ export function generateTownLevel(): GeneratedTown {
       x: map.tileToWorldCenter(23, 11).x,
       y: map.tileToWorldCenter(23, 11).y,
       dialogue: [
-        'Greetings, child of fate. The dark miasma of the dungeon takes a heavy toll.',
-        'Step forward and let the sacred spring wash away your exhaustion and cleanse your spirits.',
-        'I have fully restored your Health and Mana reserves. Go forth unharmed!',
+        'Blessings upon you, {PLAYERNAME}. The dark miasma of the dungeon takes a heavy toll on even the strongest {CLASS}.',
+        'Step forward and let the sacred sanctuary waters mend your wounds and replenish your arcane spirit.',
+        'Whenever you return to Town-1, come to me or stand near the central fountain to restore your Health and Mana.',
       ],
       color: '#4ade80',
       facingAngle: 2.2,
@@ -147,8 +189,8 @@ export function generateTownLevel(): GeneratedTown {
       x: map.tileToWorldCenter(8, 19).x,
       y: map.tileToWorldCenter(8, 19).y,
       dialogue: [
-        'Hail, {PLAYERNAME}! Carrying too much gear into the crypts is a quick way to an early grave.',
-        'Leave your excess weapons, potions, and legendary relics in my vault. What you deposit here will remain safe forever across your adventures.',
+        'Hail, {PLAYERNAME}! Carrying too much gear into the deep floors is a quick way to run out of pack space.',
+        'Store your spare weapons, rare armor, and potions in my Town Vault. Everything stored here is saved persistently across all your sessions!',
       ],
       color: '#fbbf24',
       facingAngle: -0.5,
@@ -161,8 +203,8 @@ export function generateTownLevel(): GeneratedTown {
       x: map.tileToWorldCenter(19, 15).x,
       y: map.tileToWorldCenter(19, 15).y,
       dialogue: [
-        'Well met, traveler! Looking for sturdy supplies before you plunge into the dark depths?',
-        'I carry the finest elixirs, enchanted rings, and forged armor gold can buy. I also buy unwanted spoils from your delves!',
+        'Well met, {PLAYERNAME}! Looking for sturdy supplies before you plunge into the 10 Floors of Ruin?',
+        'I stock health elixirs, mana flasks, weapons, and armor for every {CLASS}. I also pay fair gold for unwanted dungeon loot!',
       ],
       color: '#f59e0b',
       facingAngle: -2.0,
@@ -175,8 +217,8 @@ export function generateTownLevel(): GeneratedTown {
       x: map.tileToWorldCenter(23, 19).x,
       y: map.tileToWorldCenter(23, 19).y,
       dialogue: [
-        'Hmph! That blade of yours could use some serious attention if you plan on striking down the Dungeon Lords.',
-        'Hand over your weapons and armor with a bit of coin, and I will reforge them to strike harder and withstand greater impacts.',
+        'Hail, {PLAYERNAME}! That gear of yours will need tempering if you plan on surviving the deeper dungeon bosses.',
+        'Bring me your equipped weapons and armor along with dungeon gold, and I will reforge them to higher tiers on my anvil!',
       ],
       color: '#f97316',
       facingAngle: 2.8,
@@ -189,9 +231,9 @@ export function generateTownLevel(): GeneratedTown {
       x: map.tileToWorldCenter(16, 4).x,
       y: map.tileToWorldCenter(16, 4).y,
       dialogue: [
-        'Halt, {PLAYERNAME}. Beyond this ancient archway lies the 10 Floors of Ruin.',
-        'The portal responds only to your will. Once you conquer a floor and slay its guardians, the path forward permanently opens.',
-        'Beware of Floor 3, Floor 6, and the dreaded Floor 10—monstrous boss entities await within!',
+        'Stand ready, {CLASS} {PLAYERNAME}. Beyond this ancient archway lies the 10-Floor Dungeon of Ruin.',
+        'You must conquer each floor in order—from Floor 1 down to Floor 10. Slaying a floor boss permanently unlocks the next depth.',
+        'Beware of Mortis the Undying on Floor 3, Malakor the Void Weaver on Floor 6, and Ignis Rex on Floor 10!',
       ],
       color: '#c084fc',
       facingAngle: 1.57,
@@ -204,5 +246,7 @@ export function generateTownLevel(): GeneratedTown {
     fountainPos,
     dungeonPortalPos,
     npcs,
+    props,
   };
 }
+

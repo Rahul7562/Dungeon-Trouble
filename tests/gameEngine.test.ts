@@ -117,4 +117,40 @@ describe('GameEngine death and restart cycle', () => {
     expect(usedHp).toBe(true);
     expect(engine.state.playerStats.health).toBeGreaterThan(20);
   });
+
+  it('spawns player near the central fountain in Town-1 with all 6 RPG NPCs, environmental props, and persistent vault storage', () => {
+    clearSaveGame();
+
+    const engine = new GameEngine();
+    engine.initializeNewGame('necromancer', 'Morvath', true, 1, true);
+
+    expect(engine.state.currentZone).toBe('town');
+    const town = engine.state.townLevel;
+    expect(town.npcs.length).toBeGreaterThanOrEqual(6);
+    expect(town.props.length).toBeGreaterThan(0);
+
+    // Player spawns near the central fountain
+    const distToFountain = Math.hypot(
+      engine.state.player.x - town.fountainPos.x,
+      engine.state.player.y - town.fountainPos.y
+    );
+    expect(distToFountain).toBeLessThanOrEqual(160);
+
+    // Persist an item in Town Vault Storage and verify round-trip save/load
+    engine.state.storage[0] = {
+      instanceId: 'vault-test-1',
+      itemDefId: 40, // Soulreaper Scythe of the Lich
+      defId: 40,
+      count: 1,
+    };
+    engine.state.clearedFloors = [1, 2, 3];
+    engine.state.highestFloorUnlocked = 4;
+    engine.autoSave();
+
+    const loaded = loadGameState();
+    expect(loaded?.storage[0]?.itemDefId).toBe(40);
+    expect(loaded?.clearedFloors).toEqual([1, 2, 3]);
+    expect(loaded?.highestFloorUnlocked).toBe(4);
+  });
 });
+

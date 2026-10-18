@@ -170,7 +170,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           engine.state.summons || [],
           fountainPos,
           engine.state.dungeon?.theme,
-          isTown ? [] : engine.state.dungeon?.props || [],
+          isTown ? engine.state.townLevel?.props || [] : engine.state.dungeon?.props || [],
           isTown
         );
       }
