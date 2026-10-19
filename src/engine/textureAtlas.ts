@@ -28,6 +28,7 @@ export interface BakedThemeAtlas {
   townGrassFrames: HTMLCanvasElement[][];
   townTreeFrames: HTMLCanvasElement[][];
   shorelineSprites: HTMLCanvasElement[];
+  roadEdgeSprites: HTMLCanvasElement[];
   voidBedrockSprites: HTMLCanvasElement[];
 }
 
@@ -108,12 +109,14 @@ export class TileAtlasBank {
       townGrassFrames: [],
       townTreeFrames: [],
       shorelineSprites: [],
+      roadEdgeSprites: [],
       voidBedrockSprites: [],
     };
 
     for (let v = 0; v < 16; v++) {
       baked.floorSprites.push(this.bakeDungeonFloorVariant(theme, v));
       baked.shorelineSprites.push(this.bakeShorelineMaskSprite(v));
+      baked.roadEdgeSprites.push(this.bakeRoadGrassEdgeMaskSprite(v));
     }
     for (let v = 0; v < 4; v++) {
       baked.voidBedrockSprites.push(this.bakeVoidBedrockSprite(theme, v));
@@ -125,7 +128,7 @@ export class TileAtlasBank {
       baked.townRoadSprites.push(this.bakeTownFloorVariant(true, v, 0));
       baked.townGrassSprites.push(this.bakeTownFloorVariant(false, v, 0));
     }
-    for (let f = 0; f < 6; f++) {
+    for (let f = 0; f < 8; f++) {
       const grassFrameRow: HTMLCanvasElement[] = [];
       const treeFrameRow: HTMLCanvasElement[] = [];
       for (let v = 0; v < 8; v++) {
@@ -174,6 +177,7 @@ export class TileAtlasBank {
     const allSprites: HTMLCanvasElement[] = [
       ...baked.floorSprites,
       ...baked.shorelineSprites,
+      ...baked.roadEdgeSprites,
       ...baked.voidBedrockSprites,
       ...baked.townRoadSprites,
       ...baked.townGrassSprites,
@@ -302,7 +306,7 @@ export class TileAtlasBank {
     // Bright specular corner glint on top-left bevel
     const specA = bilerp(0.08, 0.06);
     const specB = bilerp(0.42, 0.06);
-    ctx.strokeStyle = 'rgba(212, 220, 232, 0.75)';
+    ctx.strokeStyle = 'rgba(176, 188, 204, 0.65)';
     ctx.lineWidth = 0.9;
     ctx.beginPath();
     ctx.moveTo(specA.x, specA.y);
@@ -454,50 +458,49 @@ export class TileAtlasBank {
     highlight: string;
     shadow: string;
   }[] {
-    // Light-shaded silver-ash & weathered light limestone brick palette
-    // Preserves the 4-course staggered brick geometry, notched corners, and crisp bevels with a bright, clean light shade
+    // Darker charcoal-slate & weathered dungeon stone brick palette (restored darker shade)
     return [
       {
-        base: '#9aa4b2',
-        upper: '#b2bcc9',
-        lower: '#7e8896',
-        highlight: '#e2e8f0',
-        shadow: '#525b67',
+        base: '#4a525d',
+        upper: '#5c6674',
+        lower: '#373d47',
+        highlight: '#7c8796',
+        shadow: '#232830',
       },
       {
-        base: '#a3adbb',
-        upper: '#bac4d1',
-        lower: '#86909e',
-        highlight: '#ecf1f7',
-        shadow: '#58616e',
+        base: '#525b67',
+        upper: '#646f7d',
+        lower: '#3d444f',
+        highlight: '#8591a1',
+        shadow: '#272c35',
       },
       {
-        base: '#adb7c4',
-        upper: '#c4ceda',
-        lower: '#8f99a7',
-        highlight: '#f1f5f9',
-        shadow: '#5f6875',
+        base: '#424953',
+        upper: '#535c68',
+        lower: '#30363f',
+        highlight: '#717c8b',
+        shadow: '#1e2229',
       },
       {
-        base: '#929ca9',
-        upper: '#a9b3c0',
-        lower: '#76808e',
-        highlight: '#dbe2ec',
-        shadow: '#4c5560',
+        base: '#58626f',
+        upper: '#6b7685',
+        lower: '#434b56',
+        highlight: '#8e9aa9',
+        shadow: '#2b313a',
       },
       {
-        base: '#b4becc',
-        upper: '#cbd4e0',
-        lower: '#96a0ae',
-        highlight: '#f8fafc',
-        shadow: '#646e7b',
+        base: '#3d444e',
+        upper: '#4d5662',
+        lower: '#2c313a',
+        highlight: '#6b7584',
+        shadow: '#1a1e24',
       },
       {
-        base: '#9ea8b6',
-        upper: '#b6c0cd',
-        lower: '#828c9a',
-        highlight: '#e6ecf4',
-        shadow: '#555e6a',
+        base: '#4e5763',
+        upper: '#606a78',
+        lower: '#3a414b',
+        highlight: '#808b9b',
+        shadow: '#252a32',
       },
     ];
   }
@@ -521,23 +524,24 @@ export class TileAtlasBank {
     ctx.save();
     ctx.clip();
 
-    // Light-shaded reference grey stone bricks for Forgotten Catacombs, or lightened biome bricks for other themes
+    // Darker reference charcoal-slate stone bricks for Forgotten Catacombs, or dark biome bricks for other themes
     const palettes =
       theme.id === 'forgotten_catacombs'
         ? this.getReferenceGreyBrickPalettes()
         : [0, 1, 2, 3, 4, 5].map((i) => {
-            const shift = (i - 2) * 5;
+            const shift = (i - 2) * 4;
             const baseHex = i % 2 === 0 ? theme.floorPrimary : theme.floorSecondary;
             return {
-              base: adjustColor(baseHex, shift + 34),
-              upper: adjustColor(baseHex, shift + 48),
-              lower: adjustColor(baseHex, shift + 18),
-              highlight: adjustColor(theme.floorBorder, shift + 62),
-              shadow: adjustColor(baseHex, shift - 2),
+              base: adjustColor(baseHex, shift + 12),
+              upper: adjustColor(baseHex, shift + 22),
+              lower: adjustColor(baseHex, shift + 2),
+              highlight: adjustColor(theme.floorBorder, shift + 36),
+              shadow: adjustColor(baseHex, shift - 10),
             };
           });
 
-    this.renderStaggeredBrickTile(ctx, cx, cy, variant, '#363d47', palettes);
+    const mortarCol = theme.id === 'forgotten_catacombs' ? '#181c22' : '#12161f';
+    this.renderStaggeredBrickTile(ctx, cx, cy, variant, mortarCol, palettes);
 
     // Subtle biome crevice accent on variants 8, 9, 10
     if (variant === 8 || variant === 9 || variant === 10) {
@@ -582,9 +586,9 @@ export class TileAtlasBank {
     const ctx = canvas.getContext('2d')!;
     const cx = 36;
     const cy = 20;
-    // Slightly oversized diamond (33.3 x 16.65) with ZERO border stroke so adjacent tiles fuse seamlessly!
-    const hw = 33.3;
-    const hh = 16.65;
+    // Slightly oversized diamond (33.4 x 16.7) with ZERO border stroke so adjacent tiles fuse seamlessly!
+    const hw = 33.4;
+    const hh = 16.7;
 
     ctx.beginPath();
     ctx.moveTo(cx, cy - hh);
@@ -592,62 +596,119 @@ export class TileAtlasBank {
     ctx.lineTo(cx, cy + hh);
     ctx.lineTo(cx - hw, cy);
     ctx.closePath();
-    // Base fill: clean slate mortar for light-shaded stone brick roads, vibrant sunlit emerald-meadow green for grass
-    ctx.fillStyle = isRoad ? '#383f4a' : '#35a849';
+    // Base fill: Minecraft Dirt Path golden-ochre tan (#9e814d) for roads, lush meadow green (#469c38) for grass
+    ctx.fillStyle = isRoad ? '#9e814d' : '#469c38';
     ctx.fill();
 
     ctx.save();
     ctx.clip();
 
     if (isRoad) {
-      // Light-Shaded Reference 4-Course Staggered Stone Brick Tile
-      this.renderStaggeredBrickTile(
-        ctx,
-        cx,
-        cy,
-        variant,
-        '#383f4a',
-        this.getReferenceGreyBrickPalettes()
-      );
-    } else {
-      // Vibrant Sunlit Emerald Meadow Grass with Subtle Wind-Sway Animation
-      const swayPhase = (swayFrame / 6) * Math.PI * 2;
-      const strokes = [
-        { ox: -8 + (variant % 3) * 3, oy: -4, rx: 14, ry: 3.6, col: 'rgba(84, 210, 82, 0.45)' },
-        { ox: 6 - (variant % 2) * 4, oy: 3, rx: 13, ry: 3.3, col: 'rgba(34, 134, 54, 0.36)' },
-        { ox: -3 + (variant % 4) * 2, oy: 1, rx: 11, ry: 2.9, col: 'rgba(134, 239, 102, 0.36)' },
+      // Minecraft Dirt Path Block (Shovel-Flattened Grass Path from Reference Image)
+      // Crisp 12x12 isometric pixel-art sub-grid with warm golden-ochre, khaki-tan & compacted earth pixels
+      const pathPalette = [
+        '#9e814d', // Base golden-tan
+        '#a88b54', // Warm mid-ochre
+        '#937644', // Compacted khaki-brown
+        '#b2955e', // Sunlit wheat-ochre highlight
+        '#896c3c', // Deeper earth-tan pixel
+        '#a38650', // Balanced golden-tan
+        '#ba9d65', // Bright warm sand-ochre pixel
+        '#7e6235', // Rich compacted soil accent pixel
       ];
-      for (const st of strokes) {
-        ctx.fillStyle = st.col;
-        ctx.beginPath();
-        ctx.ellipse(cx + st.ox, cy + st.oy, st.rx, st.ry, 0, 0, Math.PI * 2);
-        ctx.fill();
+
+      const gridN = 12;
+      const overlap = 0.008;
+      for (let gv = 0; gv < gridN; gv++) {
+        const v0 = gv / gridN - overlap;
+        const v1 = (gv + 1) / gridN + overlap;
+        for (let gu = 0; gu < gridN; gu++) {
+          const u0 = gu / gridN - overlap;
+          const u1 = (gu + 1) / gridN + overlap;
+
+          // Pair horizontal pixels slightly to replicate the authentic Minecraft dirt-path grain
+          const pairHash = spatialHash((gu >> 1) + variant * 7, gv + variant * 5, 419);
+          const cellHash = spatialHash(gu + variant * 11, gv + variant * 3, 733);
+          const palIdx = ((pairHash & 7) * 3 + (cellHash & 7)) & 7;
+
+          const p0 = isoUV(cx, cy, u0, v0, 33.0, 16.5);
+          const p1 = isoUV(cx, cy, u1, v0, 33.0, 16.5);
+          const p2 = isoUV(cx, cy, u1, v1, 33.0, 16.5);
+          const p3 = isoUV(cx, cy, u0, v1, 33.0, 16.5);
+
+          ctx.fillStyle = pathPalette[palIdx];
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.lineTo(p3.x, p3.y);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    } else {
+      // Vibrant Sunlit Meadow Grass Block Texture (12x12 subtle pixel-art turf grid + elastic swaying grass tufts)
+      const grassPalette = [
+        '#469c38', // Base Minecraft-style lush grass green
+        '#4ea63f', // Sunlit leaf green
+        '#3f9132', // Deep turf green
+        '#55af45', // Bright meadow pixel
+        '#3a872d', // Shaded moss pixel
+        '#49a13b', // Balanced lawn green
+      ];
+      const gridN = 10;
+      const overlap = 0.008;
+      for (let gv = 0; gv < gridN; gv++) {
+        const v0 = gv / gridN - overlap;
+        const v1 = (gv + 1) / gridN + overlap;
+        for (let gu = 0; gu < gridN; gu++) {
+          const u0 = gu / gridN - overlap;
+          const u1 = (gu + 1) / gridN + overlap;
+          const gh = spatialHash(gu + variant * 7, gv + variant * 5, 271);
+          const col = grassPalette[gh % grassPalette.length];
+          if (col === '#469c38') continue; // Base fill already covers this
+          const p0 = isoUV(cx, cy, u0, v0, 33.0, 16.5);
+          const p1 = isoUV(cx, cy, u1, v0, 33.0, 16.5);
+          const p2 = isoUV(cx, cy, u1, v1, 33.0, 16.5);
+          const p3 = isoUV(cx, cy, u0, v1, 33.0, 16.5);
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.lineTo(p3.x, p3.y);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
 
-      // 2. Layered Vibrant Grass Blade Clumps with Wind-Sway Bending at the Tips
+      // 2. Layered Grass Blade Clumps with Harmonic Spring-Wiggle Physics (8-frame cycle)
+      const swayPhase = (swayFrame / 8) * Math.PI * 2;
       const tuftCount = 4 + (variant % 2);
       for (let t = 0; t < tuftCount; t++) {
         const th = spatialHash(variant * 11 + t, t, 509);
-        const u = ((th & 0xff) / 255) * 0.58 + 0.21;
-        const v = (((th >>> 8) & 0xff) / 255) * 0.58 + 0.21;
+        const u = ((th & 0xff) / 255) * 0.62 + 0.19;
+        const v = (((th >>> 8) & 0xff) / 255) * 0.62 + 0.19;
         const pt = isoUV(cx, cy, u, v, 30, 15);
-        const windBend = Math.sin(swayPhase + t * 0.85 + variant * 0.6) * 2.35;
+        // Primary breeze wave + secondary harmonic whip at blade tips
+        const primarySway = Math.sin(swayPhase + t * 0.75 + variant * 0.5);
+        const secondaryWhip = Math.sin(swayPhase * 2 - t * 0.6 + variant) * 0.35;
+        const windBend = (primarySway + secondaryWhip) * 2.5;
 
         // Soft emerald-moss shadow under grass tuft
-        ctx.fillStyle = 'rgba(20, 83, 35, 0.52)';
+        ctx.fillStyle = 'rgba(24, 78, 22, 0.48)';
         ctx.beginPath();
-        ctx.ellipse(pt.x, pt.y + 1.2, 4.4, 1.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(pt.x, pt.y + 1.1, 4.2, 1.5, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Rich emerald, spring green, & sunlit chartreuse-lime grass blades bending with the breeze
         const blades = [
-          { dx: -3.0, dy: -3.5, col: '#1f7a34', swayScale: 0.7 },
-          { dx: -1.4, dy: -5.0, col: '#2eb84a', swayScale: 0.95 },
-          { dx: 0.3, dy: -5.6, col: '#84e85a', swayScale: 1.15 },
-          { dx: 1.8, dy: -4.6, col: '#4ade80', swayScale: 1.0 },
-          { dx: 3.2, dy: -3.2, col: '#228b3b', swayScale: 0.75 },
+          { dx: -2.8, dy: -3.4, col: '#287221', swayScale: 0.75 },
+          { dx: -1.3, dy: -4.8, col: '#3b9630', swayScale: 1.0 },
+          { dx: 0.3, dy: -5.4, col: '#76d656', swayScale: 1.2 },
+          { dx: 1.7, dy: -4.4, col: '#58bd44', swayScale: 1.05 },
+          { dx: 3.0, dy: -3.1, col: '#2f8226', swayScale: 0.8 },
         ];
-        ctx.lineWidth = 1.3;
+        ctx.lineWidth = 1.25;
         ctx.lineCap = 'round';
         for (const bl of blades) {
           const tipBend = windBend * bl.swayScale;
@@ -655,33 +716,31 @@ export class TileAtlasBank {
           ctx.beginPath();
           ctx.moveTo(pt.x + bl.dx * 0.3, pt.y + 0.8);
           ctx.quadraticCurveTo(
-            pt.x + bl.dx * 0.65 + tipBend * 0.45,
-            pt.y + bl.dy * 0.5,
+            pt.x + bl.dx * 0.6 + tipBend * 0.4,
+            pt.y + bl.dy * 0.55,
             pt.x + bl.dx + tipBend,
-            pt.y + bl.dy + Math.abs(tipBend) * 0.18
+            pt.y + bl.dy + Math.abs(tipBend) * 0.2
           );
           ctx.stroke();
         }
       }
 
       // 3. Swaying Wildflowers & Lupine Spikes on Meadow Variants
-      const flowerSway = Math.sin(swayPhase + variant) * 2.1;
+      const flowerSway = (Math.sin(swayPhase + variant) + Math.sin(swayPhase * 2 + 0.5) * 0.3) * 2.2;
       if (variant === 2 || variant === 6) {
         const lPt = isoUV(cx, cy, variant === 2 ? 0.46 : 0.54, 0.48, 28, 14);
-        ctx.fillStyle = '#1e6b2e';
+        ctx.fillStyle = '#256b20';
         ctx.beginPath();
         ctx.ellipse(lPt.x, lPt.y + 1.5, 4.5, 2.0, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Swaying stem
-        ctx.strokeStyle = '#2eb84a';
+        ctx.strokeStyle = '#3b9630';
         ctx.lineWidth = 1.35;
         ctx.beginPath();
         ctx.moveTo(lPt.x, lPt.y + 1);
-        ctx.quadraticCurveTo(lPt.x + flowerSway * 0.5, lPt.y - 4, lPt.x + flowerSway, lPt.y - 9);
+        ctx.quadraticCurveTo(lPt.x + flowerSway * 0.45, lPt.y - 4, lPt.x + flowerSway, lPt.y - 9);
         ctx.stroke();
 
-        // Layered vibrant violet-lavender lupine florets swaying with the stem
         const florets = [
           { ox: -1.5, oy: -2.5, r: 1.6, col: '#7c3aed', hFrac: 0.3 },
           { ox: 1.5, oy: -3.0, r: 1.6, col: '#8b5cf6', hFrac: 0.35 },
@@ -698,7 +757,6 @@ export class TileAtlasBank {
           ctx.fill();
         }
       } else if (variant === 4 || variant === 1) {
-        // Swaying golden buttercup & white daisy cluster
         const fPt = isoUV(cx, cy, 0.52, 0.45, 28, 14);
         ctx.fillStyle = variant === 1 ? '#fde047' : '#fef9c3';
         ctx.beginPath();
@@ -1691,9 +1749,10 @@ export class TileAtlasBank {
     const y = 92;
     const scale = variant >= 4 ? 0.94 : 1.02;
     const species = variant % 4; // 0 = Emerald Oak, 1 = Highland Spruce Pine, 2 = Golden Birch, 3 = Blossoming Sakura
-    const swayPhase = (swayFrame / 6) * Math.PI * 2;
-    const baseSway = Math.sin(swayPhase) * 2.8;
-    const crownBob = Math.cos(swayPhase * 2) * 0.85;
+    const swayPhase = (swayFrame / 8) * Math.PI * 2;
+    // Harmonic wind physics: primary sway wave + secondary high-frequency canopy whip
+    const baseSway = Math.sin(swayPhase) * 2.6 + Math.sin(swayPhase * 2 - 0.5) * 0.75;
+    const crownBob = Math.cos(swayPhase * 2) * 0.95;
 
     // 1. Dappled Ground Shadow & Vibrant Mossy Root Base
     const shadowGrad = ctx.createRadialGradient(x + 3 + baseSway * 0.3, y + 3, 4, x + 3, y + 3, 33 * scale);
@@ -1963,6 +2022,134 @@ export class TileAtlasBank {
     }
     ctx.stroke();
 
+    return canvas;
+  }
+
+  /**
+   * Pre-bakes all 16 N/E/S/W Minecraft-style 1/16th-block recessed grass-block step edges
+   * (bit 0 = North is grass, bit 1 = East is grass, bit 2 = South is grass, bit 3 = West is grass)
+   * so that dirt path blocks sit cleanly recessed below adjacent green grass blocks (Reference Image).
+   */
+  private bakeRoadGrassEdgeMaskSprite(mask: number): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = 72;
+    canvas.height = 40;
+    const ctx = canvas.getContext('2d')!;
+    if (mask === 0) return canvas;
+
+    const cx = 36;
+    const cy = 20;
+    const hw = 33.4;
+    const hh = 16.7;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - hh);
+    ctx.lineTo(cx + hw, cy);
+    ctx.lineTo(cx, cy + hh);
+    ctx.lineTo(cx - hw, cy);
+    ctx.closePath();
+    ctx.clip();
+
+    // Draw a crisp Minecraft-style recessed grass-block step lip (dirt side rim + blocky green grass lip)
+    const drawMinecraftGrassStepEdge = (
+      u0: number,
+      v0: number,
+      u1: number,
+      v1: number,
+      duIn: number,
+      dvIn: number,
+      isTopEdge: boolean,
+      seedSalt: number
+    ) => {
+      const steps = 12;
+      const rimDepth = 0.065;
+      for (let i = 0; i < steps; i++) {
+        const tA = i / steps;
+        const tB = (i + 1) / steps;
+        const h = spatialHash(i + seedSalt, mask, 911);
+
+        // 1. Exposed 1/16th-block brown dirt side wall of the adjacent higher Grass Block (visible on North/East top edges)
+        if (isTopEdge) {
+          const dDepth = rimDepth * 1.45;
+          const dp0 = isoUV(cx, cy, u0 + (u1 - u0) * tA, v0 + (v1 - v0) * tA, 33.0, 16.5);
+          const dp1 = isoUV(cx, cy, u0 + (u1 - u0) * tB, v0 + (v1 - v0) * tB, 33.0, 16.5);
+          const dp2 = isoUV(
+            cx,
+            cy,
+            u0 + (u1 - u0) * tB + duIn * dDepth,
+            v0 + (v1 - v0) * tB + dvIn * dDepth,
+            33.0,
+            16.5
+          );
+          const dp3 = isoUV(
+            cx,
+            cy,
+            u0 + (u1 - u0) * tA + duIn * dDepth,
+            v0 + (v1 - v0) * tA + dvIn * dDepth,
+            33.0,
+            16.5
+          );
+          ctx.fillStyle = (h & 1) === 0 ? '#6e5034' : '#5e432a';
+          ctx.beginPath();
+          ctx.moveTo(dp0.x, dp0.y);
+          ctx.lineTo(dp1.x, dp1.y);
+          ctx.lineTo(dp2.x, dp2.y);
+          ctx.lineTo(dp3.x, dp3.y);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // 2. Crisp pixel-stepped green Grass Block top lip along the border
+        const lipDepth = rimDepth * ((h % 3 === 0) ? 1.05 : 0.82);
+        const gp0 = isoUV(cx, cy, u0 + (u1 - u0) * tA, v0 + (v1 - v0) * tA, 33.0, 16.5);
+        const gp1 = isoUV(cx, cy, u0 + (u1 - u0) * tB, v0 + (v1 - v0) * tB, 33.0, 16.5);
+        const gp2 = isoUV(
+          cx,
+          cy,
+          u0 + (u1 - u0) * tB + duIn * lipDepth,
+          v0 + (v1 - v0) * tB + dvIn * lipDepth,
+          33.0,
+          16.5
+        );
+        const gp3 = isoUV(
+          cx,
+          cy,
+          u0 + (u1 - u0) * tA + duIn * lipDepth,
+          v0 + (v1 - v0) * tA + dvIn * lipDepth,
+          33.0,
+          16.5
+        );
+
+        ctx.fillStyle = (h & 1) === 0 ? '#4ca638' : '#3f9132';
+        ctx.beginPath();
+        ctx.moveTo(gp0.x, gp0.y);
+        ctx.lineTo(gp1.x, gp1.y);
+        ctx.lineTo(gp2.x, gp2.y);
+        ctx.lineTo(gp3.x, gp3.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    };
+
+    // North neighbor (ty - 1): v = 0 edge (u from 0 to 1, inward is +v)
+    if ((mask & 1) !== 0) {
+      drawMinecraftGrassStepEdge(0, 0, 1, 0, 0, 1, true, 13);
+    }
+    // East neighbor (tx + 1): u = 1 edge (v from 0 to 1, inward is -u)
+    if ((mask & 2) !== 0) {
+      drawMinecraftGrassStepEdge(1, 0, 1, 1, -1, 0, true, 29);
+    }
+    // South neighbor (ty + 1): v = 1 edge (u from 0 to 1, inward is -v)
+    if ((mask & 4) !== 0) {
+      drawMinecraftGrassStepEdge(0, 1, 1, 1, 0, -1, false, 47);
+    }
+    // West neighbor (tx - 1): u = 0 edge (v from 0 to 1, inward is +u)
+    if ((mask & 8) !== 0) {
+      drawMinecraftGrassStepEdge(0, 0, 0, 1, 1, 0, false, 61);
+    }
+
+    ctx.restore();
     return canvas;
   }
 

@@ -3,6 +3,7 @@ import { GameEngine } from '../src/engine/gameEngine';
 import { StatType, TileType } from '../src/engine/types';
 import { clearSaveGame, hasSavedGame, loadGameState } from '../src/engine/checkpoint';
 import { sound, evaluateTownSoundscape, computeIsometricStereoPan } from '../src/engine/audio';
+import { computeNPCIdlePose } from '../src/engine/characterRigs';
 
 describe('GameEngine death and restart cycle', () => {
   beforeEach(() => {
@@ -224,7 +225,39 @@ describe('GameEngine death and restart cycle', () => {
     const leftPan = computeIsometricStereoPan(0, 0, -400, 400, 600);
     expect(rightPan).toBeGreaterThan(0.4);
     expect(leftPan).toBeLessThan(-0.4);
+
+    // 5. Standing NPCs perform idle animations (looking around left/right & nodding)
+    const sampleNpc = engine.state.townLevel.npcs[0];
+    sampleNpc.vx = 0;
+    sampleNpc.vy = 0;
+    sampleNpc.idleAction = 'look_around';
+    sampleNpc.headYaw = 0.8;
+    sampleNpc.headPitch = 0;
+    const lookPose = computeNPCIdlePose(sampleNpc, 2.0, false);
+    expect(lookPose.isMoving).toBe(false);
+    expect(Math.abs(lookPose.headLookX)).toBeGreaterThan(1.2);
+
+    sampleNpc.idleAction = 'nodding';
+    sampleNpc.headYaw = 0;
+    sampleNpc.headPitch = 0.85;
+    const nodPose = computeNPCIdlePose(sampleNpc, 2.5, true);
+    expect(nodPose.headNodY).toBeGreaterThan(1.5);
+    expect(nodPose.rightArmLift).toBeGreaterThan(0);
+
+    // 6. NPCs near river tiles never step onto Water and recover automatically if obstructed by a riverbank
+    for (const npc of engine.state.townLevel.npcs) {
+      npc.waitTimer = 0;
+    }
+    for (let step = 0; step < 120; step++) {
+      engine.update(0.1);
+      for (const npc of engine.state.townLevel.npcs) {
+        const t = map.worldToTile(npc.x, npc.y);
+        expect(map.get(t.x, t.y)).not.toBe(TileType.Water);
+        expect(map.isCircleWalkable(npc.x, npc.y, 15, true)).toBe(true);
+      }
+    }
   });
 });
+
 
 

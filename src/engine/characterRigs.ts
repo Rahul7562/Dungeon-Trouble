@@ -1221,6 +1221,106 @@ export function drawEnemyRig(
   ctx.restore();
 }
 
+export interface NPCIdlePose {
+  isMoving: boolean;
+  headLookX: number; // Horizontal head turn & gaze offset (-3.4 .. +3.4 px)
+  headNodY: number; // Vertical head nod offset (-1.5 .. +3.2 px)
+  headTilt: number; // Subtle head tilt in radians
+  torsoSwayX: number; // Gentle weight shift while standing
+  breathY: number; // Chest breathing bob
+  rightArmLift: number; // Hand/arm gesture offset
+  isBlinking: boolean;
+}
+
+/**
+ * Computes deterministic, life-like standing idle animation offsets for Town-1 NPCs
+ * (looking around left/right, nodding, breathing, blinking, and greeting gestures).
+ */
+export function computeNPCIdlePose(
+  npc: NPCEntity,
+  gameTime: number,
+  isNear: boolean = false
+): NPCIdlePose {
+  const speed = Math.hypot(npc.vx || 0, npc.vy || 0);
+  const isMoving = speed > 4;
+  const seed = (npc.x * 0.037 + npc.y * 0.053) % (Math.PI * 2);
+
+  if (isMoving) {
+    const isoAngle = worldAngleToIsoAngle(npc.facingAngle || 0);
+    return {
+      isMoving: true,
+      headLookX: Math.cos(isoAngle) * 1.6,
+      headNodY: 0,
+      headTilt: 0,
+      torsoSwayX: 0,
+      breathY: 0,
+      rightArmLift: 0,
+      isBlinking: false,
+    };
+  }
+
+  // Combine simulation-driven headYaw/headPitch with smooth procedural idle cycles
+  const t = gameTime + seed;
+  const cycleWindow = t % 7.5;
+  const autoLookWindow = cycleWindow >= 1.2 && cycleWindow < 4.4;
+  const autoNodWindow = cycleWindow >= 4.6 && cycleWindow < 6.8;
+
+  let yaw = npc.headYaw ?? 0;
+  let pitch = npc.headPitch ?? 0;
+
+  if (Math.abs(yaw) < 0.02 && Math.abs(pitch) < 0.02) {
+    if (isNear) {
+      // Friendly double-nod & attentive gaze when player is nearby
+      yaw = Math.sin(t * 1.8) * 0.25;
+      pitch = Math.max(0, Math.sin(t * 6.0)) * 0.85;
+    } else if (autoLookWindow) {
+      // Smoothly pan gaze left, pause, pan right across the town center
+      yaw = Math.sin((cycleWindow - 1.2) * (Math.PI * 2 / 3.2)) * 0.9;
+      pitch = Math.sin(t * 2.2) * 0.12;
+    } else if (autoNodWindow) {
+      // Thoughtful double-nod while standing
+      yaw = Math.sin(seed) * 0.25;
+      pitch = Math.max(-0.1, Math.sin((cycleWindow - 4.6) * 6.5)) * 0.85;
+    } else {
+      yaw = Math.sin(t * 0.9) * 0.18;
+      pitch = Math.sin(t * 1.8) * 0.12;
+    }
+  }
+
+  // Blend in facing direction slightly when not actively scanning far left/right
+  const isoFacingX = Math.cos(worldAngleToIsoAngle(npc.facingAngle || 0));
+  const headLookX = Math.max(-3.4, Math.min(3.4, yaw * 3.1 + isoFacingX * 0.65));
+  const headNodY = Math.max(-1.6, Math.min(3.2, pitch * 2.9));
+  const headTilt = yaw * 0.09 - pitch * 0.04;
+  const torsoSwayX = Math.sin(t * 1.35) * 0.65;
+  const breathY = Math.sin(t * 2.6) * 1.15;
+
+  // Arm gesture: wave when greeting player or subtle role gesture when idle
+  let rightArmLift = 0;
+  if (isNear || npc.idleAction === 'wave_greet') {
+    rightArmLift = 3.5 + Math.sin(gameTime * 8.5 + seed) * 2.2;
+  } else if (npc.idleAction === 'nodding' || autoNodWindow) {
+    rightArmLift = 1.2 + Math.max(0, Math.sin(t * 5.5)) * 1.4;
+  } else if (npc.idleAction === 'inspect_work') {
+    rightArmLift = 2.0 + Math.sin(t * 4.2) * 1.6;
+  }
+
+  // Natural periodic blink (~130ms every 3.8 seconds)
+  const blinkCycle = (gameTime + seed * 1.7) % 3.8;
+  const isBlinking = blinkCycle > 3.66;
+
+  return {
+    isMoving: false,
+    headLookX,
+    headNodY,
+    headTilt,
+    torsoSwayX,
+    breathY,
+    rightArmLift,
+    isBlinking,
+  };
+}
+
 export function drawNPCRig(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -1230,14 +1330,12 @@ export function drawNPCRig(
   gameTime: number,
   isNight: boolean = false
 ): void {
-  const speed = Math.hypot(npc.vx || 0, npc.vy || 0);
-  const isMoving = speed > 4;
+  const pose = computeNPCIdlePose(npc, gameTime, isNear);
+  const isMoving = pose.isMoving;
   const walkCycle = isMoving ? gameTime * 8.5 + npc.x * 0.05 : 0;
   const strideL = isMoving ? Math.sin(walkCycle) * 4.5 : 0;
   const strideR = isMoving ? -Math.sin(walkCycle) * 4.5 : 0;
-  const bob = isMoving
-    ? Math.abs(Math.sin(walkCycle)) * 2.1
-    : Math.sin(gameTime * 2.5 + npc.x) * 1.3;
+  const bob = isMoving ? Math.abs(Math.sin(walkCycle)) * 2.1 : pose.breathY;
 
   ctx.save();
   ctx.translate(x, y);
@@ -1264,14 +1362,15 @@ export function drawNPCRig(
   ctx.ellipse(3.5 + strideR * 0.45, -1, 3.4, 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Role-specific Robes / Apron / Tunic
-  const robeGrad = ctx.createLinearGradient(0, -34 - bob, 0, -2);
+  // Role-specific Robes / Apron / Tunic (with subtle idle torso sway)
+  const swayX = pose.torsoSwayX;
+  const robeGrad = ctx.createLinearGradient(swayX, -34 - bob, 0, -2);
   robeGrad.addColorStop(0, npc.color);
   robeGrad.addColorStop(1, '#0f172a');
   ctx.fillStyle = robeGrad;
   ctx.beginPath();
-  ctx.moveTo(-8, -28 - bob);
-  ctx.lineTo(8, -28 - bob);
+  ctx.moveTo(-8 + swayX, -28 - bob);
+  ctx.lineTo(8 + swayX, -28 - bob);
   ctx.lineTo(10, -2);
   ctx.lineTo(-10, -2);
   ctx.closePath();
@@ -1280,51 +1379,171 @@ export function drawNPCRig(
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Head & Role Headgear
+  // Articulated Arms & Sleeves (animate with walk swing or idle greeting/work gestures)
+  const leftArmSwing = isMoving ? -strideL * 0.5 : Math.sin(gameTime * 2.1 + npc.y) * 0.6;
+  const rightArmSwing = isMoving ? -strideR * 0.5 : -pose.rightArmLift;
+
+  ctx.strokeStyle = npc.color;
+  ctx.lineWidth = 3.2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  // Left arm
+  ctx.moveTo(-7.5 + swayX, -25 - bob);
+  ctx.lineTo(-10.5 + swayX, -15 - bob + leftArmSwing);
+  // Right arm
+  ctx.moveTo(7.5 + swayX, -25 - bob);
+  ctx.lineTo(10.5 + swayX, -15 - bob + rightArmSwing);
+  ctx.stroke();
+
+  // Warm hands
   ctx.fillStyle = '#fde68a';
   ctx.beginPath();
-  ctx.arc(0, -33 - bob, 6, 0, Math.PI * 2);
+  ctx.arc(-10.5 + swayX, -14.5 - bob + leftArmSwing, 1.8, 0, Math.PI * 2);
+  ctx.arc(10.5 + swayX, -14.5 - bob + rightArmSwing, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Role torso details & tools
+  if (npc.role === 'elder' || npc.role === 'healer') {
+    // Hooded mantle + staff (staff gently bobs with right hand gesture)
+    const staffBob = !isMoving ? pose.rightArmLift * 0.45 : 0;
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(10.5 + swayX, -2 - staffBob);
+    ctx.lineTo(10.5 + swayX, -38 - bob - staffBob);
+    ctx.stroke();
+    ctx.fillStyle = npc.role === 'healer' ? '#34d399' : '#fde047';
+    ctx.beginPath();
+    ctx.arc(10.5 + swayX, -40 - bob - staffBob, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (npc.role === 'blacksmith') {
+    // Heavy leather smithing apron & animated forge hammer
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(-6 + swayX, -24 - bob, 12, 16);
+    const hammerY = -26 - bob + rightArmSwing * 0.7;
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(10.5 + swayX, -15 - bob + rightArmSwing);
+    ctx.lineTo(11.5 + swayX, hammerY + 2);
+    ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(8.5 + swayX, hammerY - 2, 6.5, 4);
+  } else if (npc.role === 'shop' || npc.role === 'storage') {
+    // Merchant gold sash & coin pouch
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(-7.5 + swayX, -16 - bob, 15, 2.2);
+  }
+
+  // Head, Facial Features (Looking Around & Nodding) & Role Headgear
+  const headX = swayX + pose.headLookX * 0.65;
+  const headY = -33 - bob + pose.headNodY;
+
+  ctx.save();
+  ctx.translate(headX, headY);
+  ctx.rotate(pose.headTilt);
+
+  // Head base
+  ctx.fillStyle = '#fde68a';
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#1e293b';
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  if (npc.role === 'elder' || npc.role === 'healer') {
-    // Hooded mantle + staff
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 2;
+  // Expressive Eyes & Eyebrows that shift horizontally when looking around and dip when nodding
+  const gazeX = Math.max(-2.4, Math.min(2.4, pose.headLookX * 0.75));
+  const gazeY = Math.max(-1.0, Math.min(1.5, pose.headNodY * 0.35));
+
+  // Eyebrows
+  ctx.strokeStyle = npc.role === 'elder' ? '#cbd5e1' : '#451a03';
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(gazeX - 3.3, gazeY - 2.2);
+  ctx.lineTo(gazeX - 1.1, gazeY - 2.0);
+  ctx.moveTo(gazeX + 1.1, gazeY - 2.0);
+  ctx.lineTo(gazeX + 3.3, gazeY - 2.2);
+  ctx.stroke();
+
+  // Eyes (with natural periodic blink)
+  ctx.fillStyle = '#0f172a';
+  if (pose.isBlinking) {
+    ctx.lineWidth = 1.0;
+    ctx.strokeStyle = '#0f172a';
     ctx.beginPath();
-    ctx.moveTo(10, -2);
-    ctx.lineTo(10, -38 - bob);
+    ctx.moveTo(gazeX - 3.0, gazeY - 0.3);
+    ctx.lineTo(gazeX - 1.2, gazeY - 0.3);
+    ctx.moveTo(gazeX + 1.2, gazeY - 0.3);
+    ctx.lineTo(gazeX + 3.0, gazeY - 0.3);
     ctx.stroke();
-    ctx.fillStyle = npc.role === 'healer' ? '#34d399' : '#fde047';
+  } else {
     ctx.beginPath();
-    ctx.arc(10, -40 - bob, 3.2, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (npc.role === 'blacksmith') {
-    // Heavy leather smithing apron & forge hammer
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(-6, -24 - bob, 12, 16);
-    ctx.fillStyle = '#94a3b8';
-    ctx.fillRect(9, -26 - bob, 6, 4);
-  } else if (npc.role === 'shop' || npc.role === 'storage') {
-    // Merchant velvet cap & gold sash
-    ctx.fillStyle = '#78350f';
-    ctx.beginPath();
-    ctx.ellipse(0, -37 - bob, 6.5, 2.8, 0, 0, Math.PI * 2);
+    ctx.arc(gazeX - 2.1, gazeY - 0.3, 1.05, 0, Math.PI * 2);
+    ctx.arc(gazeX + 2.1, gazeY - 0.3, 1.05, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  // Role-specific beards & headgear attached to the nodding/turning head
+  if (npc.role === 'elder') {
+    // Flowing silver sage beard that bobs with head nods
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.moveTo(-3.5, 2.0);
+    ctx.quadraticCurveTo(gazeX * 0.4, 8.5, 0, 9.2);
+    ctx.quadraticCurveTo(gazeX * 0.4, 8.5, 3.5, 2.0);
+    ctx.closePath();
+    ctx.fill();
+    // Golden sage circlet
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, -1.5, 5.8, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  } else if (npc.role === 'healer') {
+    // Serene white-and-gold abbey veil / circlet
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath();
+    ctx.arc(0, -1.5, 6.2, Math.PI, 0);
+    ctx.fill();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+  } else if (npc.role === 'blacksmith') {
+    // Thick dark smith's beard
+    ctx.fillStyle = '#451a03';
+    ctx.beginPath();
+    ctx.arc(gazeX * 0.3, 3.2, 3.6, 0, Math.PI);
+    ctx.fill();
+  } else if (npc.role === 'shop' || npc.role === 'storage') {
+    // Merchant velvet cap & feather
+    ctx.fillStyle = '#78350f';
+    ctx.beginPath();
+    ctx.ellipse(0, -4.2, 6.8, 2.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+  } else {
+    // Villager/Guide rustic hair or cap crest
+    ctx.fillStyle = '#78350f';
+    ctx.beginPath();
+    ctx.arc(0, -1.8, 5.9, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.fill();
+  }
+
+  ctx.restore();
 
   // Handheld Warm Night Lantern when evening/dusk/night falls
   if (isNight && npc.carriesLantern !== false) {
     const lanternSwing = isMoving ? Math.sin(walkCycle) * 2.5 : Math.sin(gameTime * 3) * 0.8;
-    const lx = -11 + lanternSwing;
+    const lx = -11 + swayX + lanternSwing;
     const ly = -16 - bob;
     // Iron handle
     ctx.strokeStyle = '#64748b';
     ctx.lineWidth = 1.3;
     ctx.beginPath();
-    ctx.moveTo(-7, -21 - bob);
+    ctx.moveTo(-7 + swayX, -21 - bob);
     ctx.lineTo(lx, ly - 5);
     ctx.stroke();
 

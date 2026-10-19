@@ -177,20 +177,45 @@ export class IsometricRenderer {
         this.lightmapCtx = lctx;
       }
 
-      // Pre-bake reusable 64x64 radial light cutout sprite to avoid per-light createRadialGradient
+      // Pre-bake 128x128 natural multi-lobe inverse-square light diffusion sprite (eliminates hard circular rings)
       const lc = document.createElement('canvas');
-      lc.width = 64;
-      lc.height = 64;
+      lc.width = 128;
+      lc.height = 128;
       const lcCtx = lc.getContext('2d');
       if (lcCtx) {
-        const grad = lcCtx.createRadialGradient(32, 32, 3, 32, 32, 32);
-        grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-        grad.addColorStop(0.55, 'rgba(0, 0, 0, 0.65)');
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        // Primary smooth inverse-square atmospheric diffusion core
+        const grad = lcCtx.createRadialGradient(64, 64, 2, 64, 64, 62);
+        grad.addColorStop(0.0, 'rgba(0, 0, 0, 1.0)');
+        grad.addColorStop(0.18, 'rgba(0, 0, 0, 0.92)');
+        grad.addColorStop(0.38, 'rgba(0, 0, 0, 0.72)');
+        grad.addColorStop(0.58, 'rgba(0, 0, 0, 0.44)');
+        grad.addColorStop(0.76, 'rgba(0, 0, 0, 0.19)');
+        grad.addColorStop(0.90, 'rgba(0, 0, 0, 0.06)');
+        grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
         lcCtx.fillStyle = grad;
-        lcCtx.beginPath();
-        lcCtx.arc(32, 32, 32, 0, Math.PI * 2);
-        lcCtx.fill();
+        lcCtx.fillRect(0, 0, 128, 128);
+
+        // Soft asymmetric organic scatter lobes so light diffuses naturally rather than a geometric circle
+        const lobes = [
+          { ox: -10, oy: 4, rx: 48, ry: 34, rot: 0.25, a: 0.24 },
+          { ox: 11, oy: -3, rx: 46, ry: 36, rot: -0.3, a: 0.22 },
+          { ox: 2, oy: 9, rx: 42, ry: 44, rot: 0.5, a: 0.18 },
+        ];
+        for (const lb of lobes) {
+          lcCtx.save();
+          lcCtx.translate(64 + lb.ox, 64 + lb.oy);
+          lcCtx.rotate(lb.rot);
+          lcCtx.scale(1, lb.ry / lb.rx);
+          const lg = lcCtx.createRadialGradient(0, 0, 2, 0, 0, lb.rx);
+          lg.addColorStop(0, `rgba(0, 0, 0, ${lb.a})`);
+          lg.addColorStop(0.6, `rgba(0, 0, 0, ${lb.a * 0.4})`);
+          lg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          lcCtx.fillStyle = lg;
+          lcCtx.beginPath();
+          lcCtx.arc(0, 0, lb.rx, 0, Math.PI * 2);
+          lcCtx.fill();
+          lcCtx.restore();
+        }
         this.lightCutoutSprite = lc;
       }
     }
@@ -1302,9 +1327,50 @@ export class IsometricRenderer {
             if (isRoad) {
               const sprite = atlas.townRoadSprites[h % atlas.townRoadSprites.length];
               this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 20, 1.0, true);
+
+              // Queue pre-baked overhanging grass-fringe verge overlay wherever the tilled path borders meadow grass
+              if (map && atlas.roadEdgeSprites && atlas.roadEdgeSprites.length > 0) {
+                const tf = townData.tileFlags;
+                const w = map.width;
+                const nonGrassMask =
+                  TOWN_TILE_FLAG_ROAD |
+                  TOWN_TILE_FLAG_INTERIOR_OAK |
+                  TOWN_TILE_FLAG_INTERIOR_STONE |
+                  TOWN_TILE_FLAG_INTERIOR_CARPET |
+                  TOWN_TILE_FLAG_PERIMETER_WALL;
+                const isGrassNeighbor = (nx: number, ny: number): boolean => {
+                  if (nx < 0 || nx >= w || ny < 0 || ny >= map.height) return false;
+                  const nType = map.get(nx, ny);
+                  if (nType === TileType.Water) return false;
+                  const nf = tf[ny * w + nx];
+                  return (nf & TOWN_TILE_FLAG_TREE) !== 0 || (nType === TileType.Floor && (nf & nonGrassMask) === 0);
+                };
+                const edgeMask =
+                  (isGrassNeighbor(tx, ty - 1) ? 1 : 0) |
+                  (isGrassNeighbor(tx + 1, ty) ? 2 : 0) |
+                  (isGrassNeighbor(tx, ty + 1) ? 4 : 0) |
+                  (isGrassNeighbor(tx - 1, ty) ? 8 : 0);
+                if (edgeMask !== 0 && atlas.roadEdgeSprites[edgeMask]) {
+                  this.queueOrBlitAtlasSprite(
+                    ctx,
+                    atlas,
+                    atlas.roadEdgeSprites[edgeMask],
+                    x - 36,
+                    y - 20,
+                    1.0,
+                    true
+                  );
+                }
+              }
             } else if (atlas.townGrassFrames.length > 0) {
-              // Subtle traveling wind-sway wave across the vibrant emerald meadow grass
-              const grassFrame = (((Math.floor(gameTime * 4.5 + tx * 0.35 + ty * 0.2)) % 6) + 6) % 6;
+              // Smooth 8-frame harmonic traveling wind-wiggle wave across the meadow grass
+              const nFrames = atlas.townGrassFrames.length;
+              const grassWave =
+                gameTime * 5.2 +
+                tx * 0.32 +
+                ty * 0.21 +
+                Math.sin(gameTime * 1.8 - tx * 0.15) * 0.85;
+              const grassFrame = ((Math.floor(grassWave) % nFrames) + nFrames) % nFrames;
               const sprite = atlas.townGrassFrames[grassFrame][h & 7];
               this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 20, 1.0, true);
             } else {
@@ -1337,7 +1403,13 @@ export class IsometricRenderer {
             const sprite = atlas.townRoadSprites[h % atlas.townRoadSprites.length];
             this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 20, 1.0, true);
           } else if (atlas.townGrassFrames.length > 0) {
-            const grassFrame = (((Math.floor(gameTime * 4.5 + tx * 0.35 + ty * 0.2)) % 6) + 6) % 6;
+            const nFrames = atlas.townGrassFrames.length;
+            const grassWave =
+              gameTime * 5.2 +
+              tx * 0.32 +
+              ty * 0.21 +
+              Math.sin(gameTime * 1.8 - tx * 0.15) * 0.85;
+            const grassFrame = ((Math.floor(grassWave) % nFrames) + nFrames) % nFrames;
             const sprite = atlas.townGrassFrames[grassFrame][h & 7];
             this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 20, 1.0, true);
           } else {
@@ -1904,7 +1976,7 @@ export class IsometricRenderer {
     y: number,
     tx: number,
     ty: number,
-    _gameTime: number = 0,
+    gameTime: number = 0,
     alpha: number = 1.0,
     atlas?: ReturnType<TileAtlasBank['getAtlas']>
   ) {
@@ -1922,23 +1994,56 @@ export class IsometricRenderer {
       species = roll < 5 ? 0 : roll < 8 ? 1 : roll === 8 ? 2 : 3;
     }
 
-    if (atlas && atlas.townTreeFrames.length >= 6) {
+    // Continuous 60 FPS spring-harmonic wind-wiggle physics anchored at the tree's root base (x, y)
+    const phase = gameTime * 2.35 - tx * 0.38 - ty * 0.24 + (h & 31) * 0.25;
+    const gustEnvelope = 0.62 + 0.38 * Math.sin(gameTime * 0.85 - tx * 0.14 - ty * 0.09);
+    const primarySway = Math.sin(phase);
+    const secondaryWhip = Math.sin(phase * 2.25 + 0.65) * 0.38;
+    const tertiaryFlutter = Math.cos(phase * 3.6 - 0.4) * 0.14;
+    const windShear = (primarySway + secondaryWhip + tertiaryFlutter) * gustEnvelope * 0.048;
+    const canopyLift = Math.cos(phase * 1.9) * gustEnvelope * 0.015;
+
+    if (atlas && atlas.townTreeFrames.length > 0) {
+      const nFrames = atlas.townTreeFrames.length;
       const variantIdx = species + ((h & 1) === 0 ? 0 : 4);
-      // Traveling wind-sway wave across the valley's tree canopies
-      const treeFrame = (((Math.floor(_gameTime * 4.2 + tx * 0.45 + ty * 0.3)) % 6) + 6) % 6;
+      const treeFrame = ((Math.floor(gameTime * 5.2 + tx * 0.45 + ty * 0.3) % nFrames) + nFrames) % nFrames;
       const sprite = atlas.townTreeFrames[treeFrame][variantIdx];
-      this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 48, y - 92, alpha, false);
+      const rect = atlas.rectMap.get(sprite);
+
+      ctx.save();
+      if (alpha < 0.99) ctx.globalAlpha = alpha;
+      // Anchor transform at the root base (x, y) so roots stay planted while trunk & crown wiggle elastically
+      ctx.translate(x, y);
+      ctx.transform(1, canopyLift, windShear, 1 - Math.abs(windShear) * 0.08, 0, 0);
+      if (rect) {
+        ctx.drawImage(
+          atlas.masterSheet,
+          rect.sx,
+          rect.sy,
+          rect.sw,
+          rect.sh,
+          -48,
+          -92,
+          rect.sw,
+          rect.sh
+        );
+      } else {
+        ctx.drawImage(sprite, -48, -92);
+      }
+      ctx.restore();
       return;
     }
 
     // Lightweight vector fallback for headless tests without offscreen canvas
     ctx.save();
     ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    ctx.transform(1, canopyLift, windShear, 1, 0, 0);
     ctx.fillStyle = '#451a03';
-    ctx.fillRect(x - 4, y - 24, 8, 26);
+    ctx.fillRect(-4, -24, 8, 26);
     ctx.fillStyle = species === 2 ? '#f59e0b' : species === 3 ? '#f472b6' : '#15803d';
     ctx.beginPath();
-    ctx.arc(x, y - 34, 18, 0, Math.PI * 2);
+    ctx.arc(0, -34, 18, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -2231,16 +2336,156 @@ export class IsometricRenderer {
       ctx.lineWidth = 1.2;
       ctx.strokeRect(x - 22, y - 42, 44, 9);
     } else if (prop.kind === 'bench') {
-      // Carved Timber Plaza Bench / Chapel Pew
-      ctx.fillStyle = '#78350f';
-      ctx.strokeStyle = '#451a03';
+      // Detailed 3D Isometric Carved Honey-Oak & Wrought-Iron Sanctuary Park Bench
+      // Isometric bench axis: runs along the South-West to North-East isometric diagonal
+      // Left end centered around (x - 14, y + 3), Right end centered around (x + 14, y - 5)
+      // 1. Soft elongated isometric ground shadow underneath bench
+      ctx.fillStyle = 'rgba(10, 15, 28, 0.48)';
+      ctx.beginPath();
+      ctx.ellipse(x, y + 3, 22, 8.5, -0.26, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Rear & Front Cast Wrought-Iron Legs (Left & Right supports)
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#475569';
       ctx.lineWidth = 1.2;
-      ctx.fillRect(x - 16, y - 9, 32, 5);
-      ctx.strokeRect(x - 16, y - 9, 32, 5);
-      ctx.fillRect(x - 16, y - 16, 32, 5);
-      ctx.strokeRect(x - 16, y - 16, 32, 5);
-      ctx.fillRect(x - 14, y - 4, 3, 5);
-      ctx.fillRect(x + 11, y - 4, 3, 5);
+      // Back-left leg & upright post
+      ctx.fillRect(x - 16, y - 21, 3.2, 22);
+      ctx.strokeRect(x - 16, y - 21, 3.2, 22);
+      // Back-right leg & upright post
+      ctx.fillRect(x + 9, y - 28, 3.2, 22);
+      ctx.strokeRect(x + 9, y - 28, 3.2, 22);
+      // Front-left leg
+      ctx.fillRect(x - 11, y - 7, 3.2, 11);
+      ctx.strokeRect(x - 11, y - 7, 3.2, 11);
+      // Front-right leg
+      ctx.fillRect(x + 14, y - 14, 3.2, 11);
+      ctx.strokeRect(x + 14, y - 14, 3.2, 11);
+
+      // Under-seat wrought-iron cross-brace stretcher
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(x - 12, y - 3);
+      ctx.lineTo(x + 13, y - 10);
+      ctx.stroke();
+
+      // 3. 3D Slatted Honey-Oak Seat Deck (Isometric Parallelogram with 3 distinct wood slats & front thickness)
+      // Seat corners: Back-Left (-15, -10), Back-Right (+11, -17), Front-Right (+17, -13), Front-Left (-9, -6)
+      // 3a. Dark oak under-frame & 3D front-edge thickness
+      ctx.fillStyle = '#45210a';
+      ctx.beginPath();
+      ctx.moveTo(x - 15, y - 10);
+      ctx.lineTo(x + 11, y - 17);
+      ctx.lineTo(x + 17, y - 13);
+      ctx.lineTo(x + 17, y - 10.5);
+      ctx.lineTo(x - 9, y - 3.5);
+      ctx.lineTo(x - 15, y - 7.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3b. Three Individual Isometric Honey-Oak Seat Slats
+      const seatSlats = [
+        { t0: 0.0, t1: 0.30, fill: '#8a501e', hi: '#ad6b30' },
+        { t0: 0.35, t1: 0.65, fill: '#9c5c24', hi: '#c27a38' },
+        { t0: 0.70, t1: 1.0, fill: '#ab682c', hi: '#d48c46' },
+      ];
+      for (const sl of seatSlats) {
+        const blX = -15 + 6 * sl.t0;
+        const blY = -10 + 4 * sl.t0;
+        const brX = 11 + 6 * sl.t0;
+        const brY = -17 + 4 * sl.t0;
+        const frX = 11 + 6 * sl.t1;
+        const frY = -17 + 4 * sl.t1;
+        const flX = -15 + 6 * sl.t1;
+        const flY = -10 + 4 * sl.t1;
+
+        ctx.fillStyle = sl.fill;
+        ctx.beginPath();
+        ctx.moveTo(x + blX, y + blY);
+        ctx.lineTo(x + brX, y + brY);
+        ctx.lineTo(x + frX, y + frY);
+        ctx.lineTo(x + flX, y + flY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Crisp sunlit front-top wood grain highlight on each slat
+        ctx.strokeStyle = sl.hi;
+        ctx.lineWidth = 0.85;
+        ctx.beginPath();
+        ctx.moveTo(x + flX + 0.5, y + flY - 0.3);
+        ctx.lineTo(x + frX - 0.5, y + frY - 0.3);
+        ctx.stroke();
+      }
+
+      // 4. Angled Slatted Honey-Oak Backrest with Carved Crest Rail & Brass Studs
+      // Backrest rises from Back-Left (-15, -10) -> (-16, -21) and Back-Right (+11, -17) -> (+10, -28)
+      // 4a. Lower & Upper Backrest Slats
+      const backSlats = [
+        { yOff0: -12.5, yOff1: -15.8, fill: '#8c5220', border: '#3d1d08' },
+        { yOff0: -17.0, yOff1: -20.8, fill: '#a6652b', border: '#3d1d08' },
+      ];
+      for (const bs of backSlats) {
+        ctx.fillStyle = bs.fill;
+        ctx.strokeStyle = bs.border;
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(x - 15.5, y + bs.yOff0);
+        ctx.lineTo(x + 10.5, y + bs.yOff0 - 7);
+        ctx.lineTo(x + 10.0, y + bs.yOff1 - 7);
+        ctx.lineTo(x - 16.0, y + bs.yOff1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // 4b. Sculpted Top Crest Rail with Warm Specular Highlight & End Finials
+      ctx.strokeStyle = '#c8823e';
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x - 16.5, y - 21.2);
+      ctx.lineTo(x + 10.5, y - 28.2);
+      ctx.stroke();
+
+      // Center vertical backrest stile
+      ctx.fillStyle = '#5c3110';
+      ctx.beginPath();
+      ctx.moveTo(x - 3.5, y - 13.5);
+      ctx.lineTo(x - 1.5, y - 14.0);
+      ctx.lineTo(x - 2.0, y - 24.5);
+      ctx.lineTo(x - 4.0, y - 24.0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Brass bolt rivets along backrest posts
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(x - 14.8, y - 19.0, 1.0, 0, Math.PI * 2);
+      ctx.arc(x + 9.2, y - 26.0, 1.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 5. Curved Wrought-Iron & Oak Armrests on Left and Right Ends
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      // Left armrest scroll
+      ctx.moveTo(x - 15.5, y - 15.5);
+      ctx.quadraticCurveTo(x - 10.0, y - 13.5, x - 9.5, y - 6.5);
+      // Right armrest scroll
+      ctx.moveTo(x + 10.5, y - 22.5);
+      ctx.quadraticCurveTo(x + 16.0, y - 20.5, x + 16.2, y - 13.5);
+      ctx.stroke();
+
+      // Sunlit iron highlight on armrests
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(x - 15.2, y - 16.2);
+      ctx.quadraticCurveTo(x - 10.2, y - 14.2, x - 9.8, y - 10.0);
+      ctx.moveTo(x + 10.8, y - 23.2);
+      ctx.quadraticCurveTo(x + 15.8, y - 21.2, x + 16.0, y - 17.0);
+      ctx.stroke();
     } else if (prop.kind === 'brazier') {
       // Forged Iron Tripod Legs & Bowl
       ctx.strokeStyle = '#1e293b';
@@ -2554,6 +2799,8 @@ export class IsometricRenderer {
       ctx.arc(x, y - 24, 13, Math.PI * 0.65, Math.PI * 1.3);
       ctx.stroke();
     } else if (prop.kind === 'banner') {
+      const clothWave = Math.sin(gameTime * 3.8 + x * 0.05) * 2.2;
+      const tipWhip = Math.sin(gameTime * 6.4 + x * 0.08 - 0.9) * 1.4;
       ctx.strokeStyle = '#94a3b8';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2567,11 +2814,12 @@ export class IsometricRenderer {
       ctx.beginPath();
       ctx.moveTo(x - 6, y - 38);
       ctx.lineTo(x + 6, y - 38);
-      ctx.lineTo(x + 6, y - 14);
-      ctx.lineTo(x + 2, y - 19);
-      ctx.lineTo(x, y - 12);
-      ctx.lineTo(x - 3, y - 18);
-      ctx.lineTo(x - 6, y - 13);
+      ctx.quadraticCurveTo(x + 6 + clothWave * 0.6, y - 26, x + 6 + clothWave + tipWhip, y - 14);
+      ctx.lineTo(x + 2 + clothWave + tipWhip * 0.8, y - 19);
+      ctx.lineTo(x + clothWave + tipWhip, y - 12);
+      ctx.lineTo(x - 3 + clothWave + tipWhip * 0.8, y - 18);
+      ctx.lineTo(x - 6 + clothWave + tipWhip, y - 13);
+      ctx.quadraticCurveTo(x - 6 + clothWave * 0.6, y - 26, x - 6, y - 38);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -3336,37 +3584,55 @@ export class IsometricRenderer {
       }
       lctx.fillRect(0, 0, lw, lh);
 
-      // Cut out soft radial light fields using destination-out with pre-baked cutout sprite
+      // Cut out natural anisotropic ground-hugging light fields using destination-out
       lctx.globalCompositeOperation = 'destination-out';
 
-      const punchLight = (sx: number, sy: number, radius: number, strength: number) => {
+      const punchLight = (sx: number, sy: number, radius: number, strength: number, seed = 0) => {
         if (strength <= 0.01) return;
         const lx = sx * scaleX;
         const ly = sy * scaleY;
         const lr = Math.max(4, radius * scaleX);
+        // 2.5D Isometric ground-plane light spread (wider horizontally along the ground diamond, organically breathing)
+        const breatheX = 1.32 + Math.sin(gameTime * 2.7 + seed) * 0.05;
+        const breatheY = 0.86 + Math.cos(gameTime * 3.1 + seed * 1.3) * 0.04;
+        const rx = lr * breatheX;
+        const ry = lr * breatheY;
+
         if (this.lightCutoutSprite) {
-          lctx.globalAlpha = Math.min(1, strength);
-          lctx.drawImage(this.lightCutoutSprite, lx - lr, ly - lr, lr * 2, lr * 2);
+          // 1. Wide, soft outer atmospheric ground scatter (eliminates any circular boundary perception)
+          lctx.globalAlpha = Math.min(1, strength * 0.46);
+          lctx.drawImage(
+            this.lightCutoutSprite,
+            lx - rx * 1.48,
+            ly - ry * 1.38,
+            rx * 2.96,
+            ry * 2.76
+          );
+          // 2. Primary isometric elliptical light diffusion
+          lctx.globalAlpha = Math.min(1, strength * 0.92);
+          lctx.drawImage(this.lightCutoutSprite, lx - rx, ly - ry, rx * 2, ry * 2);
         } else {
-          const grad = lctx.createRadialGradient(lx, ly, lr * 0.1, lx, ly, lr);
+          const grad = lctx.createRadialGradient(lx, ly, lr * 0.08, lx, ly, rx);
           grad.addColorStop(0, `rgba(0, 0, 0, ${Math.min(1, strength)})`);
+          grad.addColorStop(0.55, `rgba(0, 0, 0, ${Math.min(1, strength * 0.42)})`);
           grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
           lctx.fillStyle = grad;
           lctx.beginPath();
-          lctx.arc(lx, ly, lr, 0, Math.PI * 2);
+          lctx.ellipse(lx, ly, rx, ry, 0, 0, Math.PI * 2);
           lctx.fill();
         }
       };
 
-      // Hero lantern light cutout
-      punchLight(playerX, playerY - 16, heroRadius, 0.96);
+      // Hero lantern light cutout (spreads naturally across the isometric floor around the hero)
+      punchLight(playerX, playerY - 12, heroRadius, 0.96, 1.1);
 
       // Environmental, Window, Street Lantern, & Spell light cutouts
-      for (const l of lights) {
-        if (l.x < -220 || l.x > this.width + 220 || l.y < -220 || l.y > this.height + 220) {
+      for (let i = 0; i < lights.length; i++) {
+        const l = lights[i];
+        if (l.x < -260 || l.x > this.width + 260 || l.y < -260 || l.y > this.height + 260) {
           continue;
         }
-        punchLight(l.x, l.y, l.radius, l.intensity);
+        punchLight(l.x, l.y, l.radius, l.intensity, i * 1.7);
       }
 
       lctx.globalAlpha = 1;
@@ -3378,29 +3644,51 @@ export class IsometricRenderer {
       ctx.restore();
     }
 
-    // 2. Local Warm Torch, Street Lantern, Hearth, Window, & Spell Colored Illumination (No full-screen red wash!)
+    // 2. Natural Feathered Isometric Colored Illumination Diffusion (Zero hard circular arcs!)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
-    const bloomBoost = isTown ? 0.05 + 0.06 * lanternFactor : 0.09;
+    const drawSoftColoredLight = (
+      lx: number,
+      ly: number,
+      radius: number,
+      color: string,
+      alpha: number
+    ) => {
+      if (alpha <= 0.004 || radius <= 2) return;
+      const rx = radius * 1.36;
+      const ry = radius * 0.84;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.scale(1, ry / rx);
+      ctx.globalAlpha = Math.min(1, alpha);
+      const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, rx);
+      grad.addColorStop(0.0, color);
+      grad.addColorStop(0.42, color);
+      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, rx, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    const bloomBoost = isTown ? 0.08 + 0.08 * lanternFactor : 0.13;
     for (const l of lights) {
-      if (l.intensity <= 0.02 || l.x < -160 || l.x > this.width + 160 || l.y < -160 || l.y > this.height + 160) {
+      if (l.intensity <= 0.02 || l.x < -200 || l.x > this.width + 200 || l.y < -200 || l.y > this.height + 200) {
         continue;
       }
-      const r = l.radius * 0.45;
-      ctx.globalAlpha = bloomBoost * l.intensity;
-      ctx.fillStyle = l.color;
-      ctx.beginPath();
-      ctx.arc(l.x, l.y, r, 0, Math.PI * 2);
-      ctx.fill();
+      drawSoftColoredLight(l.x, l.y, l.radius * 0.72, l.color, bloomBoost * l.intensity);
     }
 
     if (isPlayerAttacking || (isNightInTown && lanternFactor > 0.1)) {
-      ctx.globalAlpha = isPlayerAttacking ? 0.09 : 0.06 * lanternFactor;
-      ctx.fillStyle = '#fbbf24';
-      ctx.beginPath();
-      ctx.arc(playerX, playerY - 16, isPlayerAttacking ? 95 : 80, 0, Math.PI * 2);
-      ctx.fill();
+      drawSoftColoredLight(
+        playerX,
+        playerY - 12,
+        isPlayerAttacking ? 125 : 110,
+        '#fbbf24',
+        isPlayerAttacking ? 0.14 : 0.09 * lanternFactor
+      );
     }
 
     ctx.restore();

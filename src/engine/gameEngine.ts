@@ -1782,9 +1782,9 @@ export class GameEngine {
       const npcRadius = 15;
 
       for (const npc of state.townLevel.npcs) {
-        // Strict water guard: if an NPC is ever on or touching a Water tile, snap immediately to dry Floor
-        if (!currentMap.isCircleWalkable(npc.x, npc.y, npcRadius, true)) {
-          const dry = currentMap.findNearestDryWorldPos(npc.x, npc.y, npcRadius + 2);
+        // Strict water & riverbank guard: if an NPC is ever on or too close to a Water tile, push immediately to safe dry Floor
+        if (!currentMap.isCircleWalkable(npc.x, npc.y, npcRadius + 4, true)) {
+          const dry = currentMap.findNearestDryWorldPos(npc.x, npc.y, npcRadius + 16);
           npc.x = dry.x;
           npc.y = dry.y;
         }
@@ -1798,11 +1798,23 @@ export class GameEngine {
           closestNpc = npc;
         }
 
-        // Pause and face the player when they approach to talk or trade
+        // Pause and face the player when they approach to talk or trade, performing friendly nods & greetings
         if (distSqToPlayer < 72 * 72) {
           npc.vx = 0;
           npc.vy = 0;
           npc.facingAngle = Math.atan2(pdy, pdx);
+          npc.idlePhase = (npc.idlePhase ?? 0) + dt;
+          npc.idleTimer = (npc.idleTimer ?? 0) - dt;
+          if ((npc.idleTimer ?? 0) <= 0 || (npc.idleAction !== 'nodding' && npc.idleAction !== 'wave_greet')) {
+            npc.idleAction = Math.random() < 0.58 ? 'nodding' : 'wave_greet';
+            npc.idleTimer = 1.6 + Math.random() * 1.8;
+          }
+          const phase = npc.idlePhase;
+          const targetYaw = Math.sin(phase * 1.8) * 0.25;
+          const targetPitch =
+            npc.idleAction === 'nodding' ? Math.max(0, Math.sin(phase * 6.2)) * 0.85 : Math.sin(phase * 2.5) * 0.18;
+          npc.headYaw = (npc.headYaw ?? 0) + (targetYaw - (npc.headYaw ?? 0)) * Math.min(1, dt * 8);
+          npc.headPitch = (npc.headPitch ?? 0) + (targetPitch - (npc.headPitch ?? 0)) * Math.min(1, dt * 10);
           this.npcSpatialGrid.insert(npc, npc.x, npc.y, npcRadius);
           continue;
         }
@@ -1815,30 +1827,68 @@ export class GameEngine {
           continue;
         }
 
+        const selectNextDryWaypoint = () => {
+          if (!npc.waypoints || npc.waypoints.length === 0) return;
+          const nextIdx = ((npc.currentWaypointIdx ?? 0) + 1) % npc.waypoints.length;
+          npc.currentWaypointIdx = nextIdx;
+          npc.stuckTimer = 0;
+          const wp = npc.waypoints[nextIdx];
+          const jitterX = wp.x + (Math.random() - 0.5) * 10;
+          const jitterY = wp.y + (Math.random() - 0.5) * 10;
+          if (currentMap.isCircleWalkable(jitterX, jitterY, npcRadius + 14, true)) {
+            npc.targetX = jitterX;
+            npc.targetY = jitterY;
+          } else {
+            const dryWp = currentMap.findNearestDryWorldPos(wp.x, wp.y, npcRadius + 16);
+            npc.targetX = dryWp.x;
+            npc.targetY = dryWp.y;
+          }
+          if (npc.activities && npc.activities.length > 0) {
+            npc.activityText = npc.activities[nextIdx % npc.activities.length];
+          }
+        };
+
         if (npc.waypoints && npc.waypoints.length > 0) {
           if (npc.waitTimer !== undefined && npc.waitTimer > 0) {
             npc.waitTimer -= dt;
             npc.vx = 0;
             npc.vy = 0;
+            npc.idlePhase = (npc.idlePhase ?? 0) + dt;
+            npc.idleTimer = (npc.idleTimer ?? 0) - dt;
+            if ((npc.idleTimer ?? 0) <= 0 || !npc.idleAction) {
+              const roll = Math.random();
+              npc.idleAction =
+                roll < 0.42
+                  ? 'look_around'
+                  : roll < 0.76
+                  ? 'nodding'
+                  : npc.role !== 'villager'
+                  ? 'inspect_work'
+                  : 'breathing';
+              npc.idleTimer = 1.8 + Math.random() * 2.2;
+            }
+            const phase = npc.idlePhase;
+            const targetYaw =
+              npc.idleAction === 'look_around'
+                ? Math.sin(phase * 2.1 + npc.x * 0.02) * 0.92
+                : Math.sin(phase * 1.1) * 0.22;
+            const targetPitch =
+              npc.idleAction === 'nodding'
+                ? Math.max(-0.15, Math.sin(phase * 5.8)) * 0.85
+                : npc.idleAction === 'inspect_work'
+                ? 0.45 + Math.sin(phase * 3.2) * 0.25
+                : Math.sin(phase * 2.0) * 0.12;
+            npc.headYaw = (npc.headYaw ?? 0) + (targetYaw - (npc.headYaw ?? 0)) * Math.min(1, dt * 7);
+            npc.headPitch = (npc.headPitch ?? 0) + (targetPitch - (npc.headPitch ?? 0)) * Math.min(1, dt * 9);
+
             if (npc.waitTimer <= 0) {
-              const nextIdx = ((npc.currentWaypointIdx ?? 0) + 1) % npc.waypoints.length;
-              npc.currentWaypointIdx = nextIdx;
-              const wp = npc.waypoints[nextIdx];
-              const jitterX = wp.x + (Math.random() - 0.5) * 14;
-              const jitterY = wp.y + (Math.random() - 0.5) * 14;
-              if (currentMap.isCircleWalkable(jitterX, jitterY, npcRadius + 2, true)) {
-                npc.targetX = jitterX;
-                npc.targetY = jitterY;
-              } else {
-                const dryWp = currentMap.findNearestDryWorldPos(wp.x, wp.y, npcRadius + 2);
-                npc.targetX = dryWp.x;
-                npc.targetY = dryWp.y;
-              }
-              if (npc.activities && npc.activities.length > 0) {
-                npc.activityText = npc.activities[nextIdx % npc.activities.length];
-              }
+              npc.idleAction = 'breathing';
+              selectNextDryWaypoint();
             }
           } else {
+            // Smoothly recenter head gaze while walking
+            npc.headYaw = (npc.headYaw ?? 0) * Math.max(0, 1 - dt * 8);
+            npc.headPitch = (npc.headPitch ?? 0) * Math.max(0, 1 - dt * 8);
             const tx = npc.targetX ?? npc.x;
             const ty = npc.targetY ?? npc.y;
             const dx = tx - npc.x;
@@ -1846,45 +1896,78 @@ export class GameEngine {
             const dist = Math.hypot(dx, dy);
             const spd = (npc.moveSpeed || 42) * 1.15;
 
-            if (dist <= 8) {
+            if (dist <= 10) {
               npc.vx = 0;
               npc.vy = 0;
-              npc.waitTimer = 2.4 + Math.random() * 3.8;
+              npc.stuckTimer = 0;
+              npc.waitTimer = 2.8 + Math.random() * 4.0;
+              npc.idleAction = Math.random() < 0.5 ? 'look_around' : 'nodding';
+              npc.idleTimer = 1.8 + Math.random() * 2.0;
               if (npc.activities && npc.activities.length > 0) {
                 const actIdx = Math.floor(Math.random() * npc.activities.length);
                 npc.activityText = npc.activities[actIdx];
               }
             } else {
+              // Compute riverbank water-repulsion vector so NPCs naturally steer away from river/pond edges
+              const npcTile = currentMap.worldToTile(npc.x, npc.y);
+              let repelX = 0;
+              let repelY = 0;
+              for (let wy = -1; wy <= 1; wy++) {
+                for (let wx = -1; wx <= 1; wx++) {
+                  if (wx === 0 && wy === 0) continue;
+                  const ntx = npcTile.x + wx;
+                  const nty = npcTile.y + wy;
+                  if (currentMap.get(ntx, nty) === TileType.Water) {
+                    const wCenter = currentMap.tileToWorldCenter(ntx, nty);
+                    const rx = npc.x - wCenter.x;
+                    const ry = npc.y - wCenter.y;
+                    const rDist = Math.hypot(rx, ry) || 1;
+                    if (rDist < 72) {
+                      const pushStrength = (72 - rDist) / 72;
+                      repelX += (rx / rDist) * pushStrength * 0.85;
+                      repelY += (ry / rDist) * pushStrength * 0.85;
+                    }
+                  }
+                }
+              }
+
               const invDist = 1 / dist;
+              let dirX = dx * invDist + repelX;
+              let dirY = dy * invDist + repelY;
+              const dirLen = Math.hypot(dirX, dirY) || 1;
+              dirX /= dirLen;
+              dirY /= dirLen;
+
               const stepMag = spd * dt;
-              const stepX = dx * invDist * stepMag;
-              const stepY = dy * invDist * stepMag;
+              const stepX = dirX * stepMag;
+              const stepY = dirY * stepMag;
 
               if (distSqToPlayer <= fullCollisionRadiusSq) {
-                // Strictly forbid Water tiles (forbidWater = true) during continuous circle collision
+                // Strictly forbid Water tiles (forbidWater = true) with extra shoreline safety margin
                 const resolved = currentMap.resolveCircleMovement(
                   npc.x,
                   npc.y,
                   stepX,
                   stepY,
-                  npcRadius,
+                  npcRadius + 3,
                   true
                 );
                 const movedDist = Math.hypot(resolved.x - npc.x, resolved.y - npc.y);
 
                 if (
-                  movedDist >= stepMag * 0.25 &&
-                  currentMap.isCircleWalkable(resolved.x, resolved.y, npcRadius, true)
+                  movedDist >= stepMag * 0.45 &&
+                  currentMap.isCircleWalkable(resolved.x, resolved.y, npcRadius + 3, true)
                 ) {
                   npc.x = resolved.x;
                   npc.y = resolved.y;
-                  npc.vx = dx * invDist * spd;
-                  npc.vy = dy * invDist * spd;
-                  npc.facingAngle = Math.atan2(dy, dx);
+                  npc.vx = dirX * spd;
+                  npc.vy = dirY * spd;
+                  npc.facingAngle = Math.atan2(dirY, dirX);
+                  npc.stuckTimer = Math.max(0, (npc.stuckTimer ?? 0) - dt * 0.5);
                 } else {
-                  // Steer around water shoreline or obstacle before advancing waypoint
-                  const baseAngle = Math.atan2(dy, dx);
-                  const steerOffsets = [0.65, -0.65, 1.25, -1.25];
+                  // 8-angle tangential steering around riverbanks or obstacles
+                  const baseAngle = Math.atan2(dirY, dirX);
+                  const steerOffsets = [0.42, -0.42, 0.85, -0.85, 1.25, -1.25, 1.65, -1.65];
                   let steered = false;
                   for (const off of steerOffsets) {
                     const ang = baseAngle + off;
@@ -1895,12 +1978,12 @@ export class GameEngine {
                       npc.y,
                       sx,
                       sy,
-                      npcRadius,
+                      npcRadius + 3,
                       true
                     );
                     if (
-                      Math.hypot(alt.x - npc.x, alt.y - npc.y) >= stepMag * 0.45 &&
-                      currentMap.isCircleWalkable(alt.x, alt.y, npcRadius, true)
+                      Math.hypot(alt.x - npc.x, alt.y - npc.y) >= stepMag * 0.55 &&
+                      currentMap.isCircleWalkable(alt.x, alt.y, npcRadius + 3, true)
                     ) {
                       npc.x = alt.x;
                       npc.y = alt.y;
@@ -1911,25 +1994,30 @@ export class GameEngine {
                       break;
                     }
                   }
-                  if (!steered) {
+                  npc.stuckTimer = (npc.stuckTimer ?? 0) + dt;
+                  // If blocked or stuck near a riverbank for > 0.35s, advance immediately to the next dry waypoint!
+                  if (!steered || npc.stuckTimer > 0.35) {
+                    selectNextDryWaypoint();
                     npc.vx = 0;
                     npc.vy = 0;
-                    npc.waitTimer = 0.8 + Math.random() * 1.2;
+                    npc.waitTimer = 0.25;
                   }
                 }
               } else {
                 const nextX = npc.x + stepX;
                 const nextY = npc.y + stepY;
-                if (currentMap.isCircleWalkable(nextX, nextY, npcRadius, true)) {
+                if (currentMap.isCircleWalkable(nextX, nextY, npcRadius + 3, true)) {
                   npc.x = nextX;
                   npc.y = nextY;
-                  npc.vx = dx * invDist * spd;
-                  npc.vy = dy * invDist * spd;
-                  npc.facingAngle = Math.atan2(dy, dx);
+                  npc.vx = dirX * spd;
+                  npc.vy = dirY * spd;
+                  npc.facingAngle = Math.atan2(dirY, dirX);
+                  npc.stuckTimer = 0;
                 } else {
+                  selectNextDryWaypoint();
                   npc.vx = 0;
                   npc.vy = 0;
-                  npc.waitTimer = 1.0;
+                  npc.waitTimer = 0.25;
                 }
               }
             }

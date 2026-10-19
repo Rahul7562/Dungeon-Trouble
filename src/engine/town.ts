@@ -386,21 +386,22 @@ export function generateTownLevel(): GeneratedTown {
   }
 
   // Winding country roads connecting the Central Plaza (48, 46) to all 8 widely separated buildings
-  // and crossing the Silverbrook River via 4 stone-and-timber bridges!
-  // North Highroad (crosses river at Bridge 2 around x=48, y=39) -> Elder Thorne's Manor (47, 17)
-  carveRoadPath(48, 46, 48, 17, 1);
-  // Northwest Tavern Trail (crosses river at Bridge 1 around x=20, y=31) -> Griffin Tavern (18, 21)
+  // and crossing the Silverbrook River via wide 5-tile dry bridges!
+  // North Highroad (crosses river at Bridge 2 around x=48, y=38) -> Elder Thorne's Manor (48, 17)
+  carveRoadPath(48, 46, 48, 30, 2);
+  carveRoadPath(48, 30, 48, 17, 1);
+  // Northwest Tavern Trail (crosses river at Bridge 1 around x=24, y=33) -> Griffin Tavern (18, 21)
   carveRoadPath(48, 46, 29, 39, 1);
-  carveRoadPath(29, 39, 18, 21, 1);
+  carveRoadPath(29, 39, 18, 21, 2);
   // Scenic Northern Ridge Road linking Griffin Tavern (18, 21) -> Elder Manor (48, 18) -> Abbey (78, 19)
   carveRoadPath(18, 21, 48, 18, 1);
   carveRoadPath(48, 18, 78, 19, 1);
   // Northeast Abbey Trail -> Abbey of the Dawn (78, 19)
-  carveRoadPath(48, 34, 78, 19, 1);
+  carveRoadPath(48, 32, 78, 19, 2);
   // West Smithy Road -> Torvald's Ironworks (15, 51)
   carveRoadPath(48, 46, 15, 51, 1);
   // East Market Road (crosses river at Bridge 3 around x=66, y=47) -> Garrick's Emporium (80, 49)
-  carveRoadPath(48, 46, 80, 49, 1);
+  carveRoadPath(48, 46, 80, 49, 2);
   // Southwest Keep Road -> Ironclad Royal Vault (19, 81)
   carveRoadPath(15, 51, 19, 81, 1);
   carveRoadPath(48, 46, 36, 65, 1);
@@ -408,10 +409,10 @@ export function generateTownLevel(): GeneratedTown {
   // South Lakeside Road -> Riverside Weaver's Cottage (49, 82)
   carveRoadPath(48, 46, 49, 82, 1);
   // Southeast Orchard Road (crosses east of Mirror Lake at Bridge 4 around x=77, y=58) -> Miller's Homestead (79, 80)
-  carveRoadPath(80, 49, 79, 80, 1);
+  carveRoadPath(80, 49, 79, 80, 2);
   carveRoadPath(49, 82, 79, 80, 1);
   // Path to the Ancient Abyssal Portal Sanctuary at (33, 25)
-  carveRoadPath(29, 34, 33, 25, 1);
+  carveRoadPath(29, 34, 33, 25, 2);
 
   // 4. Define 8 Widely Separated Enterable Medieval Buildings (28 to 38 tiles / 55m-75m apart!)
   // Every building has its own open meadow surroundings, custom interior floor, doors, windows, and roof cutaway.
@@ -932,10 +933,10 @@ export function generateTownLevel(): GeneratedTown {
     }
   }
 
-  // 9. Populate Key NPCs & Wandering Villagers Across the Sprawling Valley (strictly on dry walkable Floor tiles)
+  // 9. Populate Key NPCs & Wandering Villagers Across the Sprawling Valley (strictly on dry walkable Floor tiles with wide river clearance)
   const wp = (tx: number, ty: number) => {
     const raw = map.tileToWorldCenter(tx, ty);
-    return map.findNearestDryWorldPos(raw.x, raw.y, 18);
+    return map.findNearestDryWorldPos(raw.x, raw.y, 44);
   };
 
   const npcs: NPCEntity[] = [
@@ -946,7 +947,7 @@ export function generateTownLevel(): GeneratedTown {
       role: 'elder',
       ...wp(48, 44),
       homePos: wp(48, 13),
-      waypoints: [wp(48, 44), wp(48, 35), wp(48, 19), wp(48, 13), wp(46, 44)],
+      waypoints: [wp(48, 44), wp(48, 32), wp(48, 19), wp(48, 13), wp(48, 19), wp(48, 32), wp(46, 44)],
       currentWaypointIdx: 0,
       moveSpeed: 38,
       waitTimer: 4.0,
@@ -973,7 +974,7 @@ export function generateTownLevel(): GeneratedTown {
       role: 'healer',
       ...wp(51, 45),
       homePos: wp(78, 14),
-      waypoints: [wp(51, 45), wp(54, 34), wp(64, 33), wp(78, 19), wp(78, 14), wp(50, 46)],
+      waypoints: [wp(51, 45), wp(48, 32), wp(63, 25), wp(78, 19), wp(78, 14), wp(78, 19), wp(63, 25), wp(48, 32), wp(50, 46)],
       currentWaypointIdx: 0,
       moveSpeed: 40,
       waitTimer: 3.5,
@@ -999,7 +1000,7 @@ export function generateTownLevel(): GeneratedTown {
       role: 'blacksmith',
       ...wp(45, 46),
       homePos: wp(15, 46),
-      waypoints: [wp(45, 46), wp(28, 49), wp(16, 51), wp(15, 46), wp(44, 47)],
+      waypoints: [wp(45, 46), wp(31, 48), wp(16, 51), wp(15, 46), wp(16, 51), wp(31, 48), wp(44, 47)],
       currentWaypointIdx: 0,
       moveSpeed: 42,
       waitTimer: 3.0,
@@ -1025,7 +1026,7 @@ export function generateTownLevel(): GeneratedTown {
       role: 'shop',
       ...wp(51, 48),
       homePos: wp(79, 44),
-      waypoints: [wp(51, 48), wp(66, 47), wp(78, 49), wp(79, 44), wp(52, 47)],
+      waypoints: [wp(51, 48), wp(64, 47), wp(78, 49), wp(79, 44), wp(78, 49), wp(64, 47), wp(52, 47)],
       currentWaypointIdx: 0,
       moveSpeed: 41,
       waitTimer: 3.2,
@@ -1051,7 +1052,7 @@ export function generateTownLevel(): GeneratedTown {
       role: 'storage',
       ...wp(45, 48),
       homePos: wp(18, 76),
-      waypoints: [wp(45, 48), wp(34, 64), wp(19, 80), wp(18, 76), wp(46, 49)],
+      waypoints: [wp(45, 48), wp(36, 65), wp(19, 80), wp(18, 76), wp(19, 80), wp(36, 65), wp(46, 49)],
       currentWaypointIdx: 0,
       moveSpeed: 36,
       waitTimer: 4.5,
@@ -1077,7 +1078,7 @@ export function generateTownLevel(): GeneratedTown {
       role: 'guide',
       ...wp(35, 26),
       homePos: wp(33, 25),
-      waypoints: [wp(35, 26), wp(39, 34), wp(46, 43), wp(33, 26)],
+      waypoints: [wp(35, 26), wp(29, 34), wp(38, 41), wp(46, 43), wp(38, 41), wp(29, 34), wp(33, 26)],
       currentWaypointIdx: 0,
       moveSpeed: 45,
       waitTimer: 3.0,
@@ -1104,7 +1105,7 @@ export function generateTownLevel(): GeneratedTown {
       role: 'villager',
       ...wp(18, 21),
       homePos: wp(17, 15),
-      waypoints: [wp(17, 15), wp(18, 21), wp(23, 28), wp(26, 33), wp(23, 28), wp(15, 23)],
+      waypoints: [wp(17, 15), wp(18, 21), wp(29, 20), wp(18, 21), wp(15, 22)],
       currentWaypointIdx: 0,
       moveSpeed: 40,
       waitTimer: 2.8,
@@ -1112,7 +1113,7 @@ export function generateTownLevel(): GeneratedTown {
       activities: [
         'Pouring spiced cider by the hearth',
         'Sweeping the tavern porch',
-        'Greeting travelers by the river bridge',
+        'Greeting travelers by the northern highroad',
         'Tending the roaring tavern fireplace',
       ],
       carriesLantern: true,
@@ -1128,9 +1129,9 @@ export function generateTownLevel(): GeneratedTown {
       name: 'Elara the Weaver',
       title: 'Mistress of Tapestries',
       role: 'villager',
-      ...wp(49, 78),
+      ...wp(49, 81),
       homePos: wp(49, 77),
-      waypoints: [wp(49, 77), wp(49, 64), wp(48, 50), wp(49, 64), wp(49, 81)],
+      waypoints: [wp(49, 77), wp(49, 81), wp(48, 64), wp(48, 50), wp(48, 64), wp(49, 81)],
       currentWaypointIdx: 0,
       moveSpeed: 42,
       waitTimer: 2.5,
@@ -1154,9 +1155,9 @@ export function generateTownLevel(): GeneratedTown {
       name: 'Miller Cedric',
       title: 'Keeper of the Orchard',
       role: 'villager',
-      ...wp(78, 77),
+      ...wp(79, 80),
       homePos: wp(78, 76),
-      waypoints: [wp(78, 76), wp(76, 62), wp(78, 50), wp(76, 62), wp(79, 80)],
+      waypoints: [wp(78, 76), wp(79, 80), wp(79, 64), wp(80, 49), wp(79, 64), wp(79, 80)],
       currentWaypointIdx: 0,
       moveSpeed: 41,
       waitTimer: 3.0,
@@ -1182,7 +1183,7 @@ export function generateTownLevel(): GeneratedTown {
       role: 'villager',
       ...wp(46, 44),
       homePos: wp(19, 15),
-      waypoints: [wp(46, 44), wp(35, 38), wp(26, 33), wp(19, 22), wp(26, 33), wp(35, 38), wp(52, 47)],
+      waypoints: [wp(46, 44), wp(38, 42), wp(29, 39), wp(18, 21), wp(29, 39), wp(38, 42), wp(52, 47)],
       currentWaypointIdx: 0,
       moveSpeed: 46,
       waitTimer: 2.6,
@@ -1198,7 +1199,7 @@ export function generateTownLevel(): GeneratedTown {
       facingAngle: Math.PI / 2,
       dialogue: [
         'From dawn’s rose glow to starlit night, Oakridge Valley is a song waiting to be sung!',
-        'Follow the winding stone paths—every bridge and bench has a view worth savoring.',
+        'Follow the winding paths—every bridge and bench has a view worth savoring.',
       ],
     },
   ];

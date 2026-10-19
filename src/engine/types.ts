@@ -457,6 +457,13 @@ export type ZoneType = 'town' | 'dungeon';
 
 export type NPCRole = 'elder' | 'healer' | 'storage' | 'shop' | 'blacksmith' | 'guide' | 'villager';
 
+export type NPCIdleAction =
+  | 'breathing'
+  | 'look_around'
+  | 'nodding'
+  | 'wave_greet'
+  | 'inspect_work';
+
 export interface NPCEntity {
   id: string;
   name: string;
@@ -479,6 +486,12 @@ export interface NPCEntity {
   activityText?: string;
   activities?: string[];
   carriesLantern?: boolean;
+  idleAction?: NPCIdleAction;
+  idleTimer?: number;
+  idlePhase?: number;
+  headYaw?: number;
+  headPitch?: number;
+  stuckTimer?: number;
 }
 
 export type TownRoofStyle =
