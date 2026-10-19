@@ -1,6 +1,6 @@
 {
-  "summary": "Comprehensive architectural and visual implementation plan for the Dungeon Trouble 2.5D Isometric Graphics Overhaul, detailing the pre-rendered HD tile/prop/sprite atlas pipeline, articulated multi-part vector character & monster rigs, offscreen multiplicative/additive lightmap compositing, and multi-layered combat VFX.",
-  "updatedAt": "2026-10-18T08:05:18.763206316Z",
+  "summary": "Implementation plan for the Town-1 Overworld Expansion, Asymmetric Medieval Architecture with Dynamic Roof Cutaways & Furnished Interiors, Wandering NPCs, and 24-Hour Daylight Cycle with Minimap Clock HUD.",
+  "updatedAt": "2026-10-19T06:08:14.667714257Z",
   "requestFeedback": true,
   "userFacing": true
 }

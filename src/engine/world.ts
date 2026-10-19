@@ -94,8 +94,8 @@ export class TileMap {
   WorldToTile(wx: number, wy: number): TileCoord { return this.worldToTile(wx, wy); }
   TileToWorldCenter(tx: number, ty: number): WorldCoord { return this.tileToWorldCenter(tx, ty); }
 
-  // Check if a circular body (cx, cy, radius) intersects any non-walkable tile
-  isCircleWalkable(cx: number, cy: number, radius: number): boolean {
+  // Check if a circular body (cx, cy, radius) intersects any non-walkable tile (or water when forbidWater is true)
+  isCircleWalkable(cx: number, cy: number, radius: number, forbidWater = false): boolean {
     const minTileX = Math.floor((cx - radius - this.originX) / this.tileSize);
     const maxTileX = Math.floor((cx + radius - this.originX) / this.tileSize);
     const minTileY = Math.floor((cy - radius - this.originY) / this.tileSize);
@@ -104,7 +104,10 @@ export class TileMap {
     for (let ty = minTileY; ty <= maxTileY; ty++) {
       for (let tx = minTileX; tx <= maxTileX; tx++) {
         const tile = this.get(tx, ty);
-        if (!TileFlags.isWalkable(tile)) {
+        const blocked = forbidWater
+          ? tile !== TileType.Floor && tile !== TileType.Exit
+          : !TileFlags.isWalkable(tile);
+        if (blocked) {
           // AABB vs Circle test
           const tileMinX = this.originX + tx * this.tileSize;
           const tileMaxX = tileMinX + this.tileSize;
@@ -125,13 +128,38 @@ export class TileMap {
     return true;
   }
 
-  // Smooth continuous collision and wall-sliding resolution
+  // Snap any world coordinate to the nearest dry walkable Floor tile center that is clear of Water and Walls
+  findNearestDryWorldPos(wx: number, wy: number, radius = 14): { x: number; y: number } {
+    if (this.isCircleWalkable(wx, wy, radius, true)) {
+      return { x: wx, y: wy };
+    }
+    const startTile = this.worldToTile(wx, wy);
+    for (let r = 1; r <= 12; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+          const tx = startTile.x + dx;
+          const ty = startTile.y + dy;
+          if (this.get(tx, ty) === TileType.Floor) {
+            const center = this.tileToWorldCenter(tx, ty);
+            if (this.isCircleWalkable(center.x, center.y, radius, true)) {
+              return center;
+            }
+          }
+        }
+      }
+    }
+    return { x: wx, y: wy };
+  }
+
+  // Smooth continuous collision and wall-sliding resolution (strictly blocks Water when forbidWater = true)
   resolveCircleMovement(
     cx: number,
     cy: number,
     dx: number,
     dy: number,
-    radius: number
+    radius: number,
+    forbidWater = false
   ): { x: number; y: number } {
     let currentX = cx;
     let currentY = cy;
@@ -148,7 +176,10 @@ export class TileMap {
       for (let ty = minTy; ty <= maxTy; ty++) {
         for (let tx = minTx; tx <= maxTx; tx++) {
           const tile = this.get(tx, ty);
-          if (!TileFlags.isWalkable(tile)) {
+          const blocked = forbidWater
+            ? tile !== TileType.Floor && tile !== TileType.Exit
+            : !TileFlags.isWalkable(tile);
+          if (blocked) {
             const tileMinX = this.originX + tx * this.tileSize;
             const tileMaxX = tileMinX + this.tileSize;
             const tileMinY = this.originY + ty * this.tileSize;
@@ -181,7 +212,10 @@ export class TileMap {
       for (let ty = minTy; ty <= maxTy; ty++) {
         for (let tx = minTx; tx <= maxTx; tx++) {
           const tile = this.get(tx, ty);
-          if (!TileFlags.isWalkable(tile)) {
+          const blocked = forbidWater
+            ? tile !== TileType.Floor && tile !== TileType.Exit
+            : !TileFlags.isWalkable(tile);
+          if (blocked) {
             const tileMinX = this.originX + tx * this.tileSize;
             const tileMaxX = tileMinX + this.tileSize;
             const tileMinY = this.originY + ty * this.tileSize;
@@ -212,7 +246,10 @@ export class TileMap {
     for (let ty = checkMinTy; ty <= checkMaxTy; ty++) {
       for (let tx = checkMinTx; tx <= checkMaxTx; tx++) {
         const tile = this.get(tx, ty);
-        if (!TileFlags.isWalkable(tile)) {
+        const blocked = forbidWater
+          ? tile !== TileType.Floor && tile !== TileType.Exit
+          : !TileFlags.isWalkable(tile);
+        if (blocked) {
           const tileMinX = this.originX + tx * this.tileSize;
           const tileMaxX = tileMinX + this.tileSize;
           const tileMinY = this.originY + ty * this.tileSize;

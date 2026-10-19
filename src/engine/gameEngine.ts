@@ -21,15 +21,24 @@ import {
   SummonEntity,
   AbilityDef,
 } from './types';
-import { TileMap, generateDungeonLevel, TileFlags } from './world';
-import { generateTownLevel, GeneratedTown } from './town';
+import { TileMap, generateDungeonLevel, TileFlags, DungeonProp } from './world';
+import {
+  generateTownLevel,
+  GeneratedTown,
+  computeDaylightState,
+  isPlayerInsideBuilding,
+  TOWN_TILE_FLAG_TREE,
+  TOWN_TILE_FLAG_ROAD,
+  TOWN_TILE_FLAG_INTERIOR_OAK,
+} from './town';
+import { SpatialGrid } from './spatialGrid';
 import { CLASS_DEFINITIONS, getClassDefinition } from './classes';
 import { computeTotalStats, getStatName } from './stats';
 import { resolveDamagePipeline, DAMAGE_FLAGS, getSchoolColor } from './combat';
 import { rollLoot } from './loot';
 import { getItemDef, createItemStack } from './items';
 import { PLAYER_ABILITIES } from './abilities';
-import { sound } from './audio';
+import { sound, computeIsometricStereoPan } from './audio';
 import {
   saveGameState,
   loadGameState,
@@ -79,6 +88,7 @@ export interface GameEngineState {
   isVictory: boolean;
   unallocatedStatPoints: number;
   floorCleared: boolean;
+  worldTimeHours: number;
 }
 
 export const FLOOR_BOSS_DEFS: Record<
@@ -107,6 +117,69 @@ export class GameEngine {
   public worldMousePos = { x: 0, y: 0 };
   public camera = { x: 0, y: 0 };
   private nextEntityId = 1;
+
+  // Spatial Partitioning Grids for O(1) simulation & viewport culling
+  public readonly enemySpatialGrid = new SpatialGrid<EnemyEntity>(6144, 6144, 256);
+  public readonly npcSpatialGrid = new SpatialGrid<NPCEntity>(6144, 6144, 256);
+  public readonly lootSpatialGrid = new SpatialGrid<LootDropEntity>(6144, 6144, 256);
+  public readonly dungeonPropSpatialGrid = new SpatialGrid<DungeonProp>(6144, 6144, 256);
+  private readonly nearbyEnemiesBuf: EnemyEntity[] = [];
+  private readonly projHitEnemiesBuf: EnemyEntity[] = [];
+  private readonly visibleEnemiesBuf: EnemyEntity[] = [];
+  private readonly visibleNpcsBuf: NPCEntity[] = [];
+  private readonly visibleLootBuf: LootDropEntity[] = [];
+  private readonly visiblePropsBuf: DungeonProp[] = [];
+
+  /**
+   * Queries the Spatial Partitioning Grids for only the game objects overlapping the active world-space viewport box.
+   */
+  public getVisibleEntities(minX: number, minY: number, maxX: number, maxY: number) {
+    const isTown = this.state.currentZone === 'town';
+    if (isTown) {
+      if (this.isPaused) {
+        this.npcSpatialGrid.clear();
+        for (const npc of this.state.townLevel.npcs) {
+          this.npcSpatialGrid.insert(npc, npc.x, npc.y, 15);
+        }
+      }
+      this.npcSpatialGrid.queryRect(minX, minY, maxX, maxY, this.visibleNpcsBuf);
+      this.visibleEnemiesBuf.length = 0;
+      this.visibleLootBuf.length = 0;
+      return {
+        enemies: this.visibleEnemiesBuf,
+        npcs: this.visibleNpcsBuf,
+        lootDrops: this.visibleLootBuf,
+        props: this.state.townLevel.props,
+      };
+    } else {
+      if (this.isPaused) {
+        this.enemySpatialGrid.clear();
+        for (const e of this.state.enemies) {
+          if (e.health > 0) this.enemySpatialGrid.insert(e, e.x, e.y, e.size);
+        }
+        this.lootSpatialGrid.clear();
+        for (const d of this.state.lootDrops) {
+          this.lootSpatialGrid.insert(d, d.x, d.y, 16);
+        }
+        if (this.state.dungeon?.props) {
+          this.dungeonPropSpatialGrid.clear();
+          for (const p of this.state.dungeon.props) {
+            this.dungeonPropSpatialGrid.insert(p, p.x, p.y, 24);
+          }
+        }
+      }
+      this.enemySpatialGrid.queryRect(minX, minY, maxX, maxY, this.visibleEnemiesBuf);
+      this.lootSpatialGrid.queryRect(minX, minY, maxX, maxY, this.visibleLootBuf);
+      this.dungeonPropSpatialGrid.queryRect(minX, minY, maxX, maxY, this.visiblePropsBuf);
+      this.visibleNpcsBuf.length = 0;
+      return {
+        enemies: this.visibleEnemiesBuf,
+        npcs: this.visibleNpcsBuf,
+        lootDrops: this.visibleLootBuf,
+        props: this.visiblePropsBuf,
+      };
+    }
+  }
 
   constructor() {
     this.isPaused = true;
@@ -193,7 +266,7 @@ export class GameEngine {
         {
           id: `init-${this.nextEntityId++}`,
           text: startInTown
-            ? `Welcome to Town-1, ${resolvedPlayerName}! Visit the Elder and merchants to prepare.`
+            ? `Welcome to Town-1, ${resolvedPlayerName}! Explore the village houses, meet the townsfolk, and prepare.`
             : `Entered Dungeon Chamber - Floor ${targetFloor}. Slay foes and seek the portal.`,
           type: 'system',
           timestamp: new Date().toLocaleTimeString(),
@@ -210,6 +283,7 @@ export class GameEngine {
       isVictory: false,
       unallocatedStatPoints: 0,
       floorCleared: false,
+      worldTimeHours: 9.5,
     };
 
     this.camera.x = ((initialSpawn.x - initialSpawn.y) / 64) * 32;
@@ -279,6 +353,7 @@ export class GameEngine {
     state.floatingTexts = [];
     state.screenShake = 0;
 
+    sound.setAmbientZone(zone);
     if (zone === 'town') {
       state.enemies = [];
       state.summons = [];
@@ -369,7 +444,18 @@ export class GameEngine {
       isVictory: false,
       unallocatedStatPoints: save.unallocatedStatPoints || 0,
       floorCleared: false,
+      worldTimeHours: 9.5,
     };
+
+    // Ensure saved town position is walkable on the expanded 48x48 Town-1 map
+    if (isTown) {
+      const pt = townLevel.map.worldToTile(this.state.player.x, this.state.player.y);
+      const tileAtSaved = townLevel.map.get(pt.x, pt.y);
+      if (tileAtSaved === TileType.Wall) {
+        this.state.player.x = townLevel.playerSpawn.x;
+        this.state.player.y = townLevel.playerSpawn.y;
+      }
+    }
 
     this.camera.x = ((this.state.player.x - this.state.player.y) / 64) * 32;
     this.camera.y = ((this.state.player.x + this.state.player.y) / 64) * 16;
@@ -1638,7 +1724,10 @@ export class GameEngine {
     }
 
     const moveSpeedStat = state.playerStats.calculated[StatType.MoveSpeed];
-    let actualSpeed = 175 * (moveSpeedStat / 100);
+    let actualSpeed = 365 * (moveSpeedStat / 100);
+    if (state.currentZone === 'town') {
+      actualSpeed *= 1.28;
+    }
 
     for (const eff of state.player.statusEffects) {
       if (eff.speedMultiplier) {
@@ -1653,31 +1742,300 @@ export class GameEngine {
     const playerTile = currentMap.worldToTile(state.player.x, state.player.y);
     const tileUnderPlayer = currentMap.get(playerTile.x, playerTile.y);
 
+    // Substantially slow down player movement when wading through water tiles (both Town-1 and Dungeons)
+    if (tileUnderPlayer === TileType.Water) {
+      actualSpeed *= 0.32;
+      state.player.vx = wx * actualSpeed;
+      state.player.vy = wy * actualSpeed;
+      if ((wx !== 0 || wy !== 0) && Math.random() < 0.25) {
+        state.particles.push({
+          x: state.player.x + (Math.random() - 0.5) * 14,
+          y: state.player.y + (Math.random() - 0.5) * 14,
+          vx: (Math.random() - 0.5) * 28,
+          vy: (Math.random() - 0.5) * 28 - 10,
+          color: '#7dd3fc',
+          size: 2.5,
+          life: 0.35,
+          maxLife: 0.35,
+        });
+      }
+    }
+
     if (state.currentZone === 'town') {
+      // Advance 24-hour overworld daylight cycle: 24 hours per 240 real-time seconds (4 minutes)
+      state.worldTimeHours = ((state.worldTimeHours ?? 9.5) + dt * (24 / 240)) % 24;
+
       // Fountain regeneration in town
       const fountain = state.townLevel.fountainPos;
-      if (fountain && Math.hypot(state.player.x - fountain.x, state.player.y - fountain.y) <= 80) {
+      if (fountain && Math.hypot(state.player.x - fountain.x, state.player.y - fountain.y) <= 85) {
         const maxHp = state.playerStats.calculated[StatType.MaxHealth];
         const maxMp = state.playerStats.calculated[StatType.MaxMana];
         state.playerStats.health = Math.min(maxHp, state.playerStats.health + 35 * dt);
         state.playerStats.mana = Math.min(maxMp, state.playerStats.mana + 30 * dt);
       }
-      // Active NPC detection
+
+      // Populate NPC Spatial Partitioning Grid & Strictly Prevent NPCs From Stepping on Water Tiles
+      this.npcSpatialGrid.clear();
       let closestNpc: NPCEntity | null = null;
-      let closestDist = 85;
+      let closestDistSq = 85 * 85;
+      const fullCollisionRadiusSq = 1200 * 1200;
+      const npcRadius = 15;
+
       for (const npc of state.townLevel.npcs) {
-        const d = Math.hypot(state.player.x - npc.x, state.player.y - npc.y);
-        if (d < closestDist) {
-          closestDist = d;
+        // Strict water guard: if an NPC is ever on or touching a Water tile, snap immediately to dry Floor
+        if (!currentMap.isCircleWalkable(npc.x, npc.y, npcRadius, true)) {
+          const dry = currentMap.findNearestDryWorldPos(npc.x, npc.y, npcRadius + 2);
+          npc.x = dry.x;
+          npc.y = dry.y;
+        }
+
+        const pdx = state.player.x - npc.x;
+        const pdy = state.player.y - npc.y;
+        const distSqToPlayer = pdx * pdx + pdy * pdy;
+
+        if (distSqToPlayer < closestDistSq) {
+          closestDistSq = distSqToPlayer;
           closestNpc = npc;
         }
+
+        // Pause and face the player when they approach to talk or trade
+        if (distSqToPlayer < 72 * 72) {
+          npc.vx = 0;
+          npc.vy = 0;
+          npc.facingAngle = Math.atan2(pdy, pdx);
+          this.npcSpatialGrid.insert(npc, npc.x, npc.y, npcRadius);
+          continue;
+        }
+
+        // Spatial simulation culling: skip pathing math for NPCs very far outside the active area
+        if (distSqToPlayer > 1800 * 1800) {
+          npc.vx = 0;
+          npc.vy = 0;
+          this.npcSpatialGrid.insert(npc, npc.x, npc.y, npcRadius);
+          continue;
+        }
+
+        if (npc.waypoints && npc.waypoints.length > 0) {
+          if (npc.waitTimer !== undefined && npc.waitTimer > 0) {
+            npc.waitTimer -= dt;
+            npc.vx = 0;
+            npc.vy = 0;
+            if (npc.waitTimer <= 0) {
+              const nextIdx = ((npc.currentWaypointIdx ?? 0) + 1) % npc.waypoints.length;
+              npc.currentWaypointIdx = nextIdx;
+              const wp = npc.waypoints[nextIdx];
+              const jitterX = wp.x + (Math.random() - 0.5) * 14;
+              const jitterY = wp.y + (Math.random() - 0.5) * 14;
+              if (currentMap.isCircleWalkable(jitterX, jitterY, npcRadius + 2, true)) {
+                npc.targetX = jitterX;
+                npc.targetY = jitterY;
+              } else {
+                const dryWp = currentMap.findNearestDryWorldPos(wp.x, wp.y, npcRadius + 2);
+                npc.targetX = dryWp.x;
+                npc.targetY = dryWp.y;
+              }
+              if (npc.activities && npc.activities.length > 0) {
+                npc.activityText = npc.activities[nextIdx % npc.activities.length];
+              }
+            }
+          } else {
+            const tx = npc.targetX ?? npc.x;
+            const ty = npc.targetY ?? npc.y;
+            const dx = tx - npc.x;
+            const dy = ty - npc.y;
+            const dist = Math.hypot(dx, dy);
+            const spd = (npc.moveSpeed || 42) * 1.15;
+
+            if (dist <= 8) {
+              npc.vx = 0;
+              npc.vy = 0;
+              npc.waitTimer = 2.4 + Math.random() * 3.8;
+              if (npc.activities && npc.activities.length > 0) {
+                const actIdx = Math.floor(Math.random() * npc.activities.length);
+                npc.activityText = npc.activities[actIdx];
+              }
+            } else {
+              const invDist = 1 / dist;
+              const stepMag = spd * dt;
+              const stepX = dx * invDist * stepMag;
+              const stepY = dy * invDist * stepMag;
+
+              if (distSqToPlayer <= fullCollisionRadiusSq) {
+                // Strictly forbid Water tiles (forbidWater = true) during continuous circle collision
+                const resolved = currentMap.resolveCircleMovement(
+                  npc.x,
+                  npc.y,
+                  stepX,
+                  stepY,
+                  npcRadius,
+                  true
+                );
+                const movedDist = Math.hypot(resolved.x - npc.x, resolved.y - npc.y);
+
+                if (
+                  movedDist >= stepMag * 0.25 &&
+                  currentMap.isCircleWalkable(resolved.x, resolved.y, npcRadius, true)
+                ) {
+                  npc.x = resolved.x;
+                  npc.y = resolved.y;
+                  npc.vx = dx * invDist * spd;
+                  npc.vy = dy * invDist * spd;
+                  npc.facingAngle = Math.atan2(dy, dx);
+                } else {
+                  // Steer around water shoreline or obstacle before advancing waypoint
+                  const baseAngle = Math.atan2(dy, dx);
+                  const steerOffsets = [0.65, -0.65, 1.25, -1.25];
+                  let steered = false;
+                  for (const off of steerOffsets) {
+                    const ang = baseAngle + off;
+                    const sx = Math.cos(ang) * stepMag;
+                    const sy = Math.sin(ang) * stepMag;
+                    const alt = currentMap.resolveCircleMovement(
+                      npc.x,
+                      npc.y,
+                      sx,
+                      sy,
+                      npcRadius,
+                      true
+                    );
+                    if (
+                      Math.hypot(alt.x - npc.x, alt.y - npc.y) >= stepMag * 0.45 &&
+                      currentMap.isCircleWalkable(alt.x, alt.y, npcRadius, true)
+                    ) {
+                      npc.x = alt.x;
+                      npc.y = alt.y;
+                      npc.vx = Math.cos(ang) * spd;
+                      npc.vy = Math.sin(ang) * spd;
+                      npc.facingAngle = ang;
+                      steered = true;
+                      break;
+                    }
+                  }
+                  if (!steered) {
+                    npc.vx = 0;
+                    npc.vy = 0;
+                    npc.waitTimer = 0.8 + Math.random() * 1.2;
+                  }
+                }
+              } else {
+                const nextX = npc.x + stepX;
+                const nextY = npc.y + stepY;
+                if (currentMap.isCircleWalkable(nextX, nextY, npcRadius, true)) {
+                  npc.x = nextX;
+                  npc.y = nextY;
+                  npc.vx = dx * invDist * spd;
+                  npc.vy = dy * invDist * spd;
+                  npc.facingAngle = Math.atan2(dy, dx);
+                } else {
+                  npc.vx = 0;
+                  npc.vy = 0;
+                  npc.waitTimer = 1.0;
+                }
+              }
+            }
+          }
+        }
+
+        this.npcSpatialGrid.insert(npc, npc.x, npc.y, npcRadius);
       }
       state.activeNPC = closestNpc;
+
+      // Update Positional Town-1 Ambient Audio Manager (birds, wind, water, market chatter, forge, chimes)
+      let waterTileWeight = 0;
+      let waterPanAcc = 0;
+      let treeTileWeight = 0;
+      let treePanAcc = 0;
+      const scanRadius = 5;
+      const townFlags = state.townLevel.tileFlags;
+      const mapWidth = currentMap.width;
+      const mapHeight = currentMap.height;
+
+      for (let dy = -scanRadius; dy <= scanRadius; dy++) {
+        const ty = playerTile.y + dy;
+        if (ty < 0 || ty >= mapHeight) continue;
+        for (let dx = -scanRadius; dx <= scanRadius; dx++) {
+          const tx = playerTile.x + dx;
+          if (tx < 0 || tx >= mapWidth) continue;
+          const distTiles = Math.hypot(dx, dy);
+          if (distTiles > scanRadius) continue;
+          const falloff = 1 - distTiles / (scanRadius + 0.5);
+          const idx = ty * mapWidth + tx;
+          const tType = currentMap.get(tx, ty);
+          const isoPan = Math.max(-0.85, Math.min(0.85, ((dx - dy) * 0.7071) / scanRadius));
+
+          if (tType === TileType.Water) {
+            waterTileWeight += falloff;
+            waterPanAcc += isoPan * falloff;
+          } else if (townFlags && (townFlags[idx] & TOWN_TILE_FLAG_TREE) !== 0) {
+            treeTileWeight += falloff;
+            treePanAcc += isoPan * falloff;
+          }
+        }
+      }
+
+      const waterProximity = Math.min(1, waterTileWeight / 4.5);
+      const waterPan = waterTileWeight > 0.01 ? waterPanAcc / waterTileWeight : 0;
+      const treeDensity = Math.min(1, treeTileWeight / 5.5);
+      const treePan = treeTileWeight > 0.01 ? treePanAcc / treeTileWeight : 0;
+
+      let isIndoors = false;
+      for (let bIdx = 0; bIdx < state.townLevel.buildings.length; bIdx++) {
+        if (
+          isPlayerInsideBuilding(
+            state.player.x,
+            state.player.y,
+            currentMap,
+            state.townLevel.buildings[bIdx]
+          )
+        ) {
+          isIndoors = true;
+          break;
+        }
+      }
+
+      const nearbyNpcs = this.npcSpatialGrid.queryRadius(state.player.x, state.player.y, 440);
+      let nearestNpcPan = 0;
+      if (nearbyNpcs.length > 0) {
+        nearestNpcPan = computeIsometricStereoPan(
+          state.player.x,
+          state.player.y,
+          nearbyNpcs[0].x,
+          nearbyNpcs[0].y,
+          440
+        );
+      }
+
+      const daylight = computeDaylightState(state.worldTimeHours ?? 9.5);
+      const pIdx = playerTile.y * mapWidth + playerTile.x;
+      const pFlags = townFlags ? townFlags[pIdx] : 0;
+
+      sound.updateSpatialAmbience(dt, {
+        zone: 'town',
+        playerX: state.player.x,
+        playerY: state.player.y,
+        playerVx: wx * actualSpeed,
+        playerVy: wy * actualSpeed,
+        timeOfDayPhase: daylight.phase,
+        isIndoors,
+        isOnRoad: (pFlags & TOWN_TILE_FLAG_ROAD) !== 0,
+        isInWater: tileUnderPlayer === TileType.Water,
+        waterProximity,
+        waterPan,
+        treeDensity,
+        treePan,
+        nearbyNpcCount: nearbyNpcs.length,
+        nearestNpcPan,
+      });
     } else {
       state.activeNPC = null;
-      if (tileUnderPlayer === TileType.Water) {
-        actualSpeed *= 0.55;
-      } else if (tileUnderPlayer === TileType.Lava) {
+      sound.updateSpatialAmbience(dt, {
+        zone: 'dungeon',
+        playerX: state.player.x,
+        playerY: state.player.y,
+        playerVx: wx * actualSpeed,
+        playerVy: wy * actualSpeed,
+      });
+      if (tileUnderPlayer === TileType.Lava) {
         if (!state.player.statusEffects.some((e) => e.name === 'Lava Burn')) {
           state.player.statusEffects.push({
             id: `lava-${this.nextEntityId++}`,
@@ -1709,6 +2067,23 @@ export class GameEngine {
       );
       state.player.x = resolved.x;
       state.player.y = resolved.y;
+
+      // Play terrain-aware footsteps while moving
+      if (tileUnderPlayer === TileType.Water) {
+        sound.playFootstep('water');
+      } else if (state.currentZone === 'town' && state.townLevel.tileFlags) {
+        const pIdx = playerTile.y * currentMap.width + playerTile.x;
+        const pFlags = state.townLevel.tileFlags[pIdx];
+        if ((pFlags & TOWN_TILE_FLAG_INTERIOR_OAK) !== 0) {
+          sound.playFootstep('wood');
+        } else if ((pFlags & TOWN_TILE_FLAG_ROAD) !== 0) {
+          sound.playFootstep('stone');
+        } else {
+          sound.playFootstep('grass');
+        }
+      } else {
+        sound.playFootstep('stone');
+      }
     }
 
     // Smooth Camera Follow
@@ -1717,7 +2092,7 @@ export class GameEngine {
     const targetCamX = (cellX - cellY) * 32;
     const targetCamY = (cellX + cellY) * 16;
 
-    const camFactor = 1 - Math.exp(-12 * dt);
+    const camFactor = 1 - Math.exp(-18 * dt);
     this.camera.x += (targetCamX - this.camera.x) * camFactor;
     this.camera.y += (targetCamY - this.camera.y) * camFactor;
 
@@ -1845,8 +2220,8 @@ export class GameEngine {
 
       enemy.facingAngle = Math.atan2(dy, dx);
 
-      // Aggro radius
-      if (dist < 460) {
+      // Aggro / simulation radius across the expanded viewport
+      if (dist < 740) {
         // Boss Mechanics: Multi-phase transitions & AoE Telegraphs
         if (enemy.archetype === 'dungeon_lord') {
           const hpRatio = enemy.health / enemy.maxHealth;
@@ -2048,11 +2423,42 @@ export class GameEngine {
       }
     }
 
-    // Enemy-Enemy Soft Separation so enemies don't overlap into a single dot
-    for (let i = 0; i < state.enemies.length; i++) {
-      for (let j = i + 1; j < state.enemies.length; j++) {
-        const e1 = state.enemies[i];
-        const e2 = state.enemies[j];
+    // Populate Enemy, Loot, and Dungeon Prop Spatial Grids for O(1) spatial queries & viewport culling
+    this.enemySpatialGrid.clear();
+    for (let i = state.enemies.length - 1; i >= 0; i--) {
+      const e = state.enemies[i];
+      if (e.health <= 0) {
+        state.enemies.splice(i, 1);
+        continue;
+      }
+      this.enemySpatialGrid.insert(e, e.x, e.y, e.size);
+    }
+
+    this.lootSpatialGrid.clear();
+    for (let i = 0; i < state.lootDrops.length; i++) {
+      const d = state.lootDrops[i];
+      this.lootSpatialGrid.insert(d, d.x, d.y, 16);
+    }
+
+    if (state.currentZone === 'dungeon' && state.dungeon?.props) {
+      this.dungeonPropSpatialGrid.clear();
+      for (let i = 0; i < state.dungeon.props.length; i++) {
+        const p = state.dungeon.props[i];
+        this.dungeonPropSpatialGrid.insert(p, p.x, p.y, 24);
+      }
+    }
+
+    // Enemy-Enemy Soft Separation using Spatial Grid (only separates active nearby enemies)
+    const activeEnemies = this.enemySpatialGrid.queryRadius(
+      state.player.x,
+      state.player.y,
+      850,
+      this.nearbyEnemiesBuf
+    );
+    for (let i = 0; i < activeEnemies.length; i++) {
+      for (let j = i + 1; j < activeEnemies.length; j++) {
+        const e1 = activeEnemies[i];
+        const e2 = activeEnemies[j];
         const sepX = e2.x - e1.x;
         const sepY = e2.y - e1.y;
         const sepDist = Math.hypot(sepX, sepY);
@@ -2243,9 +2649,16 @@ export class GameEngine {
       }
 
       if (proj.sourceId === 'player') {
-        // Hit enemies
+        // Query only enemies in the Spatial Grid cell around the projectile
+        const candidateEnemies = this.enemySpatialGrid.queryRadius(
+          proj.x,
+          proj.y,
+          proj.radius + 48,
+          this.projHitEnemiesBuf
+        );
         let hit = false;
-        for (const enemy of state.enemies) {
+        for (let k = 0; k < candidateEnemies.length; k++) {
+          const enemy = candidateEnemies[k];
           const dist = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
           if (dist <= proj.radius + enemy.size) {
             this.applyPlayerDamageToEnemy(enemy, {
@@ -2303,7 +2716,13 @@ export class GameEngine {
                 });
               }
 
-              for (const splash of state.enemies) {
+              const splashTargets = this.enemySpatialGrid.queryRadius(
+                proj.x,
+                proj.y,
+                100,
+                this.projHitEnemiesBuf
+              );
+              for (const splash of splashTargets) {
                 if (splash.id !== enemy.id && Math.hypot(splash.x - proj.x, splash.y - proj.y) <= 80) {
                   this.applyPlayerDamageToEnemy(splash, {
                     id: 99,

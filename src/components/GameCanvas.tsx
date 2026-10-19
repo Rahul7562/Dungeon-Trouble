@@ -116,14 +116,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
       engine.update(dt);
       updateFacing();
 
-      // Throttle React HUD updates to ~15 fps to prevent React re-render lag spikes
-      tickAccumulator += dt;
-      if (tickAccumulator >= 0.066) {
-        tickAccumulator = 0;
-        onEngineTick();
+      // Throttle React HUD updates to 10 fps (and skip when paused) to prevent React re-render overhead
+      if (!engine.isPaused) {
+        tickAccumulator += dt;
+        if (tickAccumulator >= 0.1) {
+          tickAccumulator = 0;
+          onEngineTick();
+        }
       }
 
       if (rendererRef.current) {
+        const renderer = rendererRef.current;
         const maxHp = engine.state.playerStats.calculated[StatType.MaxHealth];
         const shake = engine.state.screenShake || 0;
         const shakenCamera = {
@@ -132,7 +135,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
         };
         const isTown = engine.state.currentZone === 'town';
         const currentMap = isTown ? engine.state.townLevel.map : engine.state.dungeon.map;
-        const npcs = isTown ? engine.state.townLevel.npcs : [];
         const fountainPos = isTown ? engine.state.townLevel.fountainPos : null;
         const isMoving =
           engine.isMoveActive('up') ||
@@ -140,7 +142,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           engine.isMoveActive('left') ||
           engine.isMoveActive('right');
 
-        rendererRef.current.render(
+        // Compute world-space viewport AABB from the 4 screen corners and query GameEngine SpatialGrid
+        const pad = 220;
+        const cNW = renderer.screenToWorld(-pad, -pad, shakenCamera);
+        const cNE = renderer.screenToWorld(canvas.width + pad, -pad, shakenCamera);
+        const cSW = renderer.screenToWorld(-pad, canvas.height + pad, shakenCamera);
+        const cSE = renderer.screenToWorld(canvas.width + pad, canvas.height + pad, shakenCamera);
+        const minWX = Math.min(cNW.x, cNE.x, cSW.x, cSE.x);
+        const maxWX = Math.max(cNW.x, cNE.x, cSW.x, cSE.x);
+        const minWY = Math.min(cNW.y, cNE.y, cSW.y, cSE.y);
+        const maxWY = Math.max(cNW.y, cNE.y, cSW.y, cSE.y);
+
+        const visible = engine.getVisibleEntities(minWX, minWY, maxWX, maxWY);
+
+        renderer.render(
           currentMap,
           shakenCamera,
           {
@@ -158,20 +173,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
             hitFlashTimer: engine.state.player.hitFlashTimer,
             statusEffects: engine.state.player.statusEffects,
           },
-          engine.state.enemies,
+          visible.enemies,
           engine.state.projectiles,
-          engine.state.lootDrops,
+          visible.lootDrops,
           engine.state.particles,
           engine.state.floatingTexts,
           now / 1000,
           engine.state.telegraphs || [],
-          npcs,
+          visible.npcs,
           engine.state.activeNPC,
           engine.state.summons || [],
           fountainPos,
           engine.state.dungeon?.theme,
-          isTown ? engine.state.townLevel?.props || [] : engine.state.dungeon?.props || [],
-          isTown
+          visible.props,
+          isTown,
+          isTown ? engine.state.townLevel : undefined,
+          engine.state.worldTimeHours ?? 9.5
         );
       }
 

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GameEngine } from '../src/engine/gameEngine';
-import { StatType } from '../src/engine/types';
+import { StatType, TileType } from '../src/engine/types';
 import { clearSaveGame, hasSavedGame, loadGameState } from '../src/engine/checkpoint';
+import { sound, evaluateTownSoundscape, computeIsometricStereoPan } from '../src/engine/audio';
 
 describe('GameEngine death and restart cycle', () => {
   beforeEach(() => {
@@ -126,15 +127,41 @@ describe('GameEngine death and restart cycle', () => {
 
     expect(engine.state.currentZone).toBe('town');
     const town = engine.state.townLevel;
-    expect(town.npcs.length).toBeGreaterThanOrEqual(6);
-    expect(town.props.length).toBeGreaterThan(0);
+    expect(town.map.width).toBe(96);
+    expect(town.map.height).toBe(96);
+    expect(town.buildings.length).toBeGreaterThanOrEqual(8);
+    expect(town.npcs.length).toBeGreaterThanOrEqual(10);
+    expect(town.props.length).toBeGreaterThan(30);
+    expect(town.interiorTiles.size).toBeGreaterThan(80);
 
     // Player spawns near the central fountain
     const distToFountain = Math.hypot(
       engine.state.player.x - town.fountainPos.x,
       engine.state.player.y - town.fountainPos.y
     );
-    expect(distToFountain).toBeLessThanOrEqual(160);
+    expect(distToFountain).toBeLessThanOrEqual(220);
+
+    // Every building interior center is walkable Floor, and buildings are widely separated (50m+ / 24+ tiles apart)
+    for (let i = 0; i < town.buildings.length; i++) {
+      const b = town.buildings[i];
+      const cx = b.x + Math.floor(b.w / 2);
+      const cy = b.y + Math.floor(b.h / 2);
+      expect(town.map.get(cx, cy)).toBe(TileType.Floor);
+
+      for (let j = i + 1; j < town.buildings.length; j++) {
+        const b2 = town.buildings[j];
+        const cx2 = b2.x + Math.floor(b2.w / 2);
+        const cy2 = b2.y + Math.floor(b2.h / 2);
+        const tileDist = Math.hypot(cx - cx2, cy - cy2);
+        expect(tileDist).toBeGreaterThanOrEqual(24);
+      }
+    }
+
+    // Advance engine in town and verify 24h daylight cycle progresses (4 real-time minutes = 240s per 24h)
+    engine.isPaused = false;
+    const initialTime = engine.state.worldTimeHours;
+    engine.update(10); // 10s = +1.0 in-game hour
+    expect(engine.state.worldTimeHours).toBeCloseTo(initialTime + 1.0, 2);
 
     // Persist an item in Town Vault Storage and verify round-trip save/load
     engine.state.storage[0] = {
@@ -152,5 +179,52 @@ describe('GameEngine death and restart cycle', () => {
     expect(loaded?.clearedFloors).toEqual([1, 2, 3]);
     expect(loaded?.highestFloorUnlocked).toBe(4);
   });
+
+  it('dynamically modulates positional Town-1 ambient sounds (birds, wind, water, market chatter, forge) based on player location', () => {
+    const engine = new GameEngine();
+    engine.initializeNewGame('archer', 'Sylva', true, 1, true);
+    engine.isPaused = false;
+    const map = engine.state.townLevel.map;
+
+    // 1. At Central Sanctuary Fountain Plaza (tile 48, 46): strong water & plaza market chatter
+    const plazaPos = map.tileToWorldCenter(48, 46);
+    engine.state.player.x = plazaPos.x;
+    engine.state.player.y = plazaPos.y;
+    engine.update(0.1);
+    const plazaScape = sound.getLastSoundscape();
+    expect(plazaScape).not.toBeNull();
+    expect(plazaScape!.waterGain).toBeGreaterThan(0.7);
+    expect(plazaScape!.marketChatterGain).toBeGreaterThan(0.6);
+
+    // 2. Near Garrick's Market & Curios (tile 79, 48): high market chatter, negligible forge sound
+    const marketPos = map.tileToWorldCenter(79, 48);
+    engine.state.player.x = marketPos.x;
+    engine.state.player.y = marketPos.y;
+    engine.update(0.1);
+    const marketScape = sound.getLastSoundscape()!;
+    expect(marketScape.marketChatterGain).toBeGreaterThan(0.8);
+    expect(marketScape.forgeGain).toBe(0);
+
+    // 3. Near Whispering Abbey Woodland Glade (tile 68, 22): high birdsong gain
+    const grovePos = map.tileToWorldCenter(68, 22);
+    const groveScape = evaluateTownSoundscape({
+      zone: 'town',
+      playerX: grovePos.x,
+      playerY: grovePos.y,
+      playerVx: 0,
+      playerVy: 0,
+      timeOfDayPhase: 'Morning',
+      treeDensity: 0.7,
+    });
+    expect(groveScape.birdsGain).toBeGreaterThan(0.85);
+    expect(groveScape.windGain).toBeGreaterThan(0.3);
+
+    // 4. Stereo panning responds accurately to emitter direction in 2.5D isometric space
+    const rightPan = computeIsometricStereoPan(0, 0, 400, -400, 600);
+    const leftPan = computeIsometricStereoPan(0, 0, -400, 400, 600);
+    expect(rightPan).toBeGreaterThan(0.4);
+    expect(leftPan).toBeLessThan(-0.4);
+  });
 });
+
 

@@ -43,13 +43,13 @@ export function drawHeroRig(
 
   const speed = Math.hypot(player.vx || 0, player.vy || 0);
   const isMoving = speed > 5 && !isGhost;
-  const walkCycle = isMoving ? gameTime * 11 : 0;
-  const strideL = isMoving ? Math.sin(walkCycle) * 5.5 : 0;
-  const strideR = isMoving ? -Math.sin(walkCycle) * 5.5 : 0;
-  const liftL = isMoving ? Math.max(0, -Math.cos(walkCycle)) * 3.5 : 0;
-  const liftR = isMoving ? Math.max(0, Math.cos(walkCycle)) * 3.5 : 0;
+  const walkCycle = isMoving ? gameTime * 13.5 : 0;
+  const strideL = isMoving ? Math.sin(walkCycle) * 6.0 : 0;
+  const strideR = isMoving ? -Math.sin(walkCycle) * 6.0 : 0;
+  const liftL = isMoving ? Math.max(0, -Math.cos(walkCycle)) * 3.8 : 0;
+  const liftR = isMoving ? Math.max(0, Math.cos(walkCycle)) * 3.8 : 0;
   const bob = isMoving
-    ? Math.abs(Math.sin(walkCycle)) * 2.4
+    ? Math.abs(Math.sin(walkCycle)) * 2.5
     : Math.sin(gameTime * 3.2) * 1.1;
 
   // Attack / Cast progress (0 -> 1)
@@ -114,13 +114,13 @@ export function drawHeroRig(
 
   // 1. Ground Contact Shadow & Subtle Directional Ring (Feet firmly anchored at 0,0)
   if (!isGhost) {
-    const shadowGrad = ctx.createRadialGradient(0, 1, 3, 0, 1, 22);
-    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.78)');
-    shadowGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.42)');
-    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = shadowGrad;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
     ctx.beginPath();
     ctx.ellipse(0, 1, 21, 10.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(0, 1, 13, 6.5, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Subtle tactical ground ring + facing chevron
@@ -384,13 +384,10 @@ export function drawHeroRig(
       ctx.stroke();
     } else {
       ctx.fillStyle = palette.glow;
-      ctx.shadowColor = palette.glow;
-      ctx.shadowBlur = 5;
       ctx.beginPath();
       ctx.arc(eyeCenterX - 1.8, eyeCenterY, 1.3, 0, Math.PI * 2);
       ctx.arc(eyeCenterX + 1.8, eyeCenterY, 1.3, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0;
     }
   }
 
@@ -433,8 +430,11 @@ export function drawHeroRig(
     const floatY = offHandY - 3 + Math.sin(gameTime * 5) * 2.5;
     ctx.save();
     ctx.fillStyle = palette.glow;
-    ctx.shadowColor = palette.glow;
-    ctx.shadowBlur = 8;
+    ctx.globalAlpha = 0.28;
+    ctx.beginPath();
+    ctx.arc(offHandX, floatY, 6.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.beginPath();
     ctx.arc(offHandX, floatY, 3.2, 0, Math.PI * 2);
     ctx.fill();
@@ -545,12 +545,9 @@ export function drawHeroRig(
 
     // Glowing Levitating Staff Crystal
     ctx.fillStyle = player.isAttacking ? '#fb923c' : '#38bdf8';
-    ctx.shadowColor = player.isAttacking ? '#f97316' : '#38bdf8';
-    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(25, 0, 3.6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
   } else {
     // Necromancer Bone Scythe / Skull Staff
     ctx.strokeStyle = '#cbd5e1';
@@ -574,12 +571,9 @@ export function drawHeroRig(
 
     // Glowing Violet Skull at Scythe Crown
     ctx.fillStyle = '#c084fc';
-    ctx.shadowColor = '#a855f7';
-    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(22, 0, 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
 
   ctx.restore();
@@ -602,8 +596,6 @@ export function drawHeroRig(
         ? 'rgba(56, 189, 248, 0.9)'
         : 'rgba(192, 132, 252, 0.9)';
     ctx.lineWidth = 4.5;
-    ctx.shadowColor = palette.glow;
-    ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.ellipse(0, 0, 42, 22, 0, startA, endA);
     ctx.stroke();
@@ -677,13 +669,9 @@ export function drawEnemyRig(
   // 1. Ground Shadow & Elite / Boss Aura Rings
   const shadowRx = enemy.size * 1.15;
   const shadowRy = enemy.size * 0.58;
-  const shadowGrad = ctx.createRadialGradient(0, 2, 2, 0, 2, shadowRx * 1.2);
-  shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
-  shadowGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.42)');
-  shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = shadowGrad;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
   ctx.beginPath();
-  ctx.ellipse(0, 2, shadowRx * 1.2, shadowRy * 1.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 2, shadowRx * 1.1, shadowRy * 1.1, 0, 0, Math.PI * 2);
   ctx.fill();
 
   if (enemy.isElite && !isBoss) {
@@ -798,13 +786,10 @@ export function drawEnemyRig(
     ctx.fillRect(-3, -26 - bob, 6, 3.2); // Jawbone
 
     ctx.fillStyle = '#ef4444';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 5;
     ctx.beginPath();
     ctx.arc(dirX * 2 - 2, -30.5 - bob, 1.4, 0, Math.PI * 2);
     ctx.arc(dirX * 2 + 2, -30.5 - bob, 1.4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Battered Round Buckler Shield on Off-Hand
     ctx.fillStyle = '#475569';
@@ -859,14 +844,11 @@ export function drawEnemyRig(
 
     // 3 Glowing Eldritch Eyes under Deep Hood
     ctx.fillStyle = '#e879f9';
-    ctx.shadowColor = '#d946ef';
-    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.arc(dirX * 3 - 2.2, -26 - bob, 1.3, 0, Math.PI * 2);
     ctx.arc(dirX * 3 + 2.2, -26 - bob, 1.3, 0, Math.PI * 2);
     ctx.arc(dirX * 3, -28.2 - bob, 1.1, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Dual Curved Void Daggers
     const daggerSwing = isWindup ? -0.7 : isAttacking ? 1.2 : 0.2;
@@ -992,8 +974,6 @@ export function drawEnemyRig(
 
     // Glowing Molten Furnace Core in Chest
     ctx.fillStyle = '#f97316';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.moveTo(0, -26 - bob);
     ctx.lineTo(4.5, -20 - bob);
@@ -1001,7 +981,6 @@ export function drawEnemyRig(
     ctx.lineTo(-4.5, -20 - bob);
     ctx.closePath();
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Massive Spiked Pauldrons
     for (const side of [-1, 1]) {
@@ -1073,13 +1052,10 @@ export function drawEnemyRig(
     ctx.arc(0, -33 - bob, 5.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#a855f7';
-    ctx.shadowColor = '#c084fc';
-    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.arc(-2, -33 - bob, 1.4, 0, Math.PI * 2);
     ctx.arc(2, -33 - bob, 1.4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Necrotic Ritual Staff
     ctx.strokeStyle = '#cbd5e1';
@@ -1090,12 +1066,9 @@ export function drawEnemyRig(
     ctx.stroke();
 
     ctx.fillStyle = '#c084fc';
-    ctx.shadowColor = '#c084fc';
-    ctx.shadowBlur = 9;
     ctx.beginPath();
     ctx.arc(11, -40 - bob, 3.8, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
   } else {
     // DUNGEON LORD (BOSS): Towering Abyssal Overlord with Flaming Dread-Plate, Sweeping Horns & Great-Cleaver
     // Royal Tattered War-Cloak
@@ -1140,12 +1113,9 @@ export function drawEnemyRig(
 
     // Blazing Hellfire Rib-Slits on Chest
     ctx.fillStyle = enemy.isEnraged ? '#fef08a' : '#f97316';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 10;
     for (let r = 0; r < 3; r++) {
       ctx.fillRect(-5, -28 + r * 4 - bob, 10, 1.8);
     }
-    ctx.shadowBlur = 0;
 
     // Crowned Demon-Helm & Twin Sweeping Horns
     ctx.fillStyle = '#0f172a';
@@ -1164,13 +1134,10 @@ export function drawEnemyRig(
 
     // Glowing Abyssal Eyes
     ctx.fillStyle = '#fef08a';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(-2.5, -37 - bob, 1.7, 0, Math.PI * 2);
     ctx.arc(2.5, -37 - bob, 1.7, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Colossal Flaming Dread-Cleaver
     ctx.save();
@@ -1260,9 +1227,18 @@ export function drawNPCRig(
   y: number,
   npc: NPCEntity,
   isNear: boolean,
-  gameTime: number
+  gameTime: number,
+  isNight: boolean = false
 ): void {
-  const bob = Math.sin(gameTime * 2.5 + npc.x) * 1.4;
+  const speed = Math.hypot(npc.vx || 0, npc.vy || 0);
+  const isMoving = speed > 4;
+  const walkCycle = isMoving ? gameTime * 8.5 + npc.x * 0.05 : 0;
+  const strideL = isMoving ? Math.sin(walkCycle) * 4.5 : 0;
+  const strideR = isMoving ? -Math.sin(walkCycle) * 4.5 : 0;
+  const bob = isMoving
+    ? Math.abs(Math.sin(walkCycle)) * 2.1
+    : Math.sin(gameTime * 2.5 + npc.x) * 1.3;
+
   ctx.save();
   ctx.translate(x, y);
 
@@ -1274,10 +1250,19 @@ export function drawNPCRig(
 
   // Interactive golden aura ring when player is near or hovering
   ctx.strokeStyle = isNear ? '#fde047' : npc.color;
+  ctx.globalAlpha = isNear ? 0.95 : 0.55;
   ctx.lineWidth = isNear ? 2.4 : 1.2;
   ctx.beginPath();
-  ctx.ellipse(0, 1, isNear ? 21 : 16, isNear ? 10.5 : 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 1, isNear ? 21 : 15, isNear ? 10.5 : 7.5, 0, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Walking Boots / Feet
+  ctx.fillStyle = '#334155';
+  ctx.beginPath();
+  ctx.ellipse(-3.5 + strideL * 0.45, -1, 3.4, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(3.5 + strideR * 0.45, -1, 3.4, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   // Role-specific Robes / Apron / Tunic
   const robeGrad = ctx.createLinearGradient(0, -34 - bob, 0, -2);
@@ -1322,12 +1307,43 @@ export function drawNPCRig(
     ctx.fillRect(-6, -24 - bob, 12, 16);
     ctx.fillStyle = '#94a3b8';
     ctx.fillRect(9, -26 - bob, 6, 4);
+  } else if (npc.role === 'shop' || npc.role === 'storage') {
+    // Merchant velvet cap & gold sash
+    ctx.fillStyle = '#78350f';
+    ctx.beginPath();
+    ctx.ellipse(0, -37 - bob, 6.5, 2.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Handheld Warm Night Lantern when evening/dusk/night falls
+  if (isNight && npc.carriesLantern !== false) {
+    const lanternSwing = isMoving ? Math.sin(walkCycle) * 2.5 : Math.sin(gameTime * 3) * 0.8;
+    const lx = -11 + lanternSwing;
+    const ly = -16 - bob;
+    // Iron handle
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(-7, -21 - bob);
+    ctx.lineTo(lx, ly - 5);
+    ctx.stroke();
+
+    // Glowing lantern cage (fast translucent halo instead of shadowBlur)
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+    ctx.beginPath();
+    ctx.arc(lx, ly - 0.5, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(lx - 2.8, ly - 4, 5.6, 7);
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 0.9;
+    ctx.strokeRect(lx - 2.8, ly - 4, 5.6, 7);
   }
 
   // Nameplate & Role Title
   ctx.textAlign = 'center';
   ctx.font = 'bold 11px "Cinzel", serif';
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
   ctx.fillText(npc.name, 1, -51 - bob);
   ctx.fillStyle = '#fef08a';
   ctx.fillText(npc.name, 0, -52 - bob);
@@ -1337,7 +1353,7 @@ export function drawNPCRig(
   ctx.fillText(`<${npc.title}>`, 0, -42 - bob);
 
   if (isNear) {
-    const promptY = -66 + Math.sin(gameTime * 6) * 2.5;
+    const promptY = -68 + Math.sin(gameTime * 6) * 2.5;
     ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
     ctx.strokeStyle = '#fbbf24';
     ctx.lineWidth = 1.2;
@@ -1346,6 +1362,11 @@ export function drawNPCRig(
     ctx.fillStyle = '#fde047';
     ctx.font = 'bold 9px "Plus Jakarta Sans", sans-serif';
     ctx.fillText('[E / Click] Talk', 0, promptY - 1);
+  } else if (npc.activityText && !isMoving) {
+    // Quiet ambient activity caption when paused at a waypoint
+    ctx.font = 'italic 8.5px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = 'rgba(226, 232, 240, 0.72)';
+    ctx.fillText(npc.activityText, 0, -62 - bob);
   }
 
   ctx.restore();

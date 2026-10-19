@@ -1,100 +1,111 @@
-# Dungeon Trouble — 2.5D Isometric Graphics & Rendering Overhaul
+# Town-1 Overworld Expansion, Medieval Architecture & Daylight Cycle
 
-A complete visual transformation of the real-time gameplay viewport from primitive geometric placeholders into a handcrafted 2.5D dark-fantasy action RPG with pre-rendered HD tile and prop atlases, articulated multi-limb character and monster rigs, offscreen dynamic lightmap compositing, and multi-layered spell and weapon combat effects.
+An immersive overhaul of the Town-1 Sanctuary overworld featuring an expanded asymmetric village layout, multi-story half-timbered medieval buildings with dynamic roof cutaways and furnished interiors, autonomous wandering NPCs and townsfolk, and a continuous 24-hour daylight cycle with an interactive clock display above the minimap.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> All core artistic and rendering pipeline choices have been confirmed and locked in for the overhaul while preserving 100% compatibility with existing gameplay mechanics, physics, hit detection, and controls.
+> The following architectural and gameplay decisions incorporate your preferences from Phase 1:
 
-- **Confirmed Character & Monster Art Pipeline**: **Pre-rendered HD sprite atlas with layered vector rigs** — Characters and monsters are rendered using articulated multi-part dark-fantasy vector rigs (boots, greaves, torso armor, pauldrons, cloak/hood, head/helm, glowing visor/eyes, and directional weapons/shields) combined with cached HD offscreen sprite/texture stamps for crisp performance and smooth 60 FPS procedural skeletal animation across idle, walk, attack, cast, dash, hit, and death states.
-- **Confirmed Lighting & Shadow Architecture**: **Offscreen lightmap compositing with warm torch flicker and shadows** — An offscreen lighting canvas composites ambient dungeon darkness with warm flickering radial torch/brazier light fields, cool cyan/violet crystal and spell illumination, soft directional floor drop-shadows, and wall ambient occlusion without washing out combat readability.
-- **Confirmed Architectural Texture Style**: **Handcrafted stone slabs with moss, cracks, runes, and 3D beveled walls** — A deterministic procedural texture baker generates high-detail isometric floor variants (chipped flagstones, mortar joints, moss clusters, bloodstains, scattered bones/pebbles, and etched runic sigils) alongside multi-tiered 3D beveled stone wall blocks with individual ashlar masonry courses, top cornices, wall-base ambient occlusion, and depth-sorted architectural props.
+- **Confirmed Decision 1 — Dynamic Roof Fade & Furnished Interiors**: Medieval houses feature tall stone-and-timber Tudor facades, pitched shingle/slate roofs, dormers, and chimneys inspired by the reference sheets. When the player walks through a doorway into any building's footprint, its roof smoothly fades out (`opacity -> 0.08`) to reveal warm wooden plank floors, rugs, beds, bookshelves, tables, hearths, anvils, and chests inside.
+- **Confirmed Decision 2 — 4-Minute 24-Hour Daylight Cycle**: In-game time progresses continuously at a pace of 4 real-time minutes per 24-hour cycle (`10 in-game minutes = 1 real second`), transitioning smoothly across Dawn, Morning, Afternoon, Golden Evening, Dusk, and Starlit Night.
+- **Confirmed Decision 3 — Wandering NPCs & Night Lanterns**: Key service NPCs (Elder, Cleric, Vault Keeper, Merchant, Blacksmith, Gatekeeper) stroll naturally around their respective districts and interiors while pausing when the player approaches to talk. Additional ambient villagers (Town Guard, Herbalist, Bard, Innkeeper, Apprentice, Townsfolk) roam along asymmetric cobblestone lanes, visit houses, pause to perform daily activities, and automatically ignite warm handheld lanterns from Dusk through Dawn.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Replaces the simplistic flat-polygon canvas primitives in the gameplay viewport with a multi-stage 2.5D isometric rendering engine featuring cached HD procedural textures, depth-sorted architectural landmarks, distinct animated hero and monster rigs, real-time offscreen lightmap blending, and high-impact combat VFX.
-- **Target Audience / Persona**: Action RPG players who expect immediate atmospheric immersion, tactile weapon and spell impact, unmistakable enemy silhouettes, and rich environmental storytelling as they explore and fight through the 10-floor labyrinth and Town-1 sanctuary.
-- **Key Value**: Delivers a dramatic, unmistakable leap in in-game visual quality during actual dungeon exploration and combat while maintaining 60 FPS frame pacing and preserving all existing game systems.
+- **What It Does**: Transforms Town-1 from a small symmetric 32×32 square into a sprawling, organic 48×48 medieval sanctuary village where every building can be entered, inspected, and explored while dynamic sun/moon lighting shifts across the day.
+- **Target Audience / Persona**: Action RPG players who want a living, atmospheric overworld hub to explore, trade, craft, and prepare in before delving into the 10-floor dungeon.
+- **Key Value**: Replaces static, symmetric box walls with authentic half-timbered medieval architecture, lived-in interior furnishings, autonomous NPC life cycles, and readable time-of-day atmospheric transitions.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-- **Key User Flows**:
-  1. **Town Sanctuary Visuals**: Players spawn in a richly detailed cobblestone town square surrounded by timber-and-stone sanctuary walls, glowing crystal fountain water with animated ripples and rising mist motes, warm street braziers, lush perimeter trees with layered foliage canopies, and distinct robed/armored NPC artisans.
-  2. **Dungeon Exploration**: Stepping into the dungeon reveals individually weathered stone flagstones with mortar depth, moss crevices, scattered skulls, cracked masonry, and 3D isometric walls that cast deep ambient shadows onto adjacent floors and properly occlude characters walking behind them.
-  3. **Visceral Real-Time Combat**: Executing abilities triggers multi-layered weapon arcs, directional afterimages, glowing embers, expanding frost crystal rings, hit-stop flashes, and dynamic spell illumination that lights up nearby stone tiles and walls.
-- **Visual Identity & Theme**:
-  - *Aesthetic Direction*: Handcrafted Dark-Fantasy Isometric Action RPG (inspired by *Hades*, *Diablo II: Resurrected*, and *Curse of the Dead Gods*).
-  - *Color Palette & Mood*:
-    - `--background`: Deep Abyssal Obsidian (`#05070c`) with Void Slate (`#0c101a`) shadowed recesses
-    - `--primary`: Warm Torch Amber (`#f59e0b` / `#fb923c`) and Hearth Gold (`#fef08a`)
-    - `--accent`: Arcane Cyan (`#38bdf8`), Eldritch Violet (`#c084fc`), and Crimson Blood (`#ef4444`)
-    - Biome-specific stone grading across all 4 dungeon themes (*Forgotten Catacombs*, *Frozen Depths*, *Corrupted Temple*, and *Ember Crypt*)
-  - *Typography & Hierarchy*: High-contrast `Cinzel` serif for critical strikes, boss nameplates, and runic prompts paired with crisp `Plus Jakarta Sans` for ground loot labels and floating combat numbers.
-  - *Spatial Composition & Isometric Depth*: True `2:1` isometric projection (`64x32` diamond base footprint, `52px` extruded 3D wall height) with strict `(worldX + worldY)` painter's algorithm depth sorting across walls, props, loot, summons, enemies, and the hero.
-- **Interactive Feedback & Motion**:
-  - **Twin Cleave**: Sweeping metallic blade trail with dual crescent energy ribbons, contact sparks, and directional slash bursts.
-  - **Inferno Burst**: Blazing core projectile trailed by volumetric flame particles, detonating into a multi-ring scorch crater and rising embers.
-  - **Frost Nova**: True-radius expanding glacial shockwave with 3D jutting ice spikes, crystalline floor frost patterns, and shattering ice shards.
-  - **Aether Dash**: High-velocity phase streak with 4 translucent hero afterimages, arcane warp rings at origin and destination, and trailing lightning motes.
+### Key User Flows
+1. **Exploring the Asymmetric Medieval Village**:
+   - The player spawns near the off-center Sanctuary Plaza fountain and can follow winding cobblestone paths branching northwest to the **Elder's Manor**, northeast to **St. Althea's Chapel**, east to the **Blacksmith's Forge & Foundry**, west to the **Ironbound Vault**, south-central to the **Golden Flagon Tavern & Market**, and scattered **Rustic Cottages**, **Watchtower**, and **Apothecary Lodge** across the valley.
+2. **Entering Houses & Viewing Interiors**:
+   - Approaching and walking through an open doorway transitions the player onto warm timber/flagstone interior flooring.
+   - The building's pitched roof, gable dormers, and front eaves smoothly dissolve away to reveal handcrafted interior props: blazing fireplaces, oak dining tables, beds, bookshelves, alchemy racks, weapon stands, anvils, and storage chests.
+3. **Observing & Interacting with Living NPCs**:
+   - NPCs walk between waypoints (plaza benches, market stalls, house interiors, forge anvils), pausing briefly with subtle idle animations and contextual activity bubbles.
+   - Moving within interaction range of any NPC causes them to pause and face the hero so dialogue or shop modals never break mid-conversation.
+4. **Tracking Time of Day Above the Minimap**:
+   - Directly above the bottom-right Sanctuary Minimap, a dedicated **Chronometer Bar** displays the current 12-hour/24-hour clock (e.g., `04:45 PM`), current phase badge (`Morning`, `Afternoon`, `Evening`, `Night`, `Dawn`), and a dynamic Sun/Moon phase icon with a subtle progress bar showing how close the world is to sunrise or nightfall.
+
+### Visual Identity & Theme
+- **Aesthetic Direction**: Hand-crafted 2.5D Isometric Dark-Fantasy & Medieval Tudor Sanctuary.
+- **Color Palette & Daylight Mood**:
+  - **Dawn (05:00 – 07:30)**: Rose-gold and cool mist horizon (`#f472b6` / `#fdba74` tint), soft lavender shadows, lanterns extinguishing.
+  - **Morning (07:30 – 12:00)**: Crisp sunlit sky-gold wash (`#fef08a`), vibrant emerald turf, clear stone contrast.
+  - **Afternoon (12:00 – 17:00)**: Warm zenith daylight (`#fde047`), high visibility, tight ground shadows.
+  - **Evening / Sunset (17:00 – 20:00)**: Deep amber andburnt crimson dusk glow (`#f97316` / `#fb7185`), elongated shadows, braziers and house windows warming up.
+  - **Night (20:00 – 05:00)**: Deep indigo-slate moonlight (`rgba(8, 14, 30, 0.68)` ambient darkness), glowing amber cottage windows, flickering street braziers, and warm handheld NPC lanterns cutting through the night.
+- **Typography & Hierarchy**:
+  - Display headers in `Cinzel` serif; crisp HUD controls and dialogue in `Plus Jakarta Sans`; clock numerals in `JetBrains Mono` with `tabular-nums` so time ticks never jitter horizontally.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Deterministic Offscreen Texture Atlas Baking for Tiles & Walls**
-  - *Chosen Approach*: Pre-render a deterministic bank of 16+ floor tile variants and 8+ 3D wall block variants per biome theme onto offscreen HTML5 Canvas atlases when a theme loads, then stamp them via fast `drawImage` calls during the frame loop.
-  - *Why*: Drawing intricate stone bevels, mortar lines, moss patches, pebble debris, and ashlar brick courses per tile from scratch every frame would cost ribuan path operations; baking them once into an offscreen atlas delivers rich handcrafted detail at a fraction of a millisecond per frame.
-  - *Alternatives Considered*: Per-frame procedural path drawing (too slow for high detail) or external network PNGs (violates local self-contained reliability).
-- **Decision 2: Articulated Multi-Layer Character & Monster Rigs with Animated States**
-  - *Chosen Approach*: Construct each hero class and enemy archetype from layered anatomical components (legs/stride cycle, torso cuirass/robes, pauldrons, cloak sway, head/helm, directional gaze, off-hand shield/tome/orb, and main-hand weapon swing/cast pose) driven by deterministic animation curves (`idle`, `walk`, `attack`, `cast`, `dash`, `hit`, `death`).
-  - *Why*: Ensures every unit looks like an unmistakable fantasy character or monster from all 360° aiming angles, with genuine limb movement, weapon swing arcs, and recoil rather than colored circles or triangles.
-  - *Alternatives Considered*: Single static SVG icons (lacks directional aiming and fluid weapon swing animation).
-- **Decision 3: Offscreen Multiplicative & Additive Lightmap Pass**
-  - *Chosen Approach*: Maintain a dedicated offscreen lightmap canvas that fills with biome ambient darkness, punches out soft multi-stop radial gradients around the player, torches, braziers, crystals, portals, and active spell projectiles, and composites over the scene alongside additive bloom highlights and wall drop-shadows.
-  - *Why*: Creates authentic dungeon atmosphere where torches and spells genuinely illuminate dark stone corners while guaranteeing the area around the hero remains crisp and readable during combat.
+- **Decision 1: Asymmetric 48×48 Organic Map Layout with Road & Interior Tile Subtypes**
+  - *Chosen Approach*: Expand Town-1 from `32×32` to `48×48` tiles with winding main and secondary cobblestone roads, irregular building footprints (L-shaped manor, wide tavern, turreted watchtower, twin-gable cottages), streams/ponds, and varied interior floor zones.
+  - *Why*: Eliminates the artificial "four identical boxes in four corners" feel and gives NPCs meaningful routes and interiors to visit.
+- **Decision 2: Multi-Layered Isometric Building Renderer with Per-Building Roof Cutaway**
+  - *Chosen Approach*: Define structured `TownBuilding` metadata (bounds, roof style: terracotta gable, blue-slate turret, weathered timber lodge; dormer windows; chimneys; door tiles). When the player's world coordinates fall inside (or within 1 tile of the doorway of) a building, its roof alpha smoothly interpolates down to `0.06` while keeping back/side half-timbered walls and all interior furniture visible.
+  - *Why*: Delivers the exact look of the reference medieval houses from the outside while letting players seamlessly walk inside and see every piece of furniture without loading screens.
+- **Decision 3: Waypoint & Activity State Machine for NPCs**
+  - *Chosen Approach*: Equip NPCs with a lightweight patrol/wander state machine (`walking` -> `pausing` -> `working/chatting`) using collision-aware steering (`resolveCircleMovement`) and curated district/town waypoints.
+  - *Why*: Ensures NPCs never get stuck on walls or furniture while making the town feel genuinely alive.
 
 ---
 
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+## 4. Technical Architecture & Data Strategy
 
-- **Architecture & Component Diagram**:
+### Architecture & Component Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        GameCanvas (60 FPS Render Loop)                      │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     IsometricRenderer Pipeline Coordinator                  │
-├──────────────────────┬───────────────────────────┬──────────────────────────┤
-│ 1. Atlas Baker       │ 2. Depth-Sorted Scene     │ 3. Lighting & VFX Engine │
-│ (Offscreen Cache)    │    Graph (Y-Sorting)      │    (Offscreen Composite) │
-└──────────┬───────────┴─────────────┬─────────────┴─────────────┬────────────┘
-           │                         │                           │
-           ▼                         ▼                           ▼
-┌──────────────────────┐  ┌─────────────────────────┐  ┌──────────────────────┐
-│ • 16 Floor Variants  │  │ • 3D Ashlar Wall Blocks │  │ • Ambient Shadow Map │
-│   (Cracks, Moss,     │  │   + Wall Base Occlusion │  │ • Flickering Torch & │
-│    Runes, Blood)     │  │ • 12 Handcrafted Props  │  │   Spell Light Fields │
-│ • 8 Beveled 3D Walls │  │ • Articulated Hero Rig  │  │ • Twin Cleave /      │
-│ • Ground Decal Stamps│  │ • 6 Distinct Enemy Rigs │  │   Inferno / Frost /  │
-│   (Scorch, Frost,    │  │   (Skeleton, Stalker,   │  │   Aether Dash Trails │
-│    Cobwebs, Debris)  │  │    Archer, Brute, Lich, │  │ • Floating Dust &    │
-│                      │  │    Dungeon Lord Boss)   │  │   Ember Motes        │
-└──────────────────────┘  └─────────────────────────┘  └──────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                        GameEngine (Simulation State)                       │
+│  ┌──────────────────────────┐  ┌───────────────────────┐  ┌──────────────┐ │
+│  │ TownOverworld (48x48)    │  │ DaylightCycleClock    │  │ NPC Roaming  │ │
+│  │ • Asymmetric Districts   │  │ • timeOfDayHours 0-24 │  │ • Waypoints  │ │
+│  │ • 9 Medieval Buildings   │  │ • 240s Full Cycle     │  │ • Activities │ │
+│  │ • Interior Furniture     │  │ • Phase & Sun/Moon    │  │ • Lanterns   │ │
+│  └────────────┬─────────────┘  └───────────┬───────────┘  └──────┬───────┘ │
+└───────────────┼────────────────────────────┼─────────────────────┼─────────┘
+                │                            │                     │
+                ▼                            ▼                     ▼
+┌───────────────────────────────────────────────────────┐  ┌─────────────────┐
+│              IsometricRenderer (Canvas 2.5D)          │  │   Minimap HUD   │
+│  1. Terrain Pass: Grass, Winding Cobble, Wood Floors  │  │ ┌─────────────┐ │
+│  2. Depth-Sorted Pass:                                │  │ │ Time & Phase│ │
+│     • Stone Foundations & Half-Timber Tudor Walls     │  │ │ 06:45 PM    │ │
+│     • Interior Props (Beds, Hearths, Tables, Books)   │  │ │ [Evening]   │ │
+│     • Roaming NPCs + Handheld Night Lanterns + Hero   │  │ ├─────────────┤ │
+│     • Pitched Gable Roofs & Turrets (Fade when inside)│  │ │ 48x48 Radar │ │
+│  3. Daylight & Lightmap Composite Pass:               │  │ │ + Buildings │ │
+│     • Dynamic Ambient Sky Tint (Dawn/Day/Dusk/Night)  │  │ │ + Live NPCs │ │
+│     • Glowing Windows, Braziers & Lantern Cutouts     │  │ └─────────────┘ │
+└───────────────────────────────────────────────────────┘  └─────────────────┘
 ```
 
-- **Data Model & State**:
-  - **Offscreen Tile & Wall Atlas Cache**: Keyed by `DungeonThemeId` (`forgotten_catacombs`, `frozen_depths`, `corrupted_temple`, `ember_crypt`, plus `town`), storing pre-baked high-DPI canvas bitmaps for floor slabs, cracked/mossy/runic variants, water/lava edges, and 3D multi-course stone walls.
-  - **Expanded Environmental Props & Decals**: Deterministic room decoration generator placing wall torches, iron braziers, stone columns, ruined arches, wooden barrels, crates, bone piles, chained sarcophagi, cobwebs, broken statues, and arcane crystals with proper walkability and collision radii.
-  - **Animation State Tracker**: Tracks per-entity stride phase, weapon swing arc, dash afterimage ring-buffer, hit-flash decay, and death dissolve/collapse animations without altering core combat timing or hitboxes.
-- **Interactive Component & State Mapping**:
-  - **Player Movement & Dash**: Feeds velocity and facing angle into the hero skeletal rig to animate leg stride, cloak billow, shoulder rotation, and Aether Dash afterimage trails.
-  - **Ability Activation (Slots 1–4)**: Spawns synchronized ground decals (Frost Nova ice glyph, Inferno scorch mark), multi-layered weapon slash ribbons, and dynamic point-lights that illuminate surrounding dungeon geometry.
-  - **Camera & Depth Occlusion**: Automatically renders front/side wall faces with stone cornices and slightlyghosts tall southern walls when they directly occlude the player or enemies immediately behind them so combat visibility is never lost.
+### Data Model & State Additions
+- **`TownBuilding` Definition**:
+  - Stores `id`, `name`, `bounds: { x, y, w, h }`, `wings` (for L-shaped or multi-section houses), `doors: TileCoord[]`, `roofStyle: 'terracotta_tudor' | 'teal_slate_manor' | 'weathered_stone_inn' | 'rustic_cottage'`, `hasTurret`, `chimneys`, and `windowTiles`.
+- **`DungeonPropKind` Extensions for Interiors & Village**:
+  - Adds interior and village prop types: `'bed'`, `'table'`, `'chair'`, `'bookshelf'`, `'fireplace'`, `'rug'`, `'anvil'`, `'weapon_rack'`, `'alchemy_table'`, `'well'`, `'street_lantern'`, `'market_stall'`, `'bench'`.
+- **NPC Roaming & Activity State**:
+  - Extends `NPCEntity` with `homePos`, `wanderRadius`, `waypoints`, `targetX`, `targetY`, `moveSpeed`, `waitTimer`, `currentActivity`, `isMoving`, and `carriesLanternAtNight`.
+- **Daylight Cycle State (`worldTimeHours`)**:
+  - Stored on `GameEngineState` (initialized at `9.5` = `09:30 AM`), advancing by `(24 / 240) * dt` hours per second (`0.1` in-game hours per real second = 4 minutes per 24-hour day).
+  - Helper selector computes `phase` (`'Dawn' | 'Morning' | 'Afternoon' | 'Evening' | 'Dusk' | 'Night'`), formatted time string (`HH:MM AM/PM`), ambient darkness alpha, sky directional tint, shadow length, and whether night lights/lanterns are active.
+
+### Interactive Component & State Mapping
+- **Above-Minimap Time & Daylight Widget**:
+  - Rendered directly above the Minimap canvas inside the bottom-right HUD cluster.
+  - Displays the dynamic sky icon (Sun, Sunset, Crescent Moon), current formatted clock (`tabular-nums`), time-of-day phase label, and a daylight progress bar, plus a subtle button to fast-forward time by +3 hours for players who want to immediately test or experience afternoon, evening, or night lighting.
+- **Minimap Building & Interior Rendering**:
+  - Updates the Minimap canvas to distinguish outdoor grass, winding cobblestone roads, warm wooden house interiors, doorway openings, and live-moving NPC dots.

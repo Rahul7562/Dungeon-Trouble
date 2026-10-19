@@ -275,7 +275,20 @@ export type DungeonPropKind =
   | 'chains'
   | 'statue'
   | 'cobweb'
-  | 'arch';
+  | 'arch'
+  | 'bed'
+  | 'table'
+  | 'chair'
+  | 'bookshelf'
+  | 'fireplace'
+  | 'rug'
+  | 'anvil'
+  | 'weapon_rack'
+  | 'alchemy_table'
+  | 'well'
+  | 'street_lantern'
+  | 'market_stall'
+  | 'bench';
 
 export interface DungeonProp {
   id: string;
@@ -287,6 +300,8 @@ export interface DungeonProp {
   variant?: number;
   lightColor?: string;
   lightRadius?: number;
+  buildingId?: string;
+  label?: string;
 }
 
 export interface BossTelegraph {
@@ -440,7 +455,7 @@ export interface CombatLogEntry {
 export type CharacterClass = 'swordsman' | 'archer' | 'mage' | 'necromancer';
 export type ZoneType = 'town' | 'dungeon';
 
-export type NPCRole = 'elder' | 'healer' | 'storage' | 'shop' | 'blacksmith' | 'guide';
+export type NPCRole = 'elder' | 'healer' | 'storage' | 'shop' | 'blacksmith' | 'guide' | 'villager';
 
 export interface NPCEntity {
   id: string;
@@ -449,9 +464,65 @@ export interface NPCEntity {
   role: NPCRole;
   x: number;
   y: number;
+  vx?: number;
+  vy?: number;
   dialogue: string[];
   color: string;
   facingAngle: number;
+  homePos?: WorldCoord;
+  waypoints?: WorldCoord[];
+  currentWaypointIdx?: number;
+  targetX?: number;
+  targetY?: number;
+  moveSpeed?: number;
+  waitTimer?: number;
+  activityText?: string;
+  activities?: string[];
+  carriesLantern?: boolean;
+}
+
+export type TownRoofStyle =
+  | 'terracotta_tudor'
+  | 'teal_slate_manor'
+  | 'weathered_stone_inn'
+  | 'rustic_cottage'
+  | 'stone_keep';
+
+export interface TownBuilding {
+  id: string;
+  name: string;
+  subtitle?: string;
+  roofStyle: TownRoofStyle;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  wing?: { x: number; y: number; w: number; h: number };
+  doors: TileCoord[];
+  windows: TileCoord[];
+  hasTurret?: boolean;
+  turretTile?: TileCoord;
+  chimneyTile?: TileCoord;
+  hasTimberGallery?: boolean;
+  floorStyle?: 'oak_planks' | 'stone_flag' | 'royal_carpet';
+}
+
+export type TimeOfDayPhase = 'Dawn' | 'Morning' | 'Afternoon' | 'Evening' | 'Dusk' | 'Night';
+
+export interface DaylightState {
+  timeHours: number;
+  formattedTime: string;
+  phase: TimeOfDayPhase;
+  ambientDarkness: number;
+  skyTintColor: string;
+  skyTintIntensity: number;
+  sunAngleX: number;
+  sunAngleY: number;
+  shadowLength: number;
+  isNightLightsOn: boolean;
+  lanternIntensity?: number;
+  shadowTintRgb?: [number, number, number];
+  dayProgress: number;
 }
 
 export interface SummonEntity {
@@ -508,6 +579,7 @@ export interface SavedGameState {
   inventory: (ItemStack | null)[];
   storage: (ItemStack | null)[];
   unallocatedStatPoints: number;
+  worldTimeHours?: number;
   audioSettings?: AudioSettings;
   renderQuality?: RenderQuality;
   savedAt: string;
