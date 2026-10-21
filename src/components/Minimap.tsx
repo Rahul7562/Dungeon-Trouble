@@ -208,29 +208,42 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
         }
       }
 
-      // Draw NPCs (Key merchants as bright gold, wandering villagers as warm amber)
+      // Draw NPCs batched by role color
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
       for (const npc of engine.state.townLevel.npcs) {
+        if (npc.role === 'villager') continue;
         const nt = map.worldToTile(npc.x, npc.y);
-        ctx.fillStyle = npc.role === 'villager' ? '#f59e0b' : '#fde047';
-        ctx.beginPath();
-        ctx.arc(
-          (nt.x + 0.5) * scaleX,
-          (nt.y + 0.5) * scaleY,
-          npc.role === 'villager' ? 1.9 : 2.5,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
+        const cx = (nt.x + 0.5) * scaleX;
+        const cy = (nt.y + 0.5) * scaleY;
+        ctx.moveTo(cx + 2.5, cy);
+        ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
       }
+      ctx.fill();
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      for (const npc of engine.state.townLevel.npcs) {
+        if (npc.role !== 'villager') continue;
+        const nt = map.worldToTile(npc.x, npc.y);
+        const cx = (nt.x + 0.5) * scaleX;
+        const cy = (nt.y + 0.5) * scaleY;
+        ctx.moveTo(cx + 1.9, cy);
+        ctx.arc(cx, cy, 1.9, 0, Math.PI * 2);
+      }
+      ctx.fill();
     } else {
-      // In dungeon: draw enemies as red dots
+      // In dungeon: draw enemies as red dots in a single batched path
       ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
       for (const enemy of enemies) {
         const et = map.worldToTile(enemy.x, enemy.y);
-        ctx.beginPath();
-        ctx.arc((et.x + 0.5) * scaleX, (et.y + 0.5) * scaleY, 2, 0, Math.PI * 2);
-        ctx.fill();
+        const cx = (et.x + 0.5) * scaleX;
+        const cy = (et.y + 0.5) * scaleY;
+        ctx.moveTo(cx + 2, cy);
+        ctx.arc(cx, cy, 2, 0, Math.PI * 2);
       }
+      ctx.fill();
     }
 
     // Draw player as bright cyan dot with subtle halo
@@ -244,15 +257,7 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
     ctx.beginPath();
     ctx.arc((pt.x + 0.5) * scaleX, (pt.y + 0.5) * scaleY, 3, 0, Math.PI * 2);
     ctx.fill();
-  }, [
-    engine,
-    isTown,
-    engine.state.player.x,
-    engine.state.player.y,
-    engine.state.enemies.length,
-    worldTimeHours,
-    currentBuilding,
-  ]);
+  });
 
   // Calculate sun/moon marker position along the 24h cycle bar (0% at 00:00, 50% at 12:00, 100% at 24:00)
   const dayProgressPercent = Math.min(100, Math.max(0, (daylight.timeHours / 24) * 100));
@@ -263,7 +268,7 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
       {isTown && (
         <div
           id="daylight-clock-widget"
-          className={`w-[164px] bg-slate-950/90 backdrop-blur-md border border-slate-800/90 rounded-2xl px-3 py-2 shadow-2xl ${phaseVisuals.glowColor} transition-colors duration-500`}
+          className={`w-[164px] bg-slate-950/95 border border-slate-800/90 rounded-2xl px-3 py-2 shadow-2xl ${phaseVisuals.glowColor} transition-colors duration-500`}
         >
           <div className="flex items-center justify-between gap-1.5">
             <div className="flex items-center gap-1.5">
@@ -308,7 +313,7 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
       )}
 
       {/* Minimap Card */}
-      <div className="w-[164px] bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-2xl p-2.5 shadow-2xl">
+      <div className="w-[164px] bg-slate-950/95 border border-slate-800 rounded-2xl p-2.5 shadow-2xl">
         <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300 mb-1.5 px-0.5">
           <div className="flex items-center gap-1.5 truncate">
             <Compass className="w-3.5 h-3.5 text-amber-400 shrink-0" />

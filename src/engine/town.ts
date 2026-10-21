@@ -56,6 +56,7 @@ export interface GeneratedTown {
   treeSet: Set<string>;
   buildingWallMap: Map<string, BuildingWallMeta>;
   tileFlags: Uint8Array;
+  edgeMasks: Uint8Array;
   wallBuildingIdx: Int16Array;
   spatialIndex: TownSpatialIndex;
 }
@@ -1268,6 +1269,46 @@ export function generateTownLevel(): GeneratedTown {
     }
   }
 
+  // Precompute road-to-grass verge masks (bits 0..3) and water shoreline masks (bits 4..7) once
+  const edgeMasks = new Uint8Array(totalTiles);
+  const nonGrassMask =
+    TOWN_TILE_FLAG_ROAD |
+    TOWN_TILE_FLAG_INTERIOR_OAK |
+    TOWN_TILE_FLAG_INTERIOR_STONE |
+    TOWN_TILE_FLAG_INTERIOR_CARPET |
+    TOWN_TILE_FLAG_PERIMETER_WALL;
+  const isGrassNeighbor = (nx: number, ny: number): boolean => {
+    if (nx < 0 || nx >= width || ny < 0 || ny >= height) return false;
+    const nType = map.get(nx, ny);
+    if (nType === TileType.Water) return false;
+    const nf = tileFlags[ny * width + nx];
+    return (nf & TOWN_TILE_FLAG_TREE) !== 0 || (nType === TileType.Floor && (nf & nonGrassMask) === 0);
+  };
+
+  for (let ty = 0; ty < height; ty++) {
+    const rowOff = ty * width;
+    for (let tx = 0; tx < width; tx++) {
+      const idx = rowOff + tx;
+      const tType = map.get(tx, ty);
+      let mask = 0;
+      if ((tileFlags[idx] & TOWN_TILE_FLAG_ROAD) !== 0) {
+        mask |=
+          (isGrassNeighbor(tx, ty - 1) ? 1 : 0) |
+          (isGrassNeighbor(tx + 1, ty) ? 2 : 0) |
+          (isGrassNeighbor(tx, ty + 1) ? 4 : 0) |
+          (isGrassNeighbor(tx - 1, ty) ? 8 : 0);
+      } else if (tType === TileType.Water) {
+        const shore =
+          (map.get(tx, ty - 1) === TileType.Water ? 0 : 1) |
+          (map.get(tx + 1, ty) === TileType.Water ? 0 : 2) |
+          (map.get(tx, ty + 1) === TileType.Water ? 0 : 4) |
+          (map.get(tx - 1, ty) === TileType.Water ? 0 : 8);
+        mask |= shore << 4;
+      }
+      edgeMasks[idx] = mask;
+    }
+  }
+
   // 11. Build 8x8-tile Spatial Partitioning Grid (TownSpatialIndex) for O(1) viewport chunk culling
   const chunkTiles = 8;
   const chunkCols = Math.ceil(width / chunkTiles);
@@ -1351,6 +1392,7 @@ export function generateTownLevel(): GeneratedTown {
     treeSet: treeKeySet,
     buildingWallMap,
     tileFlags,
+    edgeMasks,
     wallBuildingIdx,
     spatialIndex,
   };

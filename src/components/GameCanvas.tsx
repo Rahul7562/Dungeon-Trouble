@@ -16,18 +16,27 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
+    let viewW = window.innerWidth;
+    let viewH = window.innerHeight;
+
     const updateSize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      canvas.width = w;
-      canvas.height = h;
+      viewW = window.innerWidth;
+      viewH = window.innerHeight;
+      const rawDpr = window.devicePixelRatio || 1;
+      const dpr = viewW * viewH > 1_000_000 ? 1 : Math.min(1.5, rawDpr);
+      canvas.width = Math.round(viewW * dpr);
+      canvas.height = Math.round(viewH * dpr);
+      canvas.style.width = `${viewW}px`;
+      canvas.style.height = `${viewH}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
       if (!rendererRef.current) {
-        rendererRef.current = new IsometricRenderer(ctx, w, h);
+        rendererRef.current = new IsometricRenderer(ctx, viewW, viewH);
       } else {
-        rendererRef.current.resize(w, h);
+        rendererRef.current.resize(viewW, viewH);
       }
     };
 
@@ -63,7 +72,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
         engine.worldMousePos = worldMouse;
         const dx = worldMouse.x - engine.state.player.x;
         const dy = worldMouse.y - engine.state.player.y;
-        if (Math.hypot(dx, dy) > 2) {
+        if (dx * dx + dy * dy > 4) {
           engine.state.player.facingAngle = Math.atan2(dy, dx);
         }
       }
@@ -72,8 +81,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
     const handleMouseMove = (e: MouseEvent) => {
       mouseClientX = e.clientX;
       mouseClientY = e.clientY;
-      engine.mousePos = { x: e.clientX, y: e.clientY };
-      updateFacing();
+      engine.mousePos.x = e.clientX;
+      engine.mousePos.y = e.clientY;
     };
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -98,7 +107,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
     document.addEventListener('visibilitychange', handleBlur);
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('contextmenu', handleContextMenu);
 
@@ -106,6 +115,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
     let lastTime = performance.now();
     let animId: number;
     let tickAccumulator = 0;
+    const shakenCamera = { x: 0, y: 0 };
+    const playerRenderState = {
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      facingAngle: 0,
+      isAttacking: false,
+      attackAnimTimer: 0,
+      health: 100,
+      maxHealth: 100,
+      playerName: '',
+      playerClass: engine.state.selectedClass,
+      hitFlashTimer: 0 as number | undefined,
+      statusEffects: engine.state.player.statusEffects,
+    };
 
     const gameLoop = (now: number) => {
       const elapsedSec = (now - lastTime) / 1000;
@@ -114,12 +139,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
       const dt = Math.min(0.05, Math.max(0.001, elapsedSec));
 
       engine.update(dt);
-      updateFacing();
-
-      // Throttle React HUD updates to 10 fps (and skip when paused) to prevent React re-render overhead
       if (!engine.isPaused) {
+        updateFacing();
         tickAccumulator += dt;
-        if (tickAccumulator >= 0.1) {
+        if (tickAccumulator >= 0.15) {
           tickAccumulator = 0;
           onEngineTick();
         }
@@ -129,10 +152,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
         const renderer = rendererRef.current;
         const maxHp = engine.state.playerStats.calculated[StatType.MaxHealth];
         const shake = engine.state.screenShake || 0;
-        const shakenCamera = {
-          x: engine.camera.x + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0),
-          y: engine.camera.y + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0),
-        };
+        shakenCamera.x = engine.camera.x + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0);
+        shakenCamera.y = engine.camera.y + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0);
+
         const isTown = engine.state.currentZone === 'town';
         const currentMap = isTown ? engine.state.townLevel.map : engine.state.dungeon.map;
         const fountainPos = isTown ? engine.state.townLevel.fountainPos : null;
@@ -145,9 +167,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
         // Compute world-space viewport AABB from the 4 screen corners and query GameEngine SpatialGrid
         const pad = 220;
         const cNW = renderer.screenToWorld(-pad, -pad, shakenCamera);
-        const cNE = renderer.screenToWorld(canvas.width + pad, -pad, shakenCamera);
-        const cSW = renderer.screenToWorld(-pad, canvas.height + pad, shakenCamera);
-        const cSE = renderer.screenToWorld(canvas.width + pad, canvas.height + pad, shakenCamera);
+        const cNE = renderer.screenToWorld(viewW + pad, -pad, shakenCamera);
+        const cSW = renderer.screenToWorld(-pad, viewH + pad, shakenCamera);
+        const cSE = renderer.screenToWorld(viewW + pad, viewH + pad, shakenCamera);
         const minWX = Math.min(cNW.x, cNE.x, cSW.x, cSE.x);
         const maxWX = Math.max(cNW.x, cNE.x, cSW.x, cSE.x);
         const minWY = Math.min(cNW.y, cNE.y, cSW.y, cSE.y);
@@ -155,24 +177,24 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
 
         const visible = engine.getVisibleEntities(minWX, minWY, maxWX, maxWY);
 
+        playerRenderState.x = engine.state.player.x;
+        playerRenderState.y = engine.state.player.y;
+        playerRenderState.vx = isMoving ? 10 : 0;
+        playerRenderState.vy = isMoving ? 10 : 0;
+        playerRenderState.facingAngle = engine.state.player.facingAngle;
+        playerRenderState.isAttacking = engine.state.player.isAttacking;
+        playerRenderState.attackAnimTimer = engine.state.player.attackAnimTimer;
+        playerRenderState.health = engine.state.playerStats.health;
+        playerRenderState.maxHealth = maxHp;
+        playerRenderState.playerName = engine.state.playerName;
+        playerRenderState.playerClass = engine.state.selectedClass;
+        playerRenderState.hitFlashTimer = engine.state.player.hitFlashTimer;
+        playerRenderState.statusEffects = engine.state.player.statusEffects;
+
         renderer.render(
           currentMap,
           shakenCamera,
-          {
-            x: engine.state.player.x,
-            y: engine.state.player.y,
-            vx: isMoving ? 10 : 0,
-            vy: isMoving ? 10 : 0,
-            facingAngle: engine.state.player.facingAngle,
-            isAttacking: engine.state.player.isAttacking,
-            attackAnimTimer: engine.state.player.attackAnimTimer,
-            health: engine.state.playerStats.health,
-            maxHealth: maxHp,
-            playerName: engine.state.playerName,
-            playerClass: engine.state.selectedClass,
-            hitFlashTimer: engine.state.player.hitFlashTimer,
-            statusEffects: engine.state.player.statusEffects,
-          },
+          playerRenderState,
           visible.enemies,
           engine.state.projectiles,
           visible.lootDrops,

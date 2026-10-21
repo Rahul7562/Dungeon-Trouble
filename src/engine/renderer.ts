@@ -64,6 +64,8 @@ export class SpriteBatcher {
   private shBuf: Int16Array;
   private dxBuf: Int16Array;
   private dyBuf: Int16Array;
+  private dwBuf: Int16Array;
+  private dhBuf: Int16Array;
   private alphaBuf: Float32Array;
   private count = 0;
   private capacity: number;
@@ -76,6 +78,8 @@ export class SpriteBatcher {
     this.shBuf = new Int16Array(capacity);
     this.dxBuf = new Int16Array(capacity);
     this.dyBuf = new Int16Array(capacity);
+    this.dwBuf = new Int16Array(capacity);
+    this.dhBuf = new Int16Array(capacity);
     this.alphaBuf = new Float32Array(capacity);
   }
 
@@ -90,7 +94,9 @@ export class SpriteBatcher {
     sh: number,
     dx: number,
     dy: number,
-    alpha = 1.0
+    alpha = 1.0,
+    dw = sw,
+    dh = sh
   ): void {
     if (this.count >= this.capacity) return;
     const idx = this.count++;
@@ -100,6 +106,8 @@ export class SpriteBatcher {
     this.shBuf[idx] = sh;
     this.dxBuf[idx] = dx;
     this.dyBuf[idx] = dy;
+    this.dwBuf[idx] = dw;
+    this.dhBuf[idx] = dh;
     this.alphaBuf[idx] = alpha;
   }
 
@@ -114,18 +122,16 @@ export class SpriteBatcher {
         ctx.globalAlpha = a;
         currentAlpha = a;
       }
-      const sw = this.swBuf[i];
-      const sh = this.shBuf[i];
       ctx.drawImage(
         sheet,
         this.sxBuf[i],
         this.syBuf[i],
-        sw,
-        sh,
+        this.swBuf[i],
+        this.shBuf[i],
         this.dxBuf[i],
         this.dyBuf[i],
-        sw,
-        sh
+        this.dwBuf[i],
+        this.dhBuf[i]
       );
     }
     if (currentAlpha !== 1.0) {
@@ -134,6 +140,20 @@ export class SpriteBatcher {
     this.count = 0;
   }
 }
+
+const DEPTH_WALL = 1;
+const DEPTH_CHEST = 2;
+const DEPTH_PORTAL = 3;
+const DEPTH_PROP = 4;
+const DEPTH_LOOT = 5;
+const DEPTH_AFTERIMAGE = 6;
+const DEPTH_ENEMY = 7;
+const DEPTH_NPC = 8;
+const DEPTH_SUMMON = 9;
+const DEPTH_FOUNTAIN = 10;
+const DEPTH_PLAYER = 11;
+const MAX_DEPTH_ITEMS = 2048;
+const MAX_DYNAMIC_LIGHTS = 128;
 
 export class IsometricRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -150,9 +170,34 @@ export class IsometricRenderer {
   private shadowQueueX = new Int16Array(2048);
   private shadowQueueY = new Int16Array(2048);
   private shadowQueueKind = new Uint8Array(2048);
+
+  // Zero-allocation depth-sort buffers
+  private depthValBuf = new Float32Array(MAX_DEPTH_ITEMS);
+  private depthKindBuf = new Uint8Array(MAX_DEPTH_ITEMS);
+  private depthPosXBuf = new Int16Array(MAX_DEPTH_ITEMS);
+  private depthPosYBuf = new Int16Array(MAX_DEPTH_ITEMS);
+  private depthArg1Buf = new Int16Array(MAX_DEPTH_ITEMS);
+  private depthArg2Buf = new Int16Array(MAX_DEPTH_ITEMS);
+  private depthAlphaBuf = new Float32Array(MAX_DEPTH_ITEMS);
+  private depthOrder: number[] = [];
+  private depthPropRefs: DungeonProp[] = [];
+
+  // Zero-allocation dynamic lights pool
+  private lightPool: DynamicLightSource[] = Array.from({ length: MAX_DYNAMIC_LIGHTS }, () => ({
+    x: 0,
+    y: 0,
+    radius: 0,
+    color: '#ffffff',
+    intensity: 0,
+  }));
+  private lightCount = 0;
+
   private lightmapCanvas: HTMLCanvasElement | null = null;
   private lightmapCtx: CanvasRenderingContext2D | null = null;
   private lightCutoutSprite: HTMLCanvasElement | null = null;
+  private coloredLightSprites = new Map<string, HTMLCanvasElement>();
+  private fogCanvas: HTMLCanvasElement | null = null;
+  private fogThemeId = '';
   private wallShadowNorth: HTMLCanvasElement | null = null;
   private wallShadowWest: HTMLCanvasElement | null = null;
   private wallShadowBoth: HTMLCanvasElement | null = null;
@@ -164,6 +209,36 @@ export class IsometricRenderer {
     this.height = height;
     this.initLightmapCanvas();
     this.initCachedShadowSprites();
+  }
+
+  private pushDynamicLight(x: number, y: number, radius: number, color: string, intensity: number): void {
+    if (this.lightCount >= MAX_DYNAMIC_LIGHTS) return;
+    if (x < -240 || x > this.width + 240 || y < -240 || y > this.height + 240) return;
+    const l = this.lightPool[this.lightCount++];
+    l.x = x;
+    l.y = y;
+    l.radius = radius;
+    l.color = color;
+    l.intensity = intensity;
+  }
+
+  private getColoredLightSprite(color: string): HTMLCanvasElement | null {
+    const cached = this.coloredLightSprites.get(color);
+    if (cached) return cached;
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
+    const c = document.createElement('canvas');
+    c.width = 64;
+    c.height = 64;
+    const cctx = c.getContext('2d');
+    if (!cctx) return null;
+    const grad = cctx.createRadialGradient(32, 32, 1, 32, 32, 31);
+    grad.addColorStop(0.0, color);
+    grad.addColorStop(0.42, color);
+    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    cctx.fillStyle = grad;
+    cctx.fillRect(0, 0, 64, 64);
+    this.coloredLightSprites.set(color, c);
+    return c;
   }
 
   private initLightmapCanvas() {
@@ -279,6 +354,7 @@ export class IsometricRenderer {
   resize(width: number, height: number) {
     this.width = width;
     this.height = height;
+    this.fogThemeId = '';
     if (this.lightmapCanvas) {
       this.lightmapCanvas.width = Math.max(1, Math.floor(width * 0.25));
       this.lightmapCanvas.height = Math.max(1, Math.floor(height * 0.25));
@@ -312,19 +388,7 @@ export class IsometricRenderer {
 
   // Returns true if a Wall tile borders at least one non-Wall tile in its 3x3 neighborhood
   private isPerimeterWall(map: TileMap, tx: number, ty: number): boolean {
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const nx = tx + dx;
-        const ny = ty + dy;
-        if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
-        const neighbor = map.get(nx, ny);
-        if (neighbor !== TileType.Wall && neighbor !== TileType.Empty) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return map.isPerimeterWall(tx, ty);
   }
 
   render(
@@ -398,7 +462,7 @@ export class IsometricRenderer {
     const startY = Math.max(0, Math.min(cNW.y, cNE.y, cSW.y, cSE.y) - 1);
     const endY = Math.min(map.height - 1, Math.max(cNW.y, cNE.y, cSW.y, cSE.y) + 1);
 
-    const dynamicLights: DynamicLightSource[] = [];
+    this.lightCount = 0;
     const tileFlags = townData?.tileFlags;
     const wallBuildingIdx = townData?.wallBuildingIdx;
 
@@ -417,8 +481,6 @@ export class IsometricRenderer {
     }
 
     // 1. Batched Ground Pass: Floor Tiles, Water, Shorelines, Void Bedrock & Wall-to-Floor Shadows
-    // Analytical isometric frustum bounds (tx - ty in [minDiff, maxDiff], tx + ty in [minSum, maxSum])
-    // eliminate all off-screen corner tile iterations in the axis-aligned bounding box!
     const mapWidth = map.width;
     const halfW = this.width * 0.5 - camera.x;
     const halfH = this.height * 0.5 - camera.y;
@@ -445,7 +507,6 @@ export class IsometricRenderer {
 
         if (type === TileType.Wall) {
           if (isTown) {
-            // Draw meadow turf underneath trees & perimeter walls so there are no dark holes under trees
             const isTree = tileFlags
               ? (tileFlags[rowOffset + tx] & TOWN_TILE_FLAG_TREE) !== 0
               : tx === 0 ||
@@ -469,7 +530,7 @@ export class IsometricRenderer {
                 map
               );
             }
-          } else if (!this.isPerimeterWall(map, tx, ty)) {
+          } else if (!map.isPerimeterWall(tx, ty)) {
             this.drawVoidBedrockTile(ctx, posX, posY, tx, ty, theme, atlas);
           }
           continue;
@@ -490,7 +551,6 @@ export class IsometricRenderer {
           map
         );
 
-        // Queue directional wall ambient occlusion shadows to flush after the batched floor atlas pass
         const wallNorth = map.get(tx, ty - 1) === TileType.Wall;
         const wallWest = map.get(tx - 1, ty) === TileType.Wall;
         if ((wallNorth || wallWest) && shadowCount < 2048) {
@@ -501,39 +561,19 @@ export class IsometricRenderer {
         }
 
         if (type === TileType.Lava) {
-          dynamicLights.push({
-            x: posX,
-            y: posY,
-            radius: 95,
-            color: '#f97316',
-            intensity: 0.45,
-          });
+          this.pushDynamicLight(posX, posY, 95, '#f97316', 0.45);
         } else if (type === TileType.Exit) {
-          dynamicLights.push({
-            x: posX,
-            y: posY - 16,
-            radius: 170,
-            color: '#c084fc',
-            intensity: 0.85,
-          });
+          this.pushDynamicLight(posX, posY - 16, 170, '#c084fc', 0.85);
         } else if (type === TileType.Chest) {
-          dynamicLights.push({
-            x: posX,
-            y: posY - 8,
-            radius: 110,
-            color: '#fbbf24',
-            intensity: 0.55,
-          });
+          this.pushDynamicLight(posX, posY - 8, 110, '#fbbf24', 0.55);
         }
       }
     }
 
-    // Flush all queued floor, grass, road, interior, water, shoreline, and void sprites from the single Master Texture Sheet!
     if (atlas) {
       this.spriteBatcher.flush(ctx, atlas.masterSheet);
     }
 
-    // Flush queued wall-to-floor ambient occlusion shadows in a single uninterrupted pass
     for (let i = 0; i < shadowCount; i++) {
       const kind = this.shadowQueueKind[i];
       this.drawFloorWallShadow(
@@ -545,25 +585,27 @@ export class IsometricRenderer {
       );
     }
 
-    // 1.2 Render Ground-Layer Combat Decals (Frost Nova ice patterns, Scorch craters, Shockwave rings)
-    for (const p of particles) {
+    // 1.2 Render Ground-Layer Combat Decals
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
       if (p.kind === 'frost_nova' || p.kind === 'scorch' || p.kind === 'shockwave' || p.kind === 'ring') {
         const pos = this.worldToScreen(p.x, p.y, 0, camera);
         this.drawGroundDecalParticle(ctx, pos.x, pos.y, p, gameTime);
         if (p.kind === 'frost_nova' || p.kind === 'scorch') {
-          dynamicLights.push({
-            x: pos.x,
-            y: pos.y,
-            radius: p.size * 1.4,
-            color: p.color,
-            intensity: Math.max(0, (p.life / p.maxLife) * 0.8),
-          });
+          this.pushDynamicLight(
+            pos.x,
+            pos.y,
+            p.size * 1.4,
+            p.color,
+            Math.max(0, (p.life / p.maxLife) * 0.8)
+          );
         }
       }
     }
 
-    // 1.5 Render Ground Warning Telegraphs (Boss & Elite AoE circles/rings)
-    for (const tele of telegraphs) {
+    // 1.5 Render Ground Warning Telegraphs
+    for (let i = 0; i < telegraphs.length; i++) {
+      const tele = telegraphs[i];
       const pos = this.worldToScreen(tele.x, tele.y, 0, camera);
       const ratio = Math.max(0, Math.min(1, 1 - tele.duration / tele.maxDuration));
       const rx = tele.radius * (this.isoTileW / 64);
@@ -599,7 +641,6 @@ export class IsometricRenderer {
       ctx.fillStyle = innerFill;
       ctx.fill();
 
-      // Runic crosshairs inside telegraph
       ctx.strokeStyle = baseStroke;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -616,14 +657,13 @@ export class IsometricRenderer {
       ctx.restore();
     }
 
-    // Compute visible spatial partitioning chunks (8x8-tile grid) when in Town overworld
     const spatialIndex = isTown ? townData?.spatialIndex : undefined;
     const chunkStartX = spatialIndex ? Math.max(0, startX >> 3) : 0;
     const chunkEndX = spatialIndex ? Math.min(spatialIndex.cols - 1, endX >> 3) : -1;
     const chunkStartY = spatialIndex ? Math.max(0, startY >> 3) : 0;
     const chunkEndY = spatialIndex ? Math.min(spatialIndex.rows - 1, endY >> 3) : -1;
 
-    // 1.1 Render Flat Interior Rugs on Floor Layer (Spatially culled by chunk + Roof-occlusion culled!)
+    // 1.1 Render Flat Interior Rugs on Floor Layer
     if (spatialIndex && townData) {
       for (let cy = chunkStartY; cy <= chunkEndY; cy++) {
         const rowBase = cy * spatialIndex.cols;
@@ -634,7 +674,6 @@ export class IsometricRenderer {
             if (tagged.buildingIdx >= 0) {
               const b = townData.buildings[tagged.buildingIdx];
               if (b && (this.buildingRoofAlpha.get(b.id) ?? 1.0) >= 0.98) {
-                // Cull indoor rug completely when building roof is opaque!
                 continue;
               }
             }
@@ -647,7 +686,8 @@ export class IsometricRenderer {
         }
       }
     } else {
-      for (const prop of props) {
+      for (let i = 0; i < props.length; i++) {
+        const prop = props[i];
         if (prop.kind === 'rug') {
           const pos = this.worldToScreen(prop.x, prop.y, 0, camera);
           if (pos.x >= -150 && pos.x <= this.width + 150 && pos.y >= -150 && pos.y <= this.height + 150) {
@@ -657,18 +697,33 @@ export class IsometricRenderer {
       }
     }
 
-    // 2. Collect all depth-sorted renderables: Perimeter 3D Walls, Props, Enemies, Player, Loot, Chests
-    interface DepthItem {
-      depth: number;
-      draw: () => void;
-    }
-    const depthList: DepthItem[] = [];
+    // 2. Collect all depth-sorted renderables into zero-allocation typed buffers
+    let depthCount = 0;
+    this.depthPropRefs.length = 0;
+    const pushDepthItem = (
+      depth: number,
+      kind: number,
+      posX: number,
+      posY: number,
+      arg1 = 0,
+      arg2 = 0,
+      alpha = 1.0
+    ) => {
+      if (depthCount >= MAX_DEPTH_ITEMS) return;
+      const idx = depthCount++;
+      this.depthValBuf[idx] = depth;
+      this.depthKindBuf[idx] = kind;
+      this.depthPosXBuf[idx] = posX;
+      this.depthPosYBuf[idx] = posY;
+      this.depthArg1Buf[idx] = arg1;
+      this.depthArg2Buf[idx] = arg2;
+      this.depthAlphaBuf[idx] = alpha;
+    };
 
     const playerTile = map.worldToTile(player.x, player.y);
 
     // Perimeter 3D Walls, Trees, Chests, and Exit Portals
     if (spatialIndex && tileFlags && wallBuildingIdx && townData) {
-      // Fast Spatial Chunk Wall & Tree Culling for Overworld Navigation
       for (let cy = chunkStartY; cy <= chunkEndY; cy++) {
         const rowBase = cy * spatialIndex.cols;
         for (let cx = chunkStartX; cx <= chunkEndX; cx++) {
@@ -708,39 +763,24 @@ export class IsometricRenderer {
                 }
                 if (daylight.isNightLightsOn && (flags & TOWN_TILE_FLAG_WINDOW) !== 0) {
                   const lanternFactor = daylight.lanternIntensity ?? 1.0;
-                  dynamicLights.push({
-                    x: posX,
-                    y: posY - 22,
-                    radius: 145,
-                    color: '#fbbf24',
-                    intensity: 0.72 * lanternFactor,
-                  });
+                  this.pushDynamicLight(posX, posY - 22, 145, '#fbbf24', 0.72 * lanternFactor);
                 }
               }
             }
 
-            depthList.push({
-              depth: (cellX + cellY) * 64,
-              draw: () =>
-                this.drawWallBlock(
-                  ctx,
-                  posX,
-                  posY,
-                  tx,
-                  ty,
-                  theme,
-                  isTown,
-                  atlas,
-                  wallAlpha,
-                  isOuterTree,
-                  gameTime
-                ),
-            });
+            pushDepthItem(
+              (cellX + cellY) * 64,
+              DEPTH_WALL,
+              posX,
+              posY,
+              tx,
+              ty | (isOuterTree ? 0x4000 : 0),
+              wallAlpha
+            );
           }
         }
       }
 
-      // Town Dungeon Gate Portal
       if (townData.dungeonPortalPos) {
         const portalPos = this.worldToScreen(townData.dungeonPortalPos.x, townData.dungeonPortalPos.y, 0, camera);
         if (
@@ -749,10 +789,13 @@ export class IsometricRenderer {
           portalPos.y >= -160 &&
           portalPos.y <= this.height + 160
         ) {
-          depthList.push({
-            depth: townData.dungeonPortalPos.x + townData.dungeonPortalPos.y,
-            draw: () => this.drawExitPortal(ctx, portalPos.x, portalPos.y, gameTime, true),
-          });
+          pushDepthItem(
+            townData.dungeonPortalPos.x + townData.dungeonPortalPos.y,
+            DEPTH_PORTAL,
+            portalPos.x,
+            portalPos.y,
+            1
+          );
         }
       }
     } else {
@@ -781,7 +824,7 @@ export class IsometricRenderer {
             const isPerim =
               isTown && tileFlags
                 ? (flags & TOWN_TILE_FLAG_PERIMETER_WALL) !== 0
-                : this.isPerimeterWall(map, tx, ty);
+                : map.isPerimeterWall(tx, ty);
             if (!isPerim) continue;
 
             const isOuterTree =
@@ -795,55 +838,38 @@ export class IsometricRenderer {
                   (townData?.treeSet ? townData.treeSet.has(`${tx},${ty}`) : false));
 
             let wallAlpha = 1.0;
-            const occludesPlayer =
+            if (
               tx >= playerTile.x &&
               ty >= playerTile.y &&
               tx - playerTile.x <= 2 &&
               ty - playerTile.y <= 2 &&
-              tx + ty > playerTile.x + playerTile.y;
-
-            if (occludesPlayer) {
+              tx + ty > playerTile.x + playerTile.y
+            ) {
               wallAlpha = 0.35;
             }
 
-            if (isTown && !isOuterTree) {
-              if (wallBuildingIdx && tileFlags) {
-                const bIdx = wallBuildingIdx[tileIdx];
-                if (bIdx >= 0) {
-                  if (bIdx === activeBuildingIndex) {
-                    wallAlpha = (flags & TOWN_TILE_FLAG_FRONT_WALL) !== 0 ? 0.18 : 0.72;
-                  }
-                  if (daylight.isNightLightsOn && (flags & TOWN_TILE_FLAG_WINDOW) !== 0) {
-                    const lanternFactor = daylight.lanternIntensity ?? 1.0;
-                    dynamicLights.push({
-                      x: posX,
-                      y: posY - 22,
-                      radius: 145,
-                      color: '#fbbf24',
-                      intensity: 0.72 * lanternFactor,
-                    });
-                  }
+            if (isTown && !isOuterTree && wallBuildingIdx && tileFlags) {
+              const bIdx = wallBuildingIdx[tileIdx];
+              if (bIdx >= 0) {
+                if (bIdx === activeBuildingIndex) {
+                  wallAlpha = (flags & TOWN_TILE_FLAG_FRONT_WALL) !== 0 ? 0.18 : 0.72;
+                }
+                if (daylight.isNightLightsOn && (flags & TOWN_TILE_FLAG_WINDOW) !== 0) {
+                  const lanternFactor = daylight.lanternIntensity ?? 1.0;
+                  this.pushDynamicLight(posX, posY - 22, 145, '#fbbf24', 0.72 * lanternFactor);
                 }
               }
             }
 
-            depthList.push({
-              depth: (cellX + cellY) * 64,
-              draw: () =>
-                this.drawWallBlock(
-                  ctx,
-                  posX,
-                  posY,
-                  tx,
-                  ty,
-                  theme,
-                  isTown,
-                  atlas,
-                  wallAlpha,
-                  isOuterTree,
-                  gameTime
-                ),
-            });
+            pushDepthItem(
+              (cellX + cellY) * 64,
+              DEPTH_WALL,
+              posX,
+              posY,
+              tx,
+              ty | (isOuterTree ? 0x4000 : 0),
+              wallAlpha
+            );
           } else if (type === TileType.Chest) {
             const cellX = tx + 0.5;
             const posX = Math.round((cellX - cellY) * 32 + halfW);
@@ -851,10 +877,7 @@ export class IsometricRenderer {
             if (posX < -140 || posX > this.width + 140 || posY < -140 || posY > this.height + 140) {
               continue;
             }
-            depthList.push({
-              depth: (cellX + cellY) * 64,
-              draw: () => this.drawChest(ctx, posX, posY, gameTime),
-            });
+            pushDepthItem((cellX + cellY) * 64, DEPTH_CHEST, posX, posY);
           } else if (type === TileType.Exit) {
             const cellX = tx + 0.5;
             const posX = Math.round((cellX - cellY) * 32 + halfW);
@@ -862,16 +885,13 @@ export class IsometricRenderer {
             if (posX < -160 || posX > this.width + 160 || posY < -160 || posY > this.height + 160) {
               continue;
             }
-            depthList.push({
-              depth: (cellX + cellY) * 64,
-              draw: () => this.drawExitPortal(ctx, posX, posY, gameTime, isTown),
-            });
+            pushDepthItem((cellX + cellY) * 64, DEPTH_PORTAL, posX, posY, isTown ? 1 : 0);
           }
         }
       }
     }
 
-    // Handcrafted Environmental & Interior Props (Spatially partitioned by chunk + Interior roof-occlusion culled!)
+    // Handcrafted Environmental & Interior Props
     const lanternFactor = daylight.lanternIntensity ?? (daylight.isNightLightsOn ? 1.0 : 0.0);
     if (spatialIndex && townData) {
       for (let cy = chunkStartY; cy <= chunkEndY; cy++) {
@@ -883,7 +903,6 @@ export class IsometricRenderer {
             if (tagged.buildingIdx >= 0) {
               const b = townData.buildings[tagged.buildingIdx];
               if (b && (this.buildingRoofAlpha.get(b.id) ?? 1.0) >= 0.98) {
-                // Skip indoor furniture & indoor lights when the building's roof is opaque!
                 continue;
               }
             }
@@ -896,25 +915,25 @@ export class IsometricRenderer {
               const isStreetLamp = prop.kind === 'street_lantern';
               const activeLight = !isStreetLamp || daylight.isNightLightsOn;
               if (activeLight) {
-                dynamicLights.push({
-                  x: pos.x,
-                  y: pos.y - 16,
-                  radius: isStreetLamp ? prop.lightRadius * (0.85 + 0.3 * lanternFactor) : prop.lightRadius,
-                  color: prop.lightColor,
-                  intensity: isStreetLamp ? 0.92 * lanternFactor : 0.8,
-                });
+                this.pushDynamicLight(
+                  pos.x,
+                  pos.y - 16,
+                  isStreetLamp ? prop.lightRadius * (0.85 + 0.3 * lanternFactor) : prop.lightRadius,
+                  prop.lightColor,
+                  isStreetLamp ? 0.92 * lanternFactor : 0.8
+                );
               }
             }
-            depthList.push({
-              depth: prop.x + prop.y,
-              draw: () => this.drawProp(ctx, pos.x, pos.y, prop, gameTime, theme, daylight.isNightLightsOn),
-            });
+            const pIdx = this.depthPropRefs.length;
+            this.depthPropRefs.push(prop);
+            pushDepthItem(prop.x + prop.y, DEPTH_PROP, pos.x, pos.y, pIdx);
           }
         }
       }
     } else {
-      for (const prop of props) {
-        if (prop.kind === 'rug') continue; // Already drawn on floor pass
+      for (let i = 0; i < props.length; i++) {
+        const prop = props[i];
+        if (prop.kind === 'rug') continue;
         const pos = this.worldToScreen(prop.x, prop.y, 0, camera);
         if (pos.x < -220 || pos.x > this.width + 220 || pos.y < -220 || pos.y > this.height + 220) {
           continue;
@@ -923,53 +942,192 @@ export class IsometricRenderer {
           const isStreetLamp = prop.kind === 'street_lantern';
           const activeLight = !isStreetLamp || daylight.isNightLightsOn;
           if (activeLight) {
-            dynamicLights.push({
-              x: pos.x,
-              y: pos.y - 16,
-              radius: isStreetLamp ? prop.lightRadius * (0.85 + 0.3 * lanternFactor) : prop.lightRadius,
-              color: prop.lightColor,
-              intensity: isStreetLamp ? 0.92 * lanternFactor : 0.8,
-            });
+            this.pushDynamicLight(
+              pos.x,
+              pos.y - 16,
+              isStreetLamp ? prop.lightRadius * (0.85 + 0.3 * lanternFactor) : prop.lightRadius,
+              prop.lightColor,
+              isStreetLamp ? 0.92 * lanternFactor : 0.8
+            );
           }
         }
-        depthList.push({
-          depth: prop.x + prop.y,
-          draw: () => this.drawProp(ctx, pos.x, pos.y, prop, gameTime, theme, daylight.isNightLightsOn),
-        });
+        const pIdx = this.depthPropRefs.length;
+        this.depthPropRefs.push(prop);
+        pushDepthItem(prop.x + prop.y, DEPTH_PROP, pos.x, pos.y, pIdx);
       }
     }
 
-    // Loot Drops with Rarity Light Pillars
-    for (const drop of lootDrops) {
+    // Loot Drops
+    for (let i = 0; i < lootDrops.length; i++) {
+      const drop = lootDrops[i];
       const pos = this.worldToScreen(drop.x, drop.y, 0, camera);
       const def = getItemDef(drop.item.itemDefId);
       if (def && (def.rarity ?? 0) >= ItemRarity.Rare) {
-        dynamicLights.push({
-          x: pos.x,
-          y: pos.y - 10,
-          radius: 90,
-          color: def.rarity === ItemRarity.Legendary ? '#f97316' : def.rarity === ItemRarity.Epic ? '#c084fc' : '#38bdf8',
-          intensity: 0.65,
-        });
+        this.pushDynamicLight(
+          pos.x,
+          pos.y - 10,
+          90,
+          def.rarity === ItemRarity.Legendary
+            ? '#f97316'
+            : def.rarity === ItemRarity.Epic
+            ? '#c084fc'
+            : '#38bdf8',
+          0.65
+        );
       }
-      depthList.push({
-        depth: drop.x + drop.y,
-        draw: () => this.drawLootDrop(ctx, pos.x, pos.y, drop, gameTime),
-      });
+      pushDepthItem(drop.x + drop.y, DEPTH_LOOT, pos.x, pos.y, i);
     }
 
-    // Dash Afterimages (Depth-sorted with characters)
-    for (const p of particles) {
+    // Dash Afterimages
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
       if (p.kind === 'afterimage') {
         const pos = this.worldToScreen(p.x, p.y, 0, camera);
         const alpha = Math.max(0, (p.life / p.maxLife) * 0.55);
-        depthList.push({
-          depth: p.x + p.y - 2,
-          draw: () =>
+        pushDepthItem(p.x + p.y - 2, DEPTH_AFTERIMAGE, pos.x, pos.y, i, 0, alpha);
+      }
+    }
+
+    // Enemies
+    for (let i = 0; i < enemies.length; i++) {
+      const enemy = enemies[i];
+      const pos = this.worldToScreen(enemy.x, enemy.y, enemy.z, camera);
+      if (pos.x < -220 || pos.x > this.width + 220 || pos.y < -220 || pos.y > this.height + 220) {
+        continue;
+      }
+      if (enemy.archetype === 'dungeon_lord' || enemy.isElite) {
+        this.pushDynamicLight(
+          pos.x,
+          pos.y - 18,
+          enemy.archetype === 'dungeon_lord' ? 165 : 105,
+          enemy.archetype === 'dungeon_lord' ? '#ef4444' : '#f59e0b',
+          0.55
+        );
+      }
+      pushDepthItem(enemy.x + enemy.y, DEPTH_ENEMY, pos.x, pos.y, i);
+    }
+
+    // Town NPCs
+    for (let i = 0; i < npcs.length; i++) {
+      const npc = npcs[i];
+      const pos = this.worldToScreen(npc.x, npc.y, 0, camera);
+      if (pos.x < -220 || pos.x > this.width + 220 || pos.y < -220 || pos.y > this.height + 220) {
+        continue;
+      }
+      const isNear = activeNPC !== null && activeNPC.id === npc.id;
+      if (isTown && daylight.isNightLightsOn && npc.carriesLantern !== false) {
+        this.pushDynamicLight(pos.x, pos.y - 18, 165, '#fbbf24', 0.85 * lanternFactor);
+      }
+      pushDepthItem(npc.x + npc.y, DEPTH_NPC, pos.x, pos.y, i, isNear ? 1 : 0);
+    }
+
+    // Summons
+    for (let i = 0; i < summons.length; i++) {
+      const summon = summons[i];
+      const pos = this.worldToScreen(summon.x, summon.y, 0, camera);
+      pushDepthItem(summon.x + summon.y, DEPTH_SUMMON, pos.x, pos.y, i);
+    }
+
+    // Fountain
+    if (fountainPos) {
+      const pos = this.worldToScreen(fountainPos.x, fountainPos.y, 0, camera);
+      this.pushDynamicLight(pos.x, pos.y - 16, 230, '#38bdf8', 0.88);
+      pushDepthItem(fountainPos.x + fountainPos.y, DEPTH_FOUNTAIN, pos.x, pos.y);
+    }
+
+    // Hero (Player)
+    const playerPos = this.worldToScreen(player.x, player.y, 0, camera);
+    pushDepthItem(player.x + player.y, DEPTH_PLAYER, playerPos.x, playerPos.y);
+
+    // Sort indices by depth without allocating closures
+    const order = this.depthOrder;
+    order.length = depthCount;
+    for (let i = 0; i < depthCount; i++) {
+      order[i] = i;
+    }
+    const depthVals = this.depthValBuf;
+    order.sort((a, b) => depthVals[a] - depthVals[b]);
+
+    this.spriteBatcher.clear();
+    const flushBatcher = () => {
+      if (atlas) {
+        this.spriteBatcher.flush(ctx, atlas.masterSheet);
+      }
+    };
+
+    for (let i = 0; i < depthCount; i++) {
+      const idx = order[i];
+      const kind = this.depthKindBuf[idx];
+      const px = this.depthPosXBuf[idx];
+      const py = this.depthPosYBuf[idx];
+      const a1 = this.depthArg1Buf[idx];
+      const a2 = this.depthArg2Buf[idx];
+
+      if (kind === DEPTH_WALL) {
+        this.drawWallBlock(
+          ctx,
+          px,
+          py,
+          a1,
+          a2 & 0x3fff,
+          theme,
+          isTown,
+          atlas,
+          this.depthAlphaBuf[idx],
+          (a2 & 0x4000) !== 0,
+          gameTime
+        );
+      } else if (kind === DEPTH_FOUNTAIN) {
+        this.drawFountain(ctx, px, py, gameTime, atlas);
+      } else {
+        flushBatcher();
+        switch (kind) {
+          case DEPTH_PROP:
+            this.drawProp(
+              ctx,
+              px,
+              py,
+              this.depthPropRefs[a1],
+              gameTime,
+              theme,
+              daylight.isNightLightsOn
+            );
+            break;
+          case DEPTH_ENEMY:
+            drawEnemyRig(ctx, px, py, enemies[a1], gameTime);
+            break;
+          case DEPTH_NPC:
+            drawNPCRig(
+              ctx,
+              px,
+              py,
+              npcs[a1],
+              a2 === 1,
+              gameTime,
+              isTown && daylight.isNightLightsOn
+            );
+            break;
+          case DEPTH_PLAYER:
+            drawHeroRig(ctx, px, py, player, gameTime);
+            break;
+          case DEPTH_LOOT:
+            this.drawLootDrop(ctx, px, py, lootDrops[a1], gameTime);
+            break;
+          case DEPTH_CHEST:
+            this.drawChest(ctx, px, py, gameTime);
+            break;
+          case DEPTH_PORTAL:
+            this.drawExitPortal(ctx, px, py, gameTime, a1 === 1);
+            break;
+          case DEPTH_SUMMON:
+            drawSummonRig(ctx, px, py, summons[a1], gameTime);
+            break;
+          case DEPTH_AFTERIMAGE: {
+            const p = particles[a1];
             drawHeroRig(
               ctx,
-              pos.x,
-              pos.y,
+              px,
+              py,
               {
                 ...player,
                 x: p.x,
@@ -979,96 +1137,14 @@ export class IsometricRenderer {
                 playerClass: p.playerClass || player.playerClass,
               },
               gameTime,
-              { isGhost: true, ghostColor: p.color, ghostAlpha: alpha }
-            ),
-        });
+              { isGhost: true, ghostColor: p.color, ghostAlpha: this.depthAlphaBuf[idx] }
+            );
+            break;
+          }
+        }
       }
     }
-
-    // Enemies
-    for (const enemy of enemies) {
-      const pos = this.worldToScreen(enemy.x, enemy.y, enemy.z, camera);
-      if (pos.x < -220 || pos.x > this.width + 220 || pos.y < -220 || pos.y > this.height + 220) {
-        continue;
-      }
-      if (enemy.archetype === 'dungeon_lord' || enemy.isElite) {
-        dynamicLights.push({
-          x: pos.x,
-          y: pos.y - 18,
-          radius: enemy.archetype === 'dungeon_lord' ? 165 : 105,
-          color: enemy.archetype === 'dungeon_lord' ? '#ef4444' : '#f59e0b',
-          intensity: 0.55,
-        });
-      }
-      depthList.push({
-        depth: enemy.x + enemy.y,
-        draw: () => drawEnemyRig(ctx, pos.x, pos.y, enemy, gameTime),
-      });
-    }
-
-    // Town NPCs (with walking animation & handheld night lanterns)
-    for (const npc of npcs) {
-      const pos = this.worldToScreen(npc.x, npc.y, 0, camera);
-      if (pos.x < -220 || pos.x > this.width + 220 || pos.y < -220 || pos.y > this.height + 220) {
-        continue;
-      }
-      const isNear = activeNPC !== null && activeNPC.id === npc.id;
-      if (isTown && daylight.isNightLightsOn && npc.carriesLantern !== false) {
-        dynamicLights.push({
-          x: pos.x,
-          y: pos.y - 18,
-          radius: 165,
-          color: '#fbbf24',
-          intensity: 0.85 * lanternFactor,
-        });
-      }
-      depthList.push({
-        depth: npc.x + npc.y,
-        draw: () => drawNPCRig(ctx, pos.x, pos.y, npc, isNear, gameTime, isTown && daylight.isNightLightsOn),
-      });
-    }
-
-    // Necromancer Summons
-    for (const summon of summons) {
-      const pos = this.worldToScreen(summon.x, summon.y, 0, camera);
-      depthList.push({
-        depth: summon.x + summon.y,
-        draw: () => drawSummonRig(ctx, pos.x, pos.y, summon, gameTime),
-      });
-    }
-
-    // Town Central Fountain
-    if (fountainPos) {
-      const pos = this.worldToScreen(fountainPos.x, fountainPos.y, 0, camera);
-      dynamicLights.push({
-        x: pos.x,
-        y: pos.y - 16,
-        radius: 230,
-        color: '#38bdf8',
-        intensity: 0.88,
-      });
-      depthList.push({
-        depth: fountainPos.x + fountainPos.y,
-        draw: () => this.drawFountain(ctx, pos.x, pos.y, gameTime, atlas),
-      });
-    }
-
-    // Hero (Player)
-    const playerPos = this.worldToScreen(player.x, player.y, 0, camera);
-    depthList.push({
-      depth: player.x + player.y,
-      draw: () => drawHeroRig(ctx, playerPos.x, playerPos.y, player, gameTime),
-    });
-
-    // Execute Painter's Algorithm Depth Sort with Master Texture Sheet Sprite Batching
-    depthList.sort((a, b) => a.depth - b.depth);
-    this.spriteBatcher.clear();
-    for (let i = 0; i < depthList.length; i++) {
-      depthList[i].draw();
-    }
-    if (atlas) {
-      this.spriteBatcher.flush(ctx, atlas.masterSheet);
-    }
+    flushBatcher();
 
     // 2.5 Render Medieval Pitched Roofs, Gable Dormers, Turrets & Chimneys (Spatially culled by visible chunks)
     if (isTown && townData?.buildings) {
@@ -1098,21 +1174,17 @@ export class IsometricRenderer {
     }
 
     // 3. Projectiles (rendered above ground with dynamic spell light)
-    for (const proj of projectiles) {
+    for (let i = 0; i < projectiles.length; i++) {
+      const proj = projectiles[i];
       const pos = this.worldToScreen(proj.x, proj.y, 16, camera);
       this.drawProjectile(ctx, pos.x, pos.y, proj, gameTime);
-      dynamicLights.push({
-        x: pos.x,
-        y: pos.y,
-        radius: proj.school === 1 ? 135 : 95,
-        color: proj.color,
-        intensity: 0.75,
-      });
+      this.pushDynamicLight(pos.x, pos.y, proj.school === 1 ? 135 : 95, proj.color, 0.75);
     }
 
-    // 4. Elevated Combat & Spell Particles (Slash arcs, Ice shards, Embers, Sparks, Blood, Bone fragments)
+    // 4. Elevated Combat & Spell Particles
     if (this.quality !== 'low') {
-      for (const p of particles) {
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
         if (
           p.kind === 'frost_nova' ||
           p.kind === 'scorch' ||
@@ -1120,7 +1192,7 @@ export class IsometricRenderer {
           p.kind === 'ring' ||
           p.kind === 'afterimage'
         ) {
-          continue; // Already rendered in ground or depth pass
+          continue;
         }
         const pos = this.worldToScreen(p.x, p.y, p.z ?? 10, camera);
         this.drawElevatedParticle(ctx, pos.x, pos.y, p);
@@ -1134,7 +1206,8 @@ export class IsometricRenderer {
         playerPos.x,
         playerPos.y,
         player.isAttacking,
-        dynamicLights,
+        this.lightPool,
+        this.lightCount,
         theme,
         isTown,
         gameTime,
@@ -1177,8 +1250,10 @@ export class IsometricRenderer {
     if (atlas) {
       const rect = atlas.rectMap.get(sprite);
       if (rect) {
+        const dw = rect.dw ?? rect.sw;
+        const dh = rect.dh ?? rect.sh;
         if (useBatcher) {
-          this.spriteBatcher.queue(rect.sx, rect.sy, rect.sw, rect.sh, dx, dy, alpha);
+          this.spriteBatcher.queue(rect.sx, rect.sy, rect.sw, rect.sh, dx, dy, alpha, dw, dh);
           return;
         }
         if (alpha < 0.99) {
@@ -1192,8 +1267,8 @@ export class IsometricRenderer {
             rect.sh,
             dx,
             dy,
-            rect.sw,
-            rect.sh
+            dw,
+            dh
           );
           ctx.restore();
         } else {
@@ -1205,8 +1280,8 @@ export class IsometricRenderer {
             rect.sh,
             dx,
             dy,
-            rect.sw,
-            rect.sh
+            dw,
+            dh
           );
         }
         return;
@@ -1325,31 +1400,12 @@ export class IsometricRenderer {
             }
             const isRoad = (flags & TOWN_TILE_FLAG_ROAD) !== 0;
             if (isRoad) {
-              const sprite = atlas.townRoadSprites[h % atlas.townRoadSprites.length];
+              const sprite = atlas.townRoadSprites[h & 7];
               this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 20, 1.0, true);
 
-              // Queue pre-baked overhanging grass-fringe verge overlay wherever the tilled path borders meadow grass
-              if (map && atlas.roadEdgeSprites && atlas.roadEdgeSprites.length > 0) {
-                const tf = townData.tileFlags;
-                const w = map.width;
-                const nonGrassMask =
-                  TOWN_TILE_FLAG_ROAD |
-                  TOWN_TILE_FLAG_INTERIOR_OAK |
-                  TOWN_TILE_FLAG_INTERIOR_STONE |
-                  TOWN_TILE_FLAG_INTERIOR_CARPET |
-                  TOWN_TILE_FLAG_PERIMETER_WALL;
-                const isGrassNeighbor = (nx: number, ny: number): boolean => {
-                  if (nx < 0 || nx >= w || ny < 0 || ny >= map.height) return false;
-                  const nType = map.get(nx, ny);
-                  if (nType === TileType.Water) return false;
-                  const nf = tf[ny * w + nx];
-                  return (nf & TOWN_TILE_FLAG_TREE) !== 0 || (nType === TileType.Floor && (nf & nonGrassMask) === 0);
-                };
-                const edgeMask =
-                  (isGrassNeighbor(tx, ty - 1) ? 1 : 0) |
-                  (isGrassNeighbor(tx + 1, ty) ? 2 : 0) |
-                  (isGrassNeighbor(tx, ty + 1) ? 4 : 0) |
-                  (isGrassNeighbor(tx - 1, ty) ? 8 : 0);
+              // O(1) precomputed overhanging grass-fringe verge overlay
+              if (map && townData.edgeMasks && atlas.roadEdgeSprites.length > 0) {
+                const edgeMask = townData.edgeMasks[ty * map.width + tx] & 0x0f;
                 if (edgeMask !== 0 && atlas.roadEdgeSprites[edgeMask]) {
                   this.queueOrBlitAtlasSprite(
                     ctx,
@@ -1363,14 +1419,9 @@ export class IsometricRenderer {
                 }
               }
             } else if (atlas.townGrassFrames.length > 0) {
-              // Smooth 8-frame harmonic traveling wind-wiggle wave across the meadow grass
-              const nFrames = atlas.townGrassFrames.length;
-              const grassWave =
-                gameTime * 5.2 +
-                tx * 0.32 +
-                ty * 0.21 +
-                Math.sin(gameTime * 1.8 - tx * 0.15) * 0.85;
-              const grassFrame = ((Math.floor(grassWave) % nFrames) + nFrames) % nFrames;
+              // Fast 4-frame traveling wind wave across the meadow grass (zero per-tile Math.sin!)
+              const grassFrame =
+                (Math.floor(gameTime * 2.8) + ((tx + ty) & 3)) % atlas.townGrassFrames.length;
               const sprite = atlas.townGrassFrames[grassFrame][h & 7];
               this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 20, 1.0, true);
             } else {
@@ -1446,24 +1497,25 @@ export class IsometricRenderer {
     }
 
     if (type === TileType.Water) {
-      // Determine which neighboring tiles are also Water so adjacent tiles fuse seamlessly
-      const nWater = map ? map.get(tx, ty - 1) === TileType.Water : false;
-      const sWater = map ? map.get(tx, ty + 1) === TileType.Water : false;
-      const wWater = map ? map.get(tx - 1, ty) === TileType.Water : false;
-      const eWater = map ? map.get(tx + 1, ty) === TileType.Water : false;
-      const shoreMask =
-        (nWater ? 0 : 1) | (eWater ? 0 : 2) | (sWater ? 0 : 4) | (wWater ? 0 : 8);
+      let shoreMask = 0;
+      if (isTown && townData?.edgeMasks && map) {
+        shoreMask = townData.edgeMasks[ty * map.width + tx] >>> 4;
+      } else if (map) {
+        const nWater = map.get(tx, ty - 1) === TileType.Water;
+        const eWater = map.get(tx + 1, ty) === TileType.Water;
+        const sWater = map.get(tx, ty + 1) === TileType.Water;
+        const wWater = map.get(tx - 1, ty) === TileType.Water;
+        shoreMask = (nWater ? 0 : 1) | (eWater ? 0 : 2) | (sWater ? 0 : 4) | (wWater ? 0 : 8);
+      }
       const isDeep = shoreMask === 0;
       const h = spatialHash(tx, ty, 701);
 
       if (atlas && atlas.townWaterShallowFrames.length > 0) {
-        // Fast O(1) pre-baked 8-frame water flowing animation queued to SpriteBatcher
-        const frameIdx = (Math.floor(gameTime * 7.5) + ((tx + ty) & 1)) & 7;
+        const frameIdx = (Math.floor(gameTime * 3.8) + ((tx + ty) & 1)) % atlas.townWaterShallowFrames.length;
         const frames = isDeep ? atlas.townWaterDeepFrames[frameIdx] : atlas.townWaterShallowFrames[frameIdx];
         const sprite = frames[h & 3];
         this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 20, 1.0, true);
 
-        // Queue pre-baked shoreline foam & stone embankment overlay from the Master Texture Sheet!
         if (shoreMask !== 0 && atlas.shorelineSprites[shoreMask]) {
           this.queueOrBlitAtlasSprite(
             ctx,
@@ -1576,7 +1628,7 @@ export class IsometricRenderer {
       const h = spatialHash(tx, ty, 43);
       const sprites = isTown ? atlas.townWallSprites : atlas.wallSprites;
       const sprite = sprites[h % sprites.length];
-      this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 74, alpha, false);
+      this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 36, y - 74, alpha, true);
       return;
     }
 
@@ -1994,45 +2046,18 @@ export class IsometricRenderer {
       species = roll < 5 ? 0 : roll < 8 ? 1 : roll === 8 ? 2 : 3;
     }
 
-    // Continuous 60 FPS spring-harmonic wind-wiggle physics anchored at the tree's root base (x, y)
-    const phase = gameTime * 2.35 - tx * 0.38 - ty * 0.24 + (h & 31) * 0.25;
-    const gustEnvelope = 0.62 + 0.38 * Math.sin(gameTime * 0.85 - tx * 0.14 - ty * 0.09);
-    const primarySway = Math.sin(phase);
-    const secondaryWhip = Math.sin(phase * 2.25 + 0.65) * 0.38;
-    const tertiaryFlutter = Math.cos(phase * 3.6 - 0.4) * 0.14;
-    const windShear = (primarySway + secondaryWhip + tertiaryFlutter) * gustEnvelope * 0.048;
-    const canopyLift = Math.cos(phase * 1.9) * gustEnvelope * 0.015;
-
     if (atlas && atlas.townTreeFrames.length > 0) {
       const nFrames = atlas.townTreeFrames.length;
       const variantIdx = species + ((h & 1) === 0 ? 0 : 4);
-      const treeFrame = ((Math.floor(gameTime * 5.2 + tx * 0.45 + ty * 0.3) % nFrames) + nFrames) % nFrames;
+      const treeFrame = (Math.floor(gameTime * 2.8) + ((tx * 3 + ty * 5) & 3)) % nFrames;
       const sprite = atlas.townTreeFrames[treeFrame][variantIdx];
-      const rect = atlas.rectMap.get(sprite);
-
-      ctx.save();
-      if (alpha < 0.99) ctx.globalAlpha = alpha;
-      // Anchor transform at the root base (x, y) so roots stay planted while trunk & crown wiggle elastically
-      ctx.translate(x, y);
-      ctx.transform(1, canopyLift, windShear, 1 - Math.abs(windShear) * 0.08, 0, 0);
-      if (rect) {
-        ctx.drawImage(
-          atlas.masterSheet,
-          rect.sx,
-          rect.sy,
-          rect.sw,
-          rect.sh,
-          -48,
-          -92,
-          rect.sw,
-          rect.sh
-        );
-      } else {
-        ctx.drawImage(sprite, -48, -92);
-      }
-      ctx.restore();
+      this.queueOrBlitAtlasSprite(ctx, atlas, sprite, x - 48, y - 92, alpha, true);
       return;
     }
+
+    const phase = gameTime * 2.35 - tx * 0.38 - ty * 0.24 + (h & 31) * 0.25;
+    const windShear = Math.sin(phase) * 0.04;
+    const canopyLift = Math.cos(phase * 1.9) * 0.012;
 
     // Lightweight vector fallback for headless tests without offscreen canvas
     ctx.save();
@@ -2934,8 +2959,16 @@ export class IsometricRenderer {
     atlas?: ReturnType<TileAtlasBank['getAtlas']>
   ) {
     if (atlas && atlas.fountainFrames.length > 0) {
-      const frameIdx = Math.floor(gameTime * 9.0) & 7;
-      ctx.drawImage(atlas.fountainFrames[frameIdx], x - 74, y - 92);
+      const frameIdx = Math.floor(gameTime * 4.5) % atlas.fountainFrames.length;
+      this.queueOrBlitAtlasSprite(
+        ctx,
+        atlas,
+        atlas.fountainFrames[frameIdx],
+        x - 74,
+        y - 92,
+        1.0,
+        true
+      );
       return;
     }
 
@@ -3547,6 +3580,7 @@ export class IsometricRenderer {
     playerY: number,
     isPlayerAttacking: boolean,
     lights: DynamicLightSource[],
+    lightCount: number,
     _theme: DungeonThemeConfig,
     isTown: boolean,
     gameTime: number,
@@ -3574,7 +3608,6 @@ export class IsometricRenderer {
       lctx.globalCompositeOperation = 'source-over';
       lctx.clearRect(0, 0, lw, lh);
 
-      // Smoothly interpolated ambient darkness driven by 24-hour DaylightState in Town-1, or deep abyss darkness in Dungeon
       if (isTown && daylight) {
         const darkAlpha = Math.min(0.68, Math.max(0.0, daylight.ambientDarkness));
         const [r, g, b] = daylight.shadowTintRgb ?? [10, 18, 36];
@@ -3584,7 +3617,6 @@ export class IsometricRenderer {
       }
       lctx.fillRect(0, 0, lw, lh);
 
-      // Cut out natural anisotropic ground-hugging light fields using destination-out
       lctx.globalCompositeOperation = 'destination-out';
 
       const punchLight = (sx: number, sy: number, radius: number, strength: number, seed = 0) => {
@@ -3592,14 +3624,12 @@ export class IsometricRenderer {
         const lx = sx * scaleX;
         const ly = sy * scaleY;
         const lr = Math.max(4, radius * scaleX);
-        // 2.5D Isometric ground-plane light spread (wider horizontally along the ground diamond, organically breathing)
         const breatheX = 1.32 + Math.sin(gameTime * 2.7 + seed) * 0.05;
         const breatheY = 0.86 + Math.cos(gameTime * 3.1 + seed * 1.3) * 0.04;
         const rx = lr * breatheX;
         const ry = lr * breatheY;
 
         if (this.lightCutoutSprite) {
-          // 1. Wide, soft outer atmospheric ground scatter (eliminates any circular boundary perception)
           lctx.globalAlpha = Math.min(1, strength * 0.46);
           lctx.drawImage(
             this.lightCutoutSprite,
@@ -3608,7 +3638,6 @@ export class IsometricRenderer {
             rx * 2.96,
             ry * 2.76
           );
-          // 2. Primary isometric elliptical light diffusion
           lctx.globalAlpha = Math.min(1, strength * 0.92);
           lctx.drawImage(this.lightCutoutSprite, lx - rx, ly - ry, rx * 2, ry * 2);
         } else {
@@ -3623,28 +3652,20 @@ export class IsometricRenderer {
         }
       };
 
-      // Hero lantern light cutout (spreads naturally across the isometric floor around the hero)
       punchLight(playerX, playerY - 12, heroRadius, 0.96, 1.1);
 
-      // Environmental, Window, Street Lantern, & Spell light cutouts
-      for (let i = 0; i < lights.length; i++) {
+      for (let i = 0; i < lightCount; i++) {
         const l = lights[i];
-        if (l.x < -260 || l.x > this.width + 260 || l.y < -260 || l.y > this.height + 260) {
-          continue;
-        }
         punchLight(l.x, l.y, l.radius, l.intensity, i * 1.7);
       }
 
       lctx.globalAlpha = 1;
       lctx.restore();
 
-      // Composite the offscreen lightmap over the main gameplay viewport
-      ctx.save();
       ctx.drawImage(this.lightmapCanvas, 0, 0, this.width, this.height);
-      ctx.restore();
     }
 
-    // 2. Natural Feathered Isometric Colored Illumination Diffusion (Zero hard circular arcs!)
+    // 2. Pre-baked Colored Illumination Sprites (zero per-frame createRadialGradient!)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
@@ -3658,26 +3679,17 @@ export class IsometricRenderer {
       if (alpha <= 0.004 || radius <= 2) return;
       const rx = radius * 1.36;
       const ry = radius * 0.84;
-      ctx.save();
-      ctx.translate(lx, ly);
-      ctx.scale(1, ry / rx);
-      ctx.globalAlpha = Math.min(1, alpha);
-      const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, rx);
-      grad.addColorStop(0.0, color);
-      grad.addColorStop(0.42, color);
-      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(0, 0, rx, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      const sprite = this.getColoredLightSprite(color);
+      if (sprite) {
+        ctx.globalAlpha = Math.min(1, alpha);
+        ctx.drawImage(sprite, lx - rx, ly - ry, rx * 2, ry * 2);
+      }
     };
 
     const bloomBoost = isTown ? 0.08 + 0.08 * lanternFactor : 0.13;
-    for (const l of lights) {
-      if (l.intensity <= 0.02 || l.x < -200 || l.x > this.width + 200 || l.y < -200 || l.y > this.height + 200) {
-        continue;
-      }
+    for (let i = 0; i < lightCount; i++) {
+      const l = lights[i];
+      if (l.intensity <= 0.02) continue;
       drawSoftColoredLight(l.x, l.y, l.radius * 0.72, l.color, bloomBoost * l.intensity);
     }
 
@@ -3691,6 +3703,7 @@ export class IsometricRenderer {
       );
     }
 
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
@@ -3699,27 +3712,49 @@ export class IsometricRenderer {
     _camera: Camera,
     theme: DungeonThemeConfig,
     isTown: boolean,
-    gameTime: number
+    _gameTime: number
   ) {
     if (isTown) return;
-    // Subtle atmospheric dungeon depth fog at viewport perimeter
-    ctx.save();
-    const outerRadius = Math.hypot(this.width, this.height) * 0.55;
-    const innerRadius = Math.min(this.width, this.height) * 0.34;
-    const fogGrad = ctx.createRadialGradient(
-      this.width * 0.5,
-      this.height * 0.5,
-      innerRadius,
-      this.width * 0.5,
-      this.height * 0.5,
-      outerRadius
-    );
-    const pulse = 0.24 + Math.sin(gameTime * 1.5) * 0.03;
-    fogGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    fogGrad.addColorStop(0.75, theme.fogColor || 'rgba(15, 23, 42, 0.14)');
-    fogGrad.addColorStop(1, `rgba(2, 4, 9, ${pulse.toFixed(2)})`);
-    ctx.fillStyle = fogGrad;
-    ctx.fillRect(0, 0, this.width, this.height);
-    ctx.restore();
+    const fw = Math.max(1, Math.floor(this.width * 0.25));
+    const fh = Math.max(1, Math.floor(this.height * 0.25));
+
+    if (
+      !this.fogCanvas ||
+      this.fogCanvas.width !== fw ||
+      this.fogCanvas.height !== fh ||
+      this.fogThemeId !== theme.id
+    ) {
+      if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+        if (!this.fogCanvas) {
+          this.fogCanvas = document.createElement('canvas');
+        }
+        this.fogCanvas.width = fw;
+        this.fogCanvas.height = fh;
+        const fctx = this.fogCanvas.getContext('2d');
+        if (fctx) {
+          const outerRadius = Math.hypot(fw, fh) * 0.55;
+          const innerRadius = Math.min(fw, fh) * 0.34;
+          const fogGrad = fctx.createRadialGradient(
+            fw * 0.5,
+            fh * 0.5,
+            innerRadius,
+            fw * 0.5,
+            fh * 0.5,
+            outerRadius
+          );
+          fogGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+          fogGrad.addColorStop(0.75, theme.fogColor || 'rgba(15, 23, 42, 0.14)');
+          fogGrad.addColorStop(1, 'rgba(2, 4, 9, 0.24)');
+          fctx.clearRect(0, 0, fw, fh);
+          fctx.fillStyle = fogGrad;
+          fctx.fillRect(0, 0, fw, fh);
+          this.fogThemeId = theme.id;
+        }
+      }
+    }
+
+    if (this.fogCanvas) {
+      ctx.drawImage(this.fogCanvas, 0, 0, this.width, this.height);
+    }
   }
 }

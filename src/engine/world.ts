@@ -46,6 +46,7 @@ export class TileMap {
   originX: number;
   originY: number;
   tiles: TileType[];
+  private perimeterWallMask: Uint8Array | null = null;
 
   constructor(width: number, height: number, tileSize = 64, originX = 0, originY = 0) {
     this.width = width;
@@ -69,7 +70,42 @@ export class TileMap {
   set(x: number, y: number, type: TileType): void {
     if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
       this.tiles[y * this.width + x] = type;
+      this.perimeterWallMask = null;
     }
+  }
+
+  isPerimeterWall(tx: number, ty: number): boolean {
+    if (tx < 0 || tx >= this.width || ty < 0 || ty >= this.height) return false;
+    if (!this.perimeterWallMask) {
+      const w = this.width;
+      const h = this.height;
+      const mask = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) {
+        const rowOff = y * w;
+        for (let x = 0; x < w; x++) {
+          if (this.tiles[rowOff + x] !== TileType.Wall) continue;
+          let perim = 0;
+          for (let dy = -1; dy <= 1 && !perim; dy++) {
+            const ny = y + dy;
+            if (ny < 0 || ny >= h) continue;
+            const nRow = ny * w;
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const nx = x + dx;
+              if (nx < 0 || nx >= w) continue;
+              const nb = this.tiles[nRow + nx];
+              if (nb !== TileType.Wall && nb !== TileType.Empty) {
+                perim = 1;
+                break;
+              }
+            }
+          }
+          mask[rowOff + x] = perim;
+        }
+      }
+      this.perimeterWallMask = mask;
+    }
+    return this.perimeterWallMask[ty * this.width + tx] === 1;
   }
 
   Get(x: number, y: number): TileType { return this.get(x, y); }

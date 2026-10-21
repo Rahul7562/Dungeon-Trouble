@@ -26,7 +26,7 @@ export const CombatLog: React.FC<CombatLogProps> = ({ logs }) => {
   };
 
   return (
-    <div className="pointer-events-auto absolute bottom-4 left-4 z-20 w-72 md:w-80 bg-slate-950/85 backdrop-blur border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
+    <div className="pointer-events-auto absolute bottom-4 left-4 z-20 w-72 md:w-80 bg-slate-950/95 border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
       {/* Header */}
       <div
         onClick={() => setCollapsed(!collapsed)}

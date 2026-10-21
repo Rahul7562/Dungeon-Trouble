@@ -294,7 +294,7 @@ export const App: React.FC = () => {
           onPointerMove={handleGuidePointerMove}
           onPointerUp={handleGuidePointerUp}
           onPointerCancel={handleGuidePointerUp}
-          className={`absolute z-20 max-w-xs backdrop-blur-md rounded-xl p-4 text-xs ${
+          className={`absolute z-20 max-w-xs rounded-xl p-4 text-xs ${
             showHelpGuide ? 'controls-guide-enter pointer-events-auto' : 'controls-guide-hidden'
           } ${isDraggingGuide ? 'controls-guide-dragging' : ''}`}
         >

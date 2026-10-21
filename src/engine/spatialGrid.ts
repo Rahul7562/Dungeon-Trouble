@@ -26,7 +26,7 @@ export class SpatialGrid<T extends object> {
   readonly rows: number;
   private readonly cells: SpatialCell<T>[];
   private generation = 1;
-  private readonly seenSet = new WeakSet<T>();
+  private readonly seenSet = new Set<T>();
 
   constructor(width: number, height: number, cellSize = 256) {
     this.width = Math.max(cellSize, width);
@@ -103,7 +103,8 @@ export class SpatialGrid<T extends object> {
       return out;
     }
 
-    const seen = new Set<T>();
+    const seen = this.seenSet;
+    seen.clear();
     for (let cy = minCy; cy <= maxCy; cy++) {
       const rowOffset = cy * this.cols;
       for (let cx = minCx; cx <= maxCx; cx++) {
@@ -118,6 +119,7 @@ export class SpatialGrid<T extends object> {
         }
       }
     }
+    seen.clear();
     return out;
   }
 

@@ -143,7 +143,7 @@ export const HUD: React.FC<HUDProps> = ({
       {/* Top Header: Floor, Level, Gold & Quick Menus */}
       <div className="flex items-start justify-between">
         {/* Floor & Objective */}
-        <div className="pointer-events-auto bg-slate-900/85 backdrop-blur border border-slate-800 rounded-xl px-4 py-3 shadow-xl">
+        <div className="pointer-events-auto bg-slate-900/95 border border-slate-800 rounded-xl px-4 py-3 shadow-xl">
           <div className="flex items-center gap-2">
             <span className="font-cinzel font-bold text-amber-400 text-lg">
               {isTown ? 'Town-1: Sanctuary' : `Floor ${currentFloor}: ${themeName}`}
@@ -168,7 +168,7 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         {/* Action buttons (Hero, Inventory, Audio, Menu) */}
-        <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/90 backdrop-blur border border-slate-800 p-1.5 rounded-2xl shadow-xl">
+        <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/95 border border-slate-800 p-1.5 rounded-2xl shadow-xl">
           <button
             id="char-sheet-btn"
             onClick={onOpenCharacterSheet}
@@ -220,7 +220,7 @@ export const HUD: React.FC<HUDProps> = ({
       {/* Bottom Bar: Health, Mana, XP, Skills, Potions */}
       <div className="flex flex-col items-center gap-2">
         {/* Experience Progression Bar */}
-        <div className="w-full max-w-xl bg-slate-950/80 backdrop-blur border border-slate-800/80 rounded-full h-3 p-0.5 shadow-inner">
+        <div className="w-full max-w-xl bg-slate-950/90 border border-slate-800/80 rounded-full h-3 p-0.5 shadow-inner">
           <div
             className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300"
             style={{ width: `${xpPct}%` }}
@@ -272,7 +272,7 @@ export const HUD: React.FC<HUDProps> = ({
         )}
 
         {/* Central HUD Panel */}
-        <div className="pointer-events-auto flex items-center gap-3.5 bg-slate-900/90 backdrop-blur-md border border-slate-800/90 px-5 py-3 rounded-2xl shadow-2xl">
+        <div className="pointer-events-auto flex items-center gap-3.5 bg-slate-900/95 border border-slate-800/90 px-5 py-3 rounded-2xl shadow-2xl">
           {/* Health Bar / Stat + Quick Health Potion */}
           <div className="flex items-center gap-2.5">
             <button
