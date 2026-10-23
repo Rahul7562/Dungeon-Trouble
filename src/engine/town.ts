@@ -263,8 +263,8 @@ export function generateTownLevel(): GeneratedTown {
       kind,
       x: pos.x + offsetX,
       y: pos.y + offsetY,
-      solid: kind !== 'rug',
-      radius: kind === 'rug' ? 0 : 14,
+      solid: kind !== 'rug' && kind !== 'bush',
+      radius: kind === 'rug' || kind === 'bush' ? 0 : 14,
       variant,
       lightColor,
       lightRadius,
@@ -845,6 +845,55 @@ export function generateTownLevel(): GeneratedTown {
   for (const rl of roadsideLanterns) {
     if (map.get(rl.x, rl.y) === TileType.Floor) {
       addProp('street_lantern', rl.x, rl.y, 0, 0, 0);
+    }
+  }
+
+  // 7B. Lush Leafy Bushes, Pink-Blossoming Shrubs & Wildflower Clumps (Matching image.png)
+  // Placed around the Fountain Plaza perimeter, along country paths, and beside cottages
+  const townBushes: Array<{ x: number; y: number; ox?: number; oy?: number; v: number }> = [
+    // Framing the Sanctuary Fountain Plaza
+    { x: 43, y: 43, v: 1 },
+    { x: 53, y: 43, v: 0 },
+    { x: 43, y: 49, v: 0 },
+    { x: 53, y: 49, v: 1 },
+    { x: 45, y: 41, v: 2 },
+    { x: 51, y: 41, v: 1 },
+    { x: 45, y: 51, v: 1 },
+    { x: 51, y: 51, v: 2 },
+    // Along North Highroad & Elder Manor gardens
+    { x: 46, y: 37, v: 0 },
+    { x: 50, y: 37, v: 1 },
+    { x: 46, y: 28, v: 2 },
+    { x: 50, y: 24, v: 1 },
+    { x: 44, y: 18, v: 1 },
+    { x: 52, y: 18, v: 0 },
+    // Griffin Tavern & Western Smithy approaches
+    { x: 16, y: 21, v: 1 },
+    { x: 22, y: 20, v: 0 },
+    { x: 35, y: 44, v: 2 },
+    { x: 24, y: 48, v: 0 },
+    { x: 13, y: 50, v: 1 },
+    { x: 20, y: 50, v: 2 },
+    // East Market Road & Abbey Trail
+    { x: 56, y: 45, v: 0 },
+    { x: 60, y: 48, v: 1 },
+    { x: 74, y: 48, v: 1 },
+    { x: 82, y: 48, v: 0 },
+    { x: 76, y: 19, v: 1 },
+    { x: 81, y: 19, v: 2 },
+    // Southern Meadows, Weaver's Lodge & Miller's Homestead
+    { x: 47, y: 56, v: 0 },
+    { x: 50, y: 64, v: 1 },
+    { x: 46, y: 81, v: 1 },
+    { x: 52, y: 81, v: 0 },
+    { x: 76, y: 81, v: 1 },
+    { x: 81, y: 81, v: 2 },
+    { x: 16, y: 80, v: 0 },
+    { x: 22, y: 80, v: 1 },
+  ];
+  for (const tb of townBushes) {
+    if (map.get(tb.x, tb.y) === TileType.Floor && !interiorTiles.has(`${tb.x},${tb.y}`)) {
+      addProp('bush', tb.x, tb.y, tb.ox ?? 0, tb.oy ?? 0, tb.v);
     }
   }
 

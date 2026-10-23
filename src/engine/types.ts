@@ -288,7 +288,8 @@ export type DungeonPropKind =
   | 'well'
   | 'street_lantern'
   | 'market_stall'
-  | 'bench';
+  | 'bench'
+  | 'bush';
 
 export interface DungeonProp {
   id: string;

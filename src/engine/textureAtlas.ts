@@ -640,241 +640,189 @@ export class TileAtlasBank {
     ctx.closePath();
 
     if (isRoad) {
-      // High-Resolution Hand-Crafted Compacted Earth & Shovel-Tamped Path Block
-      // 1. Rich multi-stop warm golden-ochre & sun-baked loam base gradient (zero grid seam artifacts)
-      const baseGrad = ctx.createLinearGradient(cx - hw * 0.6, cy - hh, cx + hw * 0.6, cy + hh);
-      baseGrad.addColorStop(0.0, '#ac8e55');
-      baseGrad.addColorStop(0.45, '#9e8049');
-      baseGrad.addColorStop(1.0, '#91733e');
+      // Reference Image Path Tile: Warm Biscuit-Tan / Sandy-Earth Dirt Path with Grey River Pebbles & Soil Contours
+      const baseGrad = ctx.createLinearGradient(cx - hw * 0.5, cy - hh, cx + hw * 0.5, cy + hh);
+      baseGrad.addColorStop(0.0, '#c29a70');
+      baseGrad.addColorStop(0.5, '#b68e65');
+      baseGrad.addColorStop(1.0, '#a88058');
       ctx.fillStyle = baseGrad;
       ctx.fill();
 
       ctx.save();
       ctx.clip();
 
-      // 2. Organic Coherent Soil Compaction Patches (smooth isometric lozenges with soft alpha blending)
-      for (let p = 0; p < 14; p++) {
+      // 1. Smooth Rounded Tan Soil Contour Patches (matching the subtle darker/lighter dirt patches in image.png)
+      for (let p = 0; p < 10; p++) {
         const ph = spatialHash(p + variant * 13, variant * 7 + p, 313);
-        const u = ((ph & 0xff) / 255) * 0.84 + 0.08;
-        const v = (((ph >>> 8) & 0xff) / 255) * 0.84 + 0.08;
-        const du = (((ph >>> 16) & 0x1f) / 31) * 0.16 + 0.10;
-        const dv = (((ph >>> 21) & 0x1f) / 31) * 0.16 + 0.10;
+        const u = ((ph & 0xff) / 255) * 0.78 + 0.11;
+        const v = (((ph >>> 8) & 0xff) / 255) * 0.78 + 0.11;
+        const pt = isoUV(cx, cy, u, v, 32.0, 16.0);
+        const rx = 3.2 + (((ph >>> 16) & 7) / 7) * 4.2;
+        const ry = rx * 0.5;
 
-        const c0 = isoUV(cx, cy, u - du * 0.5, v - dv * 0.5, 33.0, 16.5);
-        const c1 = isoUV(cx, cy, u + du * 0.5, v - dv * 0.5, 33.0, 16.5);
-        const c2 = isoUV(cx, cy, u + du * 0.5, v + dv * 0.5, 33.0, 16.5);
-        const c3 = isoUV(cx, cy, u - du * 0.5, v + dv * 0.5, 33.0, 16.5);
-
-        const isLight = (ph & 3) !== 0;
-        ctx.fillStyle = isLight ? 'rgba(194, 164, 102, 0.24)' : 'rgba(116, 87, 44, 0.22)';
+        const isLight = (ph & 3) === 0;
+        ctx.fillStyle = isLight ? 'rgba(212, 174, 132, 0.36)' : 'rgba(148, 108, 70, 0.34)';
         ctx.beginPath();
-        ctx.moveTo(c0.x, c0.y);
-        ctx.lineTo(c1.x, c1.y);
-        ctx.lineTo(c2.x, c2.y);
-        ctx.lineTo(c3.x, c3.y);
-        ctx.closePath();
+        ctx.ellipse(pt.x, pt.y, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // 3. Shovel-Tamped Compaction Striations & Footpath Wear Contours
-      // Crisp dual-tone horizontal/isometric-aligned tamped ridges (sunlit crest + compacted shadow trough)
-      const striationCount = 9;
-      ctx.lineCap = 'round';
-      for (let s = 0; s < striationCount; s++) {
-        const sh = spatialHash(s + variant * 17, variant * 11, 619);
-        const uStart = ((sh & 0x3f) / 63) * 0.52 + 0.08;
-        const vPos = (s + 0.8) / (striationCount + 0.6) + (((sh >>> 6) & 0x0f) / 15 - 0.5) * 0.05;
-        const spanU = 0.22 + (((sh >>> 10) & 0x1f) / 31) * 0.22;
-
-        const pA = isoUV(cx, cy, uStart, vPos, 32.5, 16.25);
-        const pMid = isoUV(
-          cx,
-          cy,
-          uStart + spanU * 0.5,
-          vPos + (((sh >>> 15) & 3) - 1.5) * 0.025,
-          32.5,
-          16.25
-        );
-        const pB = isoUV(cx, cy, Math.min(0.94, uStart + spanU), vPos, 32.5, 16.25);
-
-        // Compacted furrow shadow trough
-        ctx.strokeStyle = 'rgba(110, 82, 40, 0.42)';
-        ctx.lineWidth = 1.15;
-        ctx.beginPath();
-        ctx.moveTo(pA.x, pA.y);
-        ctx.quadraticCurveTo(pMid.x, pMid.y, pB.x, pB.y);
-        ctx.stroke();
-
-        // Sun-baked ochre crest highlight immediately below the furrow
-        ctx.strokeStyle = 'rgba(208, 178, 114, 0.48)';
-        ctx.lineWidth = 0.9;
-        ctx.beginPath();
-        ctx.moveTo(pA.x, pA.y + 0.75);
-        ctx.quadraticCurveTo(pMid.x, pMid.y + 0.75, pB.x, pB.y + 0.75);
-        ctx.stroke();
-      }
-
-      // 4. High-Definition Embedded Sandstone Pebbles & Quartz/Flint Clasts
-      const pebbleCount = 7 + (variant % 3);
+      // 2. Embedded Grey River Stones & Warm Tan Pebbles (matching the distinct grey & brown pebbles in image.png)
+      const pebbleCount = 5 + (variant % 3);
       for (let i = 0; i < pebbleCount; i++) {
         const ph = spatialHash(variant * 23 + i, i * 19 + variant, 853);
-        const u = ((ph & 0xff) / 255) * 0.76 + 0.12;
-        const v = (((ph >>> 8) & 0xff) / 255) * 0.76 + 0.12;
-        const pt = isoUV(cx, cy, u, v, 31.5, 15.75);
-        const rx = 1.15 + ((ph >>> 16) & 3) * 0.32;
-        const ry = rx * 0.58;
-        const rot = (((ph >>> 18) & 7) - 3.5) * 0.12;
+        const u = ((ph & 0xff) / 255) * 0.72 + 0.14;
+        const v = (((ph >>> 8) & 0xff) / 255) * 0.72 + 0.14;
+        const pt = isoUV(cx, cy, u, v, 31.0, 15.5);
+        const isGreyStone = (i + variant) % 2 === 0;
+        const rx = isGreyStone ? 2.1 + ((ph >>> 16) & 3) * 0.45 : 1.4 + ((ph >>> 16) & 3) * 0.3;
+        const ry = rx * 0.56;
+        const rot = (((ph >>> 18) & 7) - 3.5) * 0.1;
 
-        // Crisp recessed pocket contact shadow
-        ctx.fillStyle = 'rgba(78, 56, 26, 0.55)';
+        // Crisp dark-earth pocket shadow underneath stone
+        ctx.fillStyle = 'rgba(92, 62, 35, 0.65)';
         ctx.beginPath();
-        ctx.ellipse(pt.x + 0.45, pt.y + 0.45, rx + 0.25, ry + 0.15, rot, 0, Math.PI * 2);
+        ctx.ellipse(pt.x + 0.4, pt.y + 0.55, rx + 0.35, ry + 0.25, rot, 0, Math.PI * 2);
         ctx.fill();
 
-        // Sandstone / ochre pebble body
-        const pebbleColors = ['#b89b64', '#947846', '#c4a870', '#876b3a'];
-        ctx.fillStyle = pebbleColors[(ph >>> 21) & 3];
+        // Main pebble body (cool slate-grey river stone or warm brown stone as in image.png)
+        ctx.fillStyle = isGreyStone
+          ? (ph & 4) !== 0
+            ? '#8b9196'
+            : '#787e84'
+          : '#8c6947';
         ctx.beginPath();
         ctx.ellipse(pt.x, pt.y, rx, ry, rot, 0, Math.PI * 2);
         ctx.fill();
 
-        // Specular sunlit top-left micro-highlight
-        ctx.fillStyle = 'rgba(235, 212, 158, 0.72)';
+        // Sunlit top-left bevel highlight on stone
+        ctx.fillStyle = isGreyStone ? '#b8bec4' : '#b5906b';
         ctx.beginPath();
-        ctx.ellipse(pt.x - rx * 0.28, pt.y - ry * 0.28, rx * 0.48, ry * 0.45, rot, 0, Math.PI * 2);
+        ctx.ellipse(pt.x - rx * 0.24, pt.y - ry * 0.26, rx * 0.52, ry * 0.46, rot, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // 5. Fine High-DPI Sand & Loam Micro-Grains (sub-pixel detail at 2x resolution)
-      for (let g = 0; g < 26; g++) {
+      // 3. Subtle Fine Dirt Specks
+      for (let g = 0; g < 16; g++) {
         const gh = spatialHash(variant * 31 + g, g * 7, 991);
-        const u = ((gh & 0xff) / 255) * 0.86 + 0.07;
-        const v = (((gh >>> 8) & 0xff) / 255) * 0.86 + 0.07;
+        const u = ((gh & 0xff) / 255) * 0.84 + 0.08;
+        const v = (((gh >>> 8) & 0xff) / 255) * 0.84 + 0.08;
         const gpt = isoUV(cx, cy, u, v, 32.0, 16.0);
-        ctx.fillStyle = (gh & 1) === 0 ? 'rgba(222, 194, 132, 0.55)' : 'rgba(98, 72, 34, 0.48)';
+        ctx.fillStyle = (gh & 1) === 0 ? 'rgba(218, 182, 140, 0.55)' : 'rgba(132, 94, 58, 0.50)';
         ctx.beginPath();
-        ctx.arc(gpt.x, gpt.y, 0.55, 0, Math.PI * 2);
+        ctx.arc(gpt.x, gpt.y, 0.65, 0, Math.PI * 2);
         ctx.fill();
       }
     } else {
-      // High-Resolution Sunlit Meadow Grass Block Texture (2x supersampled)
+      // Reference Image Lush Emerald-Lime Meadow Grass Tile
       const grassGrad = ctx.createLinearGradient(cx - hw * 0.5, cy - hh, cx + hw * 0.5, cy + hh);
-      grassGrad.addColorStop(0.0, '#4ca63d');
-      grassGrad.addColorStop(0.5, '#469c38');
-      grassGrad.addColorStop(1.0, '#3e9031');
+      grassGrad.addColorStop(0.0, '#55b32e');
+      grassGrad.addColorStop(0.5, '#48a126');
+      grassGrad.addColorStop(1.0, '#3d8f20');
       ctx.fillStyle = grassGrad;
       ctx.fill();
 
       ctx.save();
       ctx.clip();
 
-      // 1. Smooth Organic Meadow Turf Dappling (replaces harsh low-res grid cells)
-      for (let p = 0; p < 12; p++) {
+      // 1. Soft Sunlit Lime & Deep Forest Turf Dappling
+      for (let p = 0; p < 10; p++) {
         const gh = spatialHash(p + variant * 9, variant * 5 + p, 271);
-        const u = ((gh & 0xff) / 255) * 0.84 + 0.08;
-        const v = (((gh >>> 8) & 0xff) / 255) * 0.84 + 0.08;
-        const du = 0.14 + (((gh >>> 16) & 0x0f) / 15) * 0.14;
-        const dv = 0.14 + (((gh >>> 20) & 0x0f) / 15) * 0.14;
-        const c0 = isoUV(cx, cy, u - du * 0.5, v - dv * 0.5, 33.0, 16.5);
-        const c1 = isoUV(cx, cy, u + du * 0.5, v - dv * 0.5, 33.0, 16.5);
-        const c2 = isoUV(cx, cy, u + du * 0.5, v + dv * 0.5, 33.0, 16.5);
-        const c3 = isoUV(cx, cy, u - du * 0.5, v + dv * 0.5, 33.0, 16.5);
+        const u = ((gh & 0xff) / 255) * 0.82 + 0.09;
+        const v = (((gh >>> 8) & 0xff) / 255) * 0.82 + 0.09;
+        const pt = isoUV(cx, cy, u, v, 32.0, 16.0);
+        const rx = 4.2 + ((gh >>> 16) & 7) * 0.65;
+        const ry = rx * 0.5;
 
-        ctx.fillStyle = (gh & 1) === 0 ? 'rgba(94, 190, 72, 0.22)' : 'rgba(42, 114, 34, 0.20)';
+        ctx.fillStyle = (gh & 1) === 0 ? 'rgba(122, 212, 59, 0.22)' : 'rgba(34, 98, 22, 0.20)';
         ctx.beginPath();
-        ctx.moveTo(c0.x, c0.y);
-        ctx.lineTo(c1.x, c1.y);
-        ctx.lineTo(c2.x, c2.y);
-        ctx.lineTo(c3.x, c3.y);
-        ctx.closePath();
+        ctx.ellipse(pt.x, pt.y, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // 2. Layered Grass Blade Clumps with Harmonic Spring-Wiggle Physics (4-frame cycle)
+      // 2. Fan-Shaped Grass Blade Clumps (Matching the crisp 5-blade grass tuft sprite in image.png)
       const swayPhase = (swayFrame / 4) * Math.PI * 2;
-      const tuftCount = 4 + (variant % 2);
+      const tuftCount = 3 + (variant % 2);
       for (let t = 0; t < tuftCount; t++) {
         const th = spatialHash(variant * 11 + t, t, 509);
-        const u = ((th & 0xff) / 255) * 0.62 + 0.19;
-        const v = (((th >>> 8) & 0xff) / 255) * 0.62 + 0.19;
+        const u = ((th & 0xff) / 255) * 0.60 + 0.20;
+        const v = (((th >>> 8) & 0xff) / 255) * 0.60 + 0.20;
         const pt = isoUV(cx, cy, u, v, 30, 15);
-        // Primary breeze wave + secondary harmonic whip at blade tips
-        const primarySway = Math.sin(swayPhase + t * 0.75 + variant * 0.5);
-        const secondaryWhip = Math.sin(swayPhase * 2 - t * 0.6 + variant) * 0.35;
-        const windBend = (primarySway + secondaryWhip) * 2.5;
+        const windBend = Math.sin(swayPhase + t * 0.8 + variant * 0.5) * 1.6;
 
-        // Soft emerald-moss shadow under grass tuft
-        ctx.fillStyle = 'rgba(24, 78, 22, 0.45)';
+        // Ground shadow oval under grass clump
+        ctx.fillStyle = 'rgba(20, 62, 14, 0.48)';
         ctx.beginPath();
-        ctx.ellipse(pt.x, pt.y + 1.1, 4.0, 1.4, 0, 0, Math.PI * 2);
+        ctx.ellipse(pt.x, pt.y + 1.2, 4.4, 1.6, 0, 0, Math.PI * 2);
         ctx.fill();
 
         const blades = [
-          { dx: -2.8, dy: -3.4, col: '#287221', swayScale: 0.75 },
-          { dx: -1.3, dy: -4.8, col: '#3b9630', swayScale: 1.0 },
-          { dx: 0.3, dy: -5.4, col: '#76d656', swayScale: 1.2 },
-          { dx: 1.7, dy: -4.4, col: '#58bd44', swayScale: 1.05 },
-          { dx: 3.0, dy: -3.1, col: '#2f8226', swayScale: 0.8 },
+          { dx: -3.2, dy: -3.4, col: '#256e18', swayScale: 0.7 },
+          { dx: -1.6, dy: -5.0, col: '#3b9624', swayScale: 0.95 },
+          { dx: 0.0, dy: -5.8, col: '#84cc16', swayScale: 1.15 },
+          { dx: 1.6, dy: -4.8, col: '#65c431', swayScale: 1.0 },
+          { dx: 3.1, dy: -3.2, col: '#2d7d1d', swayScale: 0.75 },
         ];
-        ctx.lineWidth = 1.1;
+        ctx.lineWidth = 1.25;
         ctx.lineCap = 'round';
         for (const bl of blades) {
           const tipBend = windBend * bl.swayScale;
           ctx.strokeStyle = bl.col;
           ctx.beginPath();
-          ctx.moveTo(pt.x + bl.dx * 0.3, pt.y + 0.8);
+          ctx.moveTo(pt.x + bl.dx * 0.28, pt.y + 0.8);
           ctx.quadraticCurveTo(
             pt.x + bl.dx * 0.6 + tipBend * 0.4,
             pt.y + bl.dy * 0.55,
             pt.x + bl.dx + tipBend,
-            pt.y + bl.dy + Math.abs(tipBend) * 0.2
+            pt.y + bl.dy
           );
           ctx.stroke();
         }
       }
 
-      // 3. Swaying Wildflowers & Lupine Spikes on Meadow Variants
-      const flowerSway = (Math.sin(swayPhase + variant) + Math.sin(swayPhase * 2 + 0.5) * 0.3) * 2.2;
-      if (variant === 2 || variant === 6) {
-        const lPt = isoUV(cx, cy, variant === 2 ? 0.46 : 0.54, 0.48, 28, 14);
-        ctx.fillStyle = '#256b20';
+      // 3. Blooming Wildflower Clumps on Variants 1, 2, 4, 6 (Matching the 3-blossom flower tuft in image.png)
+      const flowerSway = Math.sin(swayPhase + variant) * 1.4;
+      if (variant === 1 || variant === 2 || variant === 4 || variant === 6) {
+        const fPt = isoUV(cx, cy, variant % 2 === 0 ? 0.48 : 0.54, 0.48, 28, 14);
+        // Dark foliage rosette base
+        ctx.fillStyle = '#1e5614';
         ctx.beginPath();
-        ctx.ellipse(lPt.x, lPt.y + 1.5, 4.5, 2.0, 0, 0, Math.PI * 2);
+        ctx.ellipse(fPt.x, fPt.y + 1.4, 5.2, 2.3, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = '#3b9630';
-        ctx.lineWidth = 1.25;
+        // Broad green basal leaves fanning out
+        ctx.fillStyle = '#48a126';
         ctx.beginPath();
-        ctx.moveTo(lPt.x, lPt.y + 1);
-        ctx.quadraticCurveTo(lPt.x + flowerSway * 0.45, lPt.y - 4, lPt.x + flowerSway, lPt.y - 9);
-        ctx.stroke();
+        ctx.ellipse(fPt.x - 2.6, fPt.y + 0.5, 2.8, 1.2, -0.35, 0, Math.PI * 2);
+        ctx.ellipse(fPt.x + 2.6, fPt.y + 0.5, 2.8, 1.2, 0.35, 0, Math.PI * 2);
+        ctx.ellipse(fPt.x, fPt.y - 0.2, 2.4, 1.3, 0, 0, Math.PI * 2);
+        ctx.fill();
 
-        const florets = [
-          { ox: -1.5, oy: -2.5, r: 1.6, col: '#7c3aed', hFrac: 0.3 },
-          { ox: 1.5, oy: -3.0, r: 1.6, col: '#8b5cf6', hFrac: 0.35 },
-          { ox: -1.3, oy: -4.8, r: 1.5, col: '#a78bfa', hFrac: 0.55 },
-          { ox: 1.3, oy: -5.2, r: 1.5, col: '#c4b5fd', hFrac: 0.6 },
-          { ox: -0.9, oy: -7.0, r: 1.3, col: '#ddd6fe', hFrac: 0.8 },
-          { ox: 0.9, oy: -7.3, r: 1.3, col: '#ede9fe', hFrac: 0.85 },
-          { ox: 0, oy: -9.0, r: 1.2, col: '#f5f3ff', hFrac: 1.0 },
+        // 3 Flower Stems & Multi-Petal Blossoms (Orange, Yellow, Pink/White as in image.png)
+        const stems = [
+          { ox: -2.6, oy: -4.2, petal: variant === 2 ? '#f472b6' : '#fb923c', core: '#fef08a' },
+          { ox: 0.2, oy: -5.6, petal: '#facc15', core: '#b45309' },
+          { ox: 2.8, oy: -3.8, petal: variant === 6 ? '#f8fafc' : '#fb923c', core: '#facc15' },
         ];
-        for (const fl of florets) {
-          ctx.fillStyle = fl.col;
+        ctx.strokeStyle = '#2d7d1d';
+        ctx.lineWidth = 1.1;
+        for (const st of stems) {
+          const bx = fPt.x + st.ox + flowerSway * 0.5;
+          const by = fPt.y + st.oy;
           ctx.beginPath();
-          ctx.arc(lPt.x + fl.ox + flowerSway * fl.hFrac, lPt.y + fl.oy, fl.r, 0, Math.PI * 2);
+          ctx.moveTo(fPt.x + st.ox * 0.3, fPt.y + 0.5);
+          ctx.lineTo(bx, by);
+          ctx.stroke();
+
+          ctx.fillStyle = st.petal;
+          ctx.beginPath();
+          ctx.arc(bx, by, 1.75, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = st.core;
+          ctx.beginPath();
+          ctx.arc(bx, by, 0.75, 0, Math.PI * 2);
           ctx.fill();
         }
-      } else if (variant === 4 || variant === 1) {
-        const fPt = isoUV(cx, cy, 0.52, 0.45, 28, 14);
-        ctx.fillStyle = variant === 1 ? '#fde047' : '#fef9c3';
-        ctx.beginPath();
-        ctx.arc(fPt.x - 2 + flowerSway * 0.5, fPt.y - 1, 1.5, 0, Math.PI * 2);
-        ctx.arc(fPt.x + 2.2 + flowerSway * 0.5, fPt.y + 0.5, 1.3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#f59e0b';
-        ctx.beginPath();
-        ctx.arc(fPt.x - 2 + flowerSway * 0.5, fPt.y - 1, 0.65, 0, Math.PI * 2);
-        ctx.fill();
       }
     }
 
@@ -1620,230 +1568,487 @@ export class TileAtlasBank {
     const phase = (frame / 4) * Math.PI * 2;
     const flowFrac = frame / 4;
 
-    // 1. Ground Shadow & Circular Radial Carved Stone Tile Plaza Ring
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
+    // 1. Soft Ground Drop Shadow
+    ctx.fillStyle = 'rgba(15, 20, 28, 0.45)';
     ctx.beginPath();
-    ctx.ellipse(x, y + 4, 62, 31, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y + 8, 63, 31, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Circular Radial Stone Tile Apron
+    // 2. Outer Stepped Circular Stone Base Plinth (3D front lip + radial chiseled stone blocks)
     const apronRx = 56;
-    const apronRy = 28;
-    ctx.fillStyle = '#9c9284';
-    ctx.strokeStyle = '#26211c';
+    const apronRy = 27.5;
+    const apronDrop = 5;
+
+    // 3D front face of the stepped outer base ring
+    const apronWallGrad = ctx.createLinearGradient(x - apronRx, y, x + apronRx, y + apronDrop);
+    apronWallGrad.addColorStop(0, '#6c757d');
+    apronWallGrad.addColorStop(0.5, '#565e66');
+    apronWallGrad.addColorStop(1, '#3d434a');
+    ctx.fillStyle = apronWallGrad;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 3, apronRx, apronRy, 0, 0, Math.PI);
+    ctx.lineTo(x - apronRx, y + 3 + apronDrop);
+    ctx.ellipse(x, y + 3 + apronDrop, apronRx, apronRy, 0, Math.PI, 0, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Top face of the outer stepped stone base ring
+    ctx.fillStyle = '#8b949e';
+    ctx.strokeStyle = '#212529';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.ellipse(x, y + 2, apronRx, apronRy, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y + 3, apronRx, apronRy, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Radial stone joints around the circular stone apron
-    ctx.strokeStyle = 'rgba(33, 28, 23, 0.72)';
-    ctx.lineWidth = 1.2;
+    // Radial ashlar block joints & vertical front joints on outer base step
+    ctx.strokeStyle = '#2b3036';
+    ctx.lineWidth = 1.25;
     ctx.beginPath();
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
-      ctx.moveTo(x + Math.cos(a) * 42, y + 2 + Math.sin(a) * 21);
-      ctx.lineTo(x + Math.cos(a) * apronRx, y + 2 + Math.sin(a) * apronRy);
+      const cosA = Math.cos(a);
+      const sinA = Math.sin(a);
+      ctx.moveTo(x + cosA * 44, y + 3 + sinA * 21.5);
+      ctx.lineTo(x + cosA * apronRx, y + 3 + sinA * apronRy);
+      if (sinA > 0.05) {
+        ctx.moveTo(x + cosA * apronRx, y + 3 + sinA * apronRy);
+        ctx.lineTo(x + cosA * apronRx, y + 3 + sinA * apronRy + apronDrop);
+      }
     }
     ctx.stroke();
 
-    // 2. Lower Basin Cylindrical Carved Stone Masonry Wall
-    const basinRx = 46;
-    const basinRy = 23;
-    const wallDrop = 9;
+    // 3. Tall 2-Course Cylindrical Ashlar Stone Basin Wall (Matching reference image)
+    const basinRx = 47;
+    const basinRy = 22.5;
+    const wallDrop = 14;
+    const rimY = y - 10;
 
-    const wallGrad = ctx.createLinearGradient(x - basinRx, y, x + basinRx, y + wallDrop);
-    wallGrad.addColorStop(0, '#94a3b8');
-    wallGrad.addColorStop(0.5, '#64748b');
-    wallGrad.addColorStop(1, '#475569');
+    // Cylindrical stone wall body (lit left, mid center, shaded right)
+    const wallGrad = ctx.createLinearGradient(x - basinRx, rimY, x + basinRx, rimY + wallDrop);
+    wallGrad.addColorStop(0, '#9fa8b2');
+    wallGrad.addColorStop(0.32, '#868f98');
+    wallGrad.addColorStop(0.7, '#646d75');
+    wallGrad.addColorStop(1, '#484f56');
     ctx.fillStyle = wallGrad;
     ctx.beginPath();
-    ctx.ellipse(x, y - 2, basinRx, basinRy, 0, 0, Math.PI);
-    ctx.lineTo(x - basinRx, y - 2 + wallDrop);
-    ctx.ellipse(x, y - 2 + wallDrop, basinRx, basinRy, 0, Math.PI, 0, true);
+    ctx.ellipse(x, rimY, basinRx, basinRy, 0, 0, Math.PI);
+    ctx.lineTo(x - basinRx, rimY + wallDrop);
+    ctx.ellipse(x, rimY + wallDrop, basinRx, basinRy, 0, Math.PI, 0, true);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.6;
     ctx.stroke();
 
-    // Top Carved Stone Coping Rim
-    ctx.fillStyle = '#cbd5e1';
-    ctx.strokeStyle = '#1e293b';
+    // Horizontal middle mortar seam dividing the basin wall into 2 stacked courses of stone blocks
+    ctx.strokeStyle = '#2b3036';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.ellipse(x, rimY + wallDrop * 0.52, basinRx, basinRy, 0, 0.04 * Math.PI, 0.96 * Math.PI);
+    ctx.stroke();
+
+    // Sunlit top bevel along lower stone course
+    ctx.strokeStyle = 'rgba(222, 226, 230, 0.45)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.ellipse(x, rimY + wallDrop * 0.52 + 1.1, basinRx - 1, basinRy - 0.5, 0, 0.12 * Math.PI, 0.72 * Math.PI);
+    ctx.stroke();
+
+    // Staggered vertical stone joints for upper and lower courses
+    ctx.strokeStyle = '#2b3036';
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    for (let i = 1; i < 8; i++) {
+      const aTop = (i / 8) * Math.PI;
+      const jx1 = x + Math.cos(aTop) * basinRx;
+      const jy1 = rimY + Math.sin(aTop) * basinRy;
+      ctx.moveTo(jx1, jy1);
+      ctx.lineTo(jx1, jy1 + wallDrop * 0.52);
+
+      const aBot = ((i + 0.5) / 8) * Math.PI;
+      if (aBot < Math.PI * 0.94) {
+        const jx2 = x + Math.cos(aBot) * basinRx;
+        const jy2 = rimY + Math.sin(aBot) * basinRy + wallDrop * 0.52;
+        ctx.moveTo(jx2, jy2);
+        ctx.lineTo(jx2, jy2 + wallDrop * 0.48);
+      }
+    }
+    ctx.stroke();
+
+    // Creeping Emerald Moss & Wildflowers Around Stone Basin Base (Pink, Yellow, White, Blue)
+    const mossClusters = [
+      { angle: 0.18 * Math.PI, r: 4.5, flower: '#38bdf8' },
+      { angle: 0.34 * Math.PI, r: 5.5, flower: '#facc15' },
+      { angle: 0.44 * Math.PI, r: 4.8, flower: '#f8fafc' },
+      { angle: 0.62 * Math.PI, r: 5.2, flower: '#fb923c' },
+      { angle: 0.78 * Math.PI, r: 5.8, flower: '#f472b6' },
+      { angle: 0.88 * Math.PI, r: 4.4, flower: '#f472b6' },
+    ];
+    for (const mc of mossClusters) {
+      const mx = x + Math.cos(mc.angle) * (basinRx + 1);
+      const my = rimY + Math.sin(mc.angle) * (basinRy + 1) + wallDrop - 1;
+      // Dark foliage shadow
+      ctx.fillStyle = '#1e5616';
+      ctx.beginPath();
+      ctx.ellipse(mx, my + 1, mc.r * 1.45, mc.r * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Mid leaf green
+      ctx.fillStyle = '#409628';
+      ctx.beginPath();
+      ctx.ellipse(mx, my, mc.r * 1.15, mc.r * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Bright lime moss highlight
+      ctx.fillStyle = '#7ad43b';
+      ctx.beginPath();
+      ctx.arc(mx - 1.5, my - 0.8, mc.r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      // Tiny colorful flower blossom
+      ctx.fillStyle = mc.flower;
+      ctx.beginPath();
+      ctx.arc(mx + 1.2, my - 0.8, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(mx + 1.2, my - 0.8, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 4. Wide Carved Stone Coping Rim at Top of Main Basin
+    // 3D outer lip thickness of coping rim
+    ctx.fillStyle = '#6c757d';
+    ctx.beginPath();
+    ctx.ellipse(x, rimY + 2.5, basinRx + 1.5, basinRy + 0.8, 0, 0, Math.PI);
+    ctx.ellipse(x, rimY, basinRx + 1.5, basinRy + 0.8, 0, Math.PI, 0, true);
+    ctx.closePath();
+    ctx.fill();
+
+    const copingGrad = ctx.createLinearGradient(x - basinRx, rimY - basinRy, x + basinRx, rimY + basinRy);
+    copingGrad.addColorStop(0, '#ced4da');
+    copingGrad.addColorStop(0.5, '#adb5bd');
+    copingGrad.addColorStop(1, '#7d858d');
+    ctx.fillStyle = copingGrad;
+    ctx.strokeStyle = '#212529';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.ellipse(x, y - 2, basinRx, basinRy, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, rimY, basinRx + 1.5, basinRy + 0.8, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(30, 41, 59, 0.65)';
-    ctx.lineWidth = 1.1;
+    // Radial stone coping block joints
+    ctx.strokeStyle = '#343a40';
+    ctx.lineWidth = 1.15;
     ctx.beginPath();
     for (let i = 0; i < 14; i++) {
       const a = (i / 14) * Math.PI * 2;
-      ctx.moveTo(x + Math.cos(a) * 38, y - 2 + Math.sin(a) * 19);
-      ctx.lineTo(x + Math.cos(a) * basinRx, y - 2 + Math.sin(a) * basinRy);
+      ctx.moveTo(x + Math.cos(a) * 37.5, rimY + Math.sin(a) * 17.5);
+      ctx.lineTo(x + Math.cos(a) * (basinRx + 1), rimY + Math.sin(a) * (basinRy + 0.5));
     }
     ctx.stroke();
 
-    // 3. Lower Pool Water with Shimmering Reflection Streaks & Expanding Ripples (Reference Images 2, 5, 6)
-    const poolRx = 38;
-    const poolRy = 19;
-    const waterGrad = ctx.createRadialGradient(x, y - 2, 4, x, y - 2, poolRx);
-    waterGrad.addColorStop(0, '#22d3ee');
-    waterGrad.addColorStop(0.55, '#18829e');
-    waterGrad.addColorStop(1, '#0e5469');
-    ctx.fillStyle = waterGrad;
+    // Moss patches draped on the stone coping rim
+    ctx.fillStyle = '#409628';
     ctx.beginPath();
-    ctx.ellipse(x, y - 2, poolRx, poolRy, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - 31, rimY + 12, 4.5, 2.2, 0.3, 0, Math.PI * 2);
+    ctx.ellipse(x + 28, rimY + 13, 4.0, 2.0, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(x + 3, rimY + 20, 3.8, 1.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#7ad43b';
+    ctx.beginPath();
+    ctx.ellipse(x - 31.5, rimY + 11.5, 2.6, 1.2, 0.3, 0, Math.PI * 2);
+    ctx.ellipse(x + 27.5, rimY + 12.5, 2.4, 1.1, -0.3, 0, Math.PI * 2);
     ctx.fill();
 
-    // Horizontal shimmering water reflection streaks in lower pool
-    ctx.strokeStyle = 'rgba(165, 243, 252, 0.65)';
+    // Inner stone basin wall visible above water surface
+    const poolRx = 38;
+    const poolRy = 18;
+    ctx.fillStyle = '#495057';
+    ctx.strokeStyle = '#212529';
     ctx.lineWidth = 1.3;
     ctx.beginPath();
-    for (let s = -1; s <= 1; s++) {
-      const sx = x + s * 16 + Math.sin(phase + s) * 3;
-      const sy = y + 6 + Math.abs(s) * 2;
-      ctx.moveTo(sx - 7, sy);
-      ctx.lineTo(sx + 7, sy);
-    }
+    ctx.ellipse(x, rimY, poolRx, poolRy, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.stroke();
 
-    // Expanding concentric white-cyan ripple rings in lower pool (Reference Images 5 & 6)
+    // 5. Luminous Crystal-Blue Pool Water & White-Cyan Rim Foam
+    const waterGrad = ctx.createRadialGradient(x, rimY + 1, 4, x, rimY + 1, poolRx);
+    waterGrad.addColorStop(0, '#7dd3fc');
+    waterGrad.addColorStop(0.45, '#29b6f6');
+    waterGrad.addColorStop(0.82, '#0288d1');
+    waterGrad.addColorStop(1, '#01579b');
+    ctx.fillStyle = waterGrad;
+    ctx.beginPath();
+    ctx.ellipse(x, rimY + 1.5, poolRx - 1, poolRy - 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bright white-cyan water edge foam ring around the inside of the pool
+    ctx.strokeStyle = 'rgba(224, 242, 254, 0.85)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.ellipse(x, rimY + 1.5, poolRx - 2.2, poolRy - 1.4, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Expanding concentric cyan-white surface ripples
     for (let ring = 0; ring < 2; ring++) {
       const prog = (flowFrac + ring * 0.5) % 1;
-      const rRx = 18 + prog * 18;
-      const rRy = 9 + prog * 9;
-      ctx.strokeStyle = `rgba(224, 242, 254, ${(1 - prog) * 0.72})`;
-      ctx.lineWidth = 1.3;
+      const rRx = 14 + prog * 21;
+      const rRy = 6.5 + prog * 9.5;
+      ctx.strokeStyle = `rgba(224, 242, 254, ${(1 - prog) * 0.75})`;
+      ctx.lineWidth = 1.35;
       ctx.beginPath();
-      ctx.ellipse(x, y - 2, rRx, rRy, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, rimY + 2, rRx, rRy, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    // 4. Lower Pedestal & Middle Circular Carved Stone Bowl (y - 23)
-    const midY = y - 23;
-    const midRx = 25;
-    const midRy = 12.5;
+    // 6. Lower Central Stone Pedestal & Middle Scalloped Stone Bowl
+    const midY = rimY - 22;
+    const midRx = 22;
+    const midRy = 10.5;
 
-    ctx.fillStyle = '#475569';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.3;
-    ctx.fillRect(x - 10, midY, 20, 19);
-    ctx.strokeRect(x - 10, midY, 20, 19);
+    // Pedestal base splash ring in lower pool
+    ctx.fillStyle = 'rgba(224, 242, 254, 0.72)';
+    ctx.beginPath();
+    ctx.ellipse(x, rimY + 2, 12, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Middle Stone Bowl Rim
-    ctx.fillStyle = '#94a3b8';
+    // Lower stone pedestal column
+    const pedGrad = ctx.createLinearGradient(x - 9, midY, x + 9, rimY);
+    pedGrad.addColorStop(0, '#9fa8b2');
+    pedGrad.addColorStop(0.5, '#6c757d');
+    pedGrad.addColorStop(1, '#3d434a');
+    ctx.fillStyle = pedGrad;
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x - 8.5, midY + 6);
+    ctx.lineTo(x - 10, rimY + 1);
+    ctx.quadraticCurveTo(x, rimY + 5, x + 10, rimY + 1);
+    ctx.lineTo(x + 8.5, midY + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Middle Stone Bowl 3D Curved Underside
+    const midUnderGrad = ctx.createLinearGradient(x - midRx, midY, x + midRx, midY + 9);
+    midUnderGrad.addColorStop(0, '#868f98');
+    midUnderGrad.addColorStop(0.5, '#5c646c');
+    midUnderGrad.addColorStop(1, '#3b4046');
+    ctx.fillStyle = midUnderGrad;
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(x, midY, midRx, midRy, 0, 0, Math.PI);
+    ctx.quadraticCurveTo(x + midRx * 0.75, midY + 17, x, midY + 17);
+    ctx.quadraticCurveTo(x - midRx * 0.75, midY + 17, x - midRx, midY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Middle Stone Bowl Coping Rim
+    ctx.fillStyle = '#adb5bd';
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.ellipse(x, midY, midRx, midRy, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#18829e';
+    // Middle Bowl Bright Cyan Water Pool
+    ctx.fillStyle = '#29b6f6';
     ctx.beginPath();
-    ctx.ellipse(x, midY, 20, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, midY, midRx - 4, midRy - 2, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = '#e0f2fe';
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
 
-    // 5. Cel-Shaded Cascading Waterfall Sheet & Frothy Splash Foam Cushion (Reference Images 1, 2, 3, 5, 6)
-    // Translucent cyan waterfall curtain pouring over the front arc of the middle stone bowl
-    ctx.fillStyle = 'rgba(34, 211, 238, 0.52)';
-    ctx.beginPath();
-    ctx.moveTo(x - 21, midY + 4);
-    ctx.quadraticCurveTo(x, midY + 13, x + 21, midY + 4);
-    ctx.lineTo(x + 23, y - 1);
-    ctx.quadraticCurveTo(x, y + 9, x - 23, y - 1);
-    ctx.closePath();
-    ctx.fill();
+    // 7. Two Distinct Wide Symmetrical Waterfall Curtains from Middle Bowl into Main Pool (Matching image.png)
+    const lowerStreams = [
+      { ox: -13.5, topY: midY + 6.5, botY: rimY + 4.5, w: 6.5 },
+      { ox: 13.5, topY: midY + 6.5, botY: rimY + 4.5, w: 6.5 },
+    ];
+    for (let sIdx = 0; sIdx < lowerStreams.length; sIdx++) {
+      const st = lowerStreams[sIdx];
+      const sx = x + st.ox;
 
-    // Animated vertical white-cyan water streaks & cellular foam bands scrolling down the waterfall (Reference Images 1, 2, 5, 6)
-    ctx.lineCap = 'round';
-    for (let s = 0; s < 9; s++) {
-      const a = (0.14 + (s / 8) * 0.72) * Math.PI;
-      const topX = x + Math.cos(a) * (midRx - 2);
-      const topY = midY + Math.sin(a) * (midRy - 1);
-      const botY = topY + 19;
-
-      // Flowing sinusoidal streak
-      ctx.strokeStyle = s % 2 === 0 ? 'rgba(224, 242, 254, 0.88)' : 'rgba(103, 232, 249, 0.75)';
-      ctx.lineWidth = s % 2 === 0 ? 1.8 : 1.4;
+      // Splash ring in lower pool where waterfall lands
+      const splashRx = 8.5 + Math.sin(phase + sIdx) * 1.2;
+      const splashRy = 4.2 + Math.sin(phase + sIdx) * 0.6;
+      ctx.fillStyle = 'rgba(186, 230, 253, 0.55)';
       ctx.beginPath();
-      const streakOff = ((flowFrac * 18 + s * 5) % 14);
-      ctx.moveTo(topX + Math.sin(phase + s) * 1.2, topY + streakOff * 0.25);
-      ctx.quadraticCurveTo(
-        topX - Math.sin(phase + s) * 1.5,
-        (topY + botY) * 0.5,
-        topX + Math.cos(phase + s) * 1.2,
-        botY - 2
-      );
+      ctx.ellipse(sx, st.botY, splashRx * 1.25, splashRy * 1.25, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(sx, st.botY, splashRx, splashRy, 0, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Billowing white-cyan frothy foam puffs at the base of the waterfall (Reference Images 2, 5, 6)
-      const puffR = 3.2 + Math.sin(phase + s * 1.3) * 0.9;
-      ctx.fillStyle = '#e0f2fe';
+      // Main translucent sky-cyan waterfall ribbon body
+      const fallGrad = ctx.createLinearGradient(sx - st.w * 0.5, st.topY, sx + st.w * 0.5, st.botY);
+      fallGrad.addColorStop(0, '#e0f2fe');
+      fallGrad.addColorStop(0.25, '#38bdf8');
+      fallGrad.addColorStop(0.8, '#0284c7');
+      fallGrad.addColorStop(1, '#bae6fd');
+      ctx.fillStyle = fallGrad;
       ctx.beginPath();
-      ctx.arc(topX, botY, puffR, 0, Math.PI * 2);
+      ctx.moveTo(sx - st.w * 0.48, st.topY - 1);
+      ctx.quadraticCurveTo(sx, st.topY - 3, sx + st.w * 0.48, st.topY - 1);
+      ctx.lineTo(sx + st.w * 0.56, st.botY);
+      ctx.quadraticCurveTo(sx, st.botY + 2.5, sx - st.w * 0.56, st.botY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Animated vertical white foam stripes scrolling down the ribbon waterfall
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = 'round';
+      const stripeShift = (flowFrac * 12) % 6;
+      ctx.beginPath();
+      ctx.moveTo(sx - 1.6, st.topY + stripeShift * 0.4);
+      ctx.lineTo(sx - 1.8, st.botY - 1);
+      ctx.moveTo(sx + 1.6, st.topY + ((stripeShift + 3) % 6) * 0.4);
+      ctx.lineTo(sx + 1.8, st.botY - 1);
+      ctx.stroke();
+
+      // Frothy white foam crest at the lip of the middle bowl & base impact
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(sx, st.topY - 1, st.w * 0.48, 2.0, 0, 0, Math.PI * 2);
+      ctx.ellipse(sx, st.botY, st.w * 0.62, 2.5, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // 6. Upper Carved Stone Pedestal, Top Crown Bowl & Cel-Shaded Splash Plume (Reference Images 1 & 3)
-    const topTierY = y - 41;
-    ctx.fillStyle = '#64748b';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.2;
-    ctx.fillRect(x - 6, topTierY, 12, 17);
-    ctx.strokeRect(x - 6, topTierY, 12, 17);
+    // 8. Upper Pedestal, Upper Carved Bowl & Conical Acorn Stone Spire Finial
+    const topBowlY = midY - 18;
+    const topRx = 13.5;
+    const topRy = 6.5;
 
-    ctx.fillStyle = '#cbd5e1';
+    // Upper stone pedestal column
+    ctx.fillStyle = '#6c757d';
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
-    ctx.ellipse(x, topTierY, 13, 6.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Upper waterfall curtain into middle bowl
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.58)';
-    ctx.beginPath();
-    ctx.moveTo(x - 10, topTierY + 2);
-    ctx.quadraticCurveTo(x, topTierY + 7, x + 10, topTierY + 2);
-    ctx.lineTo(x + 12, midY - 1);
-    ctx.quadraticCurveTo(x, midY + 5, x - 12, midY - 1);
+    ctx.moveTo(x - 5.5, topBowlY + 4);
+    ctx.lineTo(x - 6.5, midY + 1);
+    ctx.quadraticCurveTo(x, midY + 3.5, x + 6.5, midY + 1);
+    ctx.lineTo(x + 5.5, topBowlY + 4);
     ctx.closePath();
     ctx.fill();
-
-    // Stylized cel-shaded curling fountain splash arcs & water droplets at top crown (Reference Images 1 & 3)
-    const plumeH = 11 + Math.sin(phase) * 2.2;
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    ctx.moveTo(x, topTierY);
-    ctx.quadraticCurveTo(x - 7, topTierY - plumeH, x - 13, topTierY - 2);
-    ctx.moveTo(x, topTierY);
-    ctx.quadraticCurveTo(x + 7, topTierY - plumeH, x + 13, topTierY - 2);
     ctx.stroke();
 
-    ctx.strokeStyle = '#e0f2fe';
-    ctx.lineWidth = 1.6;
+    // Upper Bowl 3D Curved Underside
+    ctx.fillStyle = '#5c646c';
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.moveTo(x, topTierY - 1);
-    ctx.quadraticCurveTo(x - 6, topTierY - plumeH - 1, x - 12, topTierY - 3);
-    ctx.moveTo(x, topTierY - 1);
-    ctx.quadraticCurveTo(x + 6, topTierY - plumeH - 1, x + 12, topTierY - 3);
+    ctx.ellipse(x, topBowlY, topRx, topRy, 0, 0, Math.PI);
+    ctx.quadraticCurveTo(x + topRx * 0.7, topBowlY + 10.5, x, topBowlY + 10.5);
+    ctx.quadraticCurveTo(x - topRx * 0.7, topBowlY + 10.5, x - topRx, topBowlY);
+    ctx.closePath();
+    ctx.fill();
     ctx.stroke();
 
-    // Airborne water droplets (Reference Images 1 & 3)
-    const dropOffset = (flowFrac * 10) % 6;
-    ctx.fillStyle = '#e0f2fe';
+    // Upper Bowl Stone Rim & Cyan Water
+    ctx.fillStyle = '#ced4da';
     ctx.beginPath();
-    ctx.arc(x - 14 - dropOffset * 0.4, topTierY - 5 + dropOffset, 1.8, 0, Math.PI * 2);
-    ctx.arc(x + 14 + dropOffset * 0.4, topTierY - 5 + dropOffset, 1.8, 0, Math.PI * 2);
-    ctx.arc(x, topTierY - plumeH - 2, 2.5, 0, Math.PI * 2);
+    ctx.ellipse(x, topBowlY, topRx, topRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.ellipse(x, topBowlY, topRx - 3, topRy - 1.5, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#bae6fd';
-    ctx.font = 'bold 10px "Cinzel", serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('SANCTUARY FOUNTAIN', x, y - 60);
+    // Two Upper Symmetrical Waterfall Ribbons pouring into Middle Bowl
+    const upperStreams = [
+      { ox: -7.8, topY: topBowlY + 3.8, botY: midY + 1.5, w: 4.4 },
+      { ox: 7.8, topY: topBowlY + 3.8, botY: midY + 1.5, w: 4.4 },
+    ];
+    for (const ust of upperStreams) {
+      const ux = x + ust.ox;
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(ux - ust.w * 0.45, ust.topY - 0.5);
+      ctx.lineTo(ux + ust.w * 0.45, ust.topY - 0.5);
+      ctx.lineTo(ux + ust.w * 0.52, ust.botY);
+      ctx.lineTo(ux - ust.w * 0.52, ust.botY);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.25;
+      ctx.beginPath();
+      ctx.moveTo(ux, ust.topY);
+      ctx.lineTo(ux, ust.botY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(ux, ust.botY, 4.2, 1.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 9. Pointed Conical / Acorn Stone Finial Spire at the Crown (Matching reference image)
+    const finialBaseY = topBowlY - 1;
+    const finialTipY = topBowlY - 19;
+
+    // Carved stone collar ring at base of finial
+    ctx.fillStyle = '#adb5bd';
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.ellipse(x, finialBaseY, 6.2, 3.0, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Pointed conical acorn spire body
+    const finialGrad = ctx.createLinearGradient(x - 6, finialTipY, x + 6, finialBaseY);
+    finialGrad.addColorStop(0, '#e9ecef');
+    finialGrad.addColorStop(0.45, '#adb5bd');
+    finialGrad.addColorStop(1, '#495057');
+    ctx.fillStyle = finialGrad;
+    ctx.beginPath();
+    ctx.moveTo(x, finialTipY);
+    ctx.quadraticCurveTo(x + 6.5, finialBaseY - 7, x + 5.2, finialBaseY - 1);
+    ctx.quadraticCurveTo(x, finialBaseY + 1.8, x - 5.2, finialBaseY - 1);
+    ctx.quadraticCurveTo(x - 6.5, finialBaseY - 7, x, finialTipY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Crisp sunlit left bevel on conical finial
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(x - 0.5, finialTipY + 2);
+    ctx.quadraticCurveTo(x - 4.2, finialBaseY - 7, x - 3.5, finialBaseY - 2);
+    ctx.stroke();
+
+    // 10. Signature 4-Point Diamond Star Sparkles (✦) Floating on the Pool Surface (Matching image.png)
+    const drawStarSparkle = (sx: number, sy: number, size: number) => {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - size);
+      ctx.quadraticCurveTo(sx + size * 0.22, sy - size * 0.22, sx + size, sy);
+      ctx.quadraticCurveTo(sx + size * 0.22, sy + size * 0.22, sx, sy + size);
+      ctx.quadraticCurveTo(sx - size * 0.22, sy + size * 0.22, sx - size, sy);
+      ctx.quadraticCurveTo(sx - size * 0.22, sy - size * 0.22, sx, sy - size);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    const sPulse1 = 2.6 + Math.sin(phase) * 0.9;
+    const sPulse2 = 2.4 + Math.cos(phase) * 0.9;
+    drawStarSparkle(x - 24, rimY - 3, sPulse1);
+    drawStarSparkle(x + 23, rimY - 2, sPulse2);
+    drawStarSparkle(x - 5, rimY + 11, sPulse2 * 0.9);
+    drawStarSparkle(x + 7, rimY + 9, sPulse1 * 0.85);
+    drawStarSparkle(x - 25, rimY + 6, 1.9);
 
     return canvas;
   }
@@ -1856,210 +2061,232 @@ export class TileAtlasBank {
     const x = 48;
     const y = 92;
     const scale = variant >= 4 ? 0.94 : 1.02;
-    const species = variant % 4; // 0 = Emerald Oak, 1 = Highland Spruce Pine, 2 = Golden Birch, 3 = Blossoming Sakura
+    const species = variant % 4; // Matches the 4 trees in image.png: 0 = Grand Spreading Oak, 1 = Tall Woodland Dome Tree, 2 = Medium Meadow Tree, 3 = Young Forked Sapling
     const swayPhase = (swayFrame / 4) * Math.PI * 2;
-    // Harmonic wind physics: primary sway wave + secondary high-frequency canopy whip
-    const baseSway = Math.sin(swayPhase) * 2.6 + Math.sin(swayPhase * 2 - 0.5) * 0.75;
-    const crownBob = Math.cos(swayPhase * 2) * 0.95;
+    const baseSway = Math.sin(swayPhase) * 2.1 + Math.sin(swayPhase * 2 - 0.5) * 0.55;
+    const crownBob = Math.cos(swayPhase * 2) * 0.75;
 
-    // 1. Dappled Ground Shadow & Vibrant Mossy Root Base
-    const shadowGrad = ctx.createRadialGradient(x + 3 + baseSway * 0.3, y + 3, 4, x + 3, y + 3, 33 * scale);
-    shadowGrad.addColorStop(0, 'rgba(5, 16, 10, 0.58)');
-    shadowGrad.addColorStop(0.65, 'rgba(8, 26, 16, 0.28)');
+    // Helper: Draws a scalloped pixel-art-styled leaf cluster puff with dark underside, mid emerald body, and sunlit lime top lobes
+    const drawScallopedFoliageCluster = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      tone: 'shadow' | 'mid' | 'bright' | 'crown',
+      swayMul: number
+    ) => {
+      const scx = cx + baseSway * swayMul;
+      const scy = cy + crownBob * swayMul * 0.55;
+
+      const colors =
+        tone === 'shadow'
+          ? { outline: '#0b2607', bottom: '#11380b', body: '#1f5c14', top: '#317d1c' }
+          : tone === 'mid'
+          ? { outline: '#11360a', bottom: '#1b5211', body: '#378c1f', top: '#5eb82d' }
+          : tone === 'bright'
+          ? { outline: '#18470f', bottom: '#2b7319', body: '#52ad28', top: '#8ce03a' }
+          : { outline: '#225914', bottom: '#3d8f22', body: '#7ad435', top: '#bef264' };
+
+      // 1. Scalloped outer silhouette with 8 rounded leaf lobes
+      const lobes = 8;
+      ctx.beginPath();
+      for (let i = 0; i < lobes; i++) {
+        const a = (i / lobes) * Math.PI * 2;
+        const lx = scx + Math.cos(a) * rx * 0.64;
+        const ly = scy + Math.sin(a) * ry * 0.64;
+        const lr = (i % 2 === 0 ? 0.48 : 0.41) * Math.min(rx, ry * 1.3);
+        ctx.moveTo(lx + lr, ly);
+        ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+      }
+      ctx.moveTo(scx + rx * 0.72, scy);
+      ctx.ellipse(scx, scy, rx * 0.72, ry * 0.72, 0, 0, Math.PI * 2);
+
+      // Dark forest outline & underside shadow
+      ctx.fillStyle = colors.bottom;
+      ctx.fill();
+      ctx.strokeStyle = colors.outline;
+      ctx.lineWidth = 1.25;
+      ctx.stroke();
+
+      // 2. Main emerald leaf cluster body shifted slightly up-left toward the sun
+      ctx.fillStyle = colors.body;
+      ctx.beginPath();
+      for (let i = 0; i < lobes; i++) {
+        const a = (i / lobes) * Math.PI * 2;
+        if (Math.sin(a) > 0.65) continue; // Leave dark crescent on bottom-right underside
+        const lx = scx - 0.5 + Math.cos(a) * rx * 0.58;
+        const ly = scy - 1.2 + Math.sin(a) * ry * 0.58;
+        const lr = (i % 2 === 0 ? 0.44 : 0.37) * Math.min(rx, ry * 1.25);
+        ctx.moveTo(lx + lr, ly);
+        ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+      }
+      ctx.moveTo(scx + rx * 0.64, scy - 1.2);
+      ctx.ellipse(scx - 0.4, scy - 1.2, rx * 0.64, ry * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. Sunlit top-left lime leaf puffs
+      ctx.fillStyle = colors.top;
+      ctx.beginPath();
+      ctx.arc(scx - rx * 0.25, scy - ry * 0.36, rx * 0.28, 0, Math.PI * 2);
+      ctx.arc(scx + rx * 0.08, scy - ry * 0.42, rx * 0.25, 0, Math.PI * 2);
+      ctx.arc(scx - rx * 0.42, scy - ry * 0.14, rx * 0.21, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    // Helper: Draws textured brown bark trunk with root flares & branches
+    const drawBarkTrunk = (
+      baseHalfW: number,
+      topHalfW: number,
+      trunkH: number,
+      hasWideBoughs: boolean
+    ) => {
+      const bSway = baseSway * 0.45;
+      const trunkGrad = ctx.createLinearGradient(x - baseHalfW, y, x + baseHalfW, y);
+      trunkGrad.addColorStop(0, '#855835');
+      trunkGrad.addColorStop(0.45, '#633e22');
+      trunkGrad.addColorStop(1, '#3b2211');
+      ctx.fillStyle = trunkGrad;
+      ctx.strokeStyle = '#211208';
+      ctx.lineWidth = 1.4;
+
+      ctx.beginPath();
+      // Left root buttress flare
+      ctx.moveTo(x - baseHalfW * 1.45, y + 4);
+      ctx.quadraticCurveTo(x - baseHalfW * 0.85, y - 2, x - topHalfW + bSway * 0.4, y - trunkH * 0.55);
+      if (hasWideBoughs) {
+        // Left spreading oak bough
+        ctx.lineTo(x - baseHalfW * 2.1 + bSway, y - trunkH * 0.92);
+        ctx.lineTo(x - baseHalfW * 1.55 + bSway, y - trunkH * 1.02);
+        ctx.lineTo(x - topHalfW * 0.5 + bSway * 0.6, y - trunkH * 0.68);
+        // Center-right spreading oak bough
+        ctx.lineTo(x + topHalfW * 0.5 + bSway * 0.6, y - trunkH * 0.72);
+        ctx.lineTo(x + baseHalfW * 1.65 + bSway, y - trunkH * 0.98);
+        ctx.lineTo(x + baseHalfW * 2.15 + bSway, y - trunkH * 0.86);
+      } else {
+        ctx.lineTo(x - topHalfW * 1.35 + bSway, y - trunkH);
+        ctx.lineTo(x + topHalfW * 1.35 + bSway, y - trunkH);
+      }
+      ctx.lineTo(x + topHalfW + bSway * 0.4, y - trunkH * 0.52);
+      // Right root buttress flare
+      ctx.quadraticCurveTo(x + baseHalfW * 0.85, y - 2, x + baseHalfW * 1.45, y + 4);
+      // Center root toes gripping the ground
+      ctx.quadraticCurveTo(x + baseHalfW * 0.45, y + 1, x + baseHalfW * 0.2, y + 5.5);
+      ctx.quadraticCurveTo(x, y + 2, x - baseHalfW * 0.25, y + 5.5);
+      ctx.quadraticCurveTo(x - baseHalfW * 0.5, y + 1, x - baseHalfW * 1.45, y + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Vertical bark ridges & shadow crevices
+      ctx.strokeStyle = 'rgba(33, 18, 8, 0.65)';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(x - baseHalfW * 0.35, y + 3);
+      ctx.quadraticCurveTo(x - topHalfW * 0.2, y - trunkH * 0.35, x - topHalfW * 0.5 + bSway * 0.5, y - trunkH * 0.7);
+      ctx.moveTo(x + baseHalfW * 0.25, y + 3);
+      ctx.quadraticCurveTo(x + topHalfW * 0.2, y - trunkH * 0.35, x + topHalfW * 0.4 + bSway * 0.5, y - trunkH * 0.68);
+      ctx.stroke();
+    };
+
+    // 1. Dappled Ground Shadow & Grass Tuft at Root Base
+    const shadowRx = (species === 0 ? 37 : species === 3 ? 21 : 29) * scale;
+    const shadowRy = shadowRx * 0.48;
+    const shadowGrad = ctx.createRadialGradient(x + 2, y + 3, 3, x + 2, y + 3, shadowRx);
+    shadowGrad.addColorStop(0, 'rgba(12, 24, 14, 0.55)');
+    shadowGrad.addColorStop(0.65, 'rgba(15, 32, 18, 0.26)');
     shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = shadowGrad;
     ctx.beginPath();
-    ctx.ellipse(x + 3 + baseSway * 0.25, y + 3, 33 * scale, 16 * scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 2 + baseSway * 0.2, y + 3, shadowRx, shadowRy, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#166534';
-    ctx.beginPath();
-    ctx.ellipse(x, y + 3, 15 * scale, 6.2 * scale, 0, 0, Math.PI * 2);
-    ctx.fill();
+    if (species === 0) {
+      // ARCHETYPE 0: Grand Spreading Ancient Oak (Top-Left large tree in image.png)
+      // Back shadow foliage layer behind upper boughs
+      drawScallopedFoliageCluster(x - 21 * scale, y - 34 * scale, 16 * scale, 11 * scale, 'shadow', 0.65);
+      drawScallopedFoliageCluster(x + 21 * scale, y - 33 * scale, 16 * scale, 11 * scale, 'shadow', 0.65);
+      drawScallopedFoliageCluster(x, y - 31 * scale, 20 * scale, 12 * scale, 'shadow', 0.6);
 
-    if (species === 1) {
-      // SPECIES 1: Vibrant Highland Emerald-Spruce Pine with Wind-Swaying Boughs
-      const trunkGrad = ctx.createLinearGradient(x - 6, y, x + 6, y);
-      trunkGrad.addColorStop(0, '#6b341a');
-      trunkGrad.addColorStop(0.5, '#47210f');
-      trunkGrad.addColorStop(1, '#291106');
-      ctx.fillStyle = trunkGrad;
-      ctx.beginPath();
-      ctx.moveTo(x - 8 * scale, y + 4);
-      ctx.quadraticCurveTo(x - 4 * scale, y - 4, x - 3.5 * scale + baseSway * 0.6, y - 48 * scale);
-      ctx.lineTo(x + 3.5 * scale + baseSway * 0.6, y - 48 * scale);
-      ctx.quadraticCurveTo(x + 4 * scale, y - 4, x + 8 * scale, y + 4);
-      ctx.closePath();
-      ctx.fill();
+      // Thick gnarled oak trunk with wide spreading boughs & root buttresses
+      drawBarkTrunk(9.5 * scale, 5.8 * scale, 38 * scale, true);
 
-      const tiers = [
-        { oy: -16, w: 30, h: 24, swayMul: 0.45, dark: '#063b2a', mid: '#0e694b', lit: '#189e70' },
-        { oy: -31, w: 26, h: 23, swayMul: 0.72, dark: '#084733', mid: '#127d59', lit: '#22b883' },
-        { oy: -46, w: 21, h: 21, swayMul: 1.0, dark: '#0a543c', mid: '#169168', lit: '#2dd498' },
-        { oy: -60, w: 16, h: 19, swayMul: 1.28, dark: '#0d6347', mid: '#1ca678', lit: '#4ade80' },
-        { oy: -73, w: 10, h: 16, swayMul: 1.55, dark: '#117554', mid: '#26bd8a', lit: '#86efac' },
-      ];
+      // Mid-canopy billowing emerald clusters
+      drawScallopedFoliageCluster(x - 24 * scale, y - 42 * scale, 16 * scale, 11.5 * scale, 'mid', 0.85);
+      drawScallopedFoliageCluster(x + 23 * scale, y - 41 * scale, 16 * scale, 11.5 * scale, 'mid', 0.85);
+      drawScallopedFoliageCluster(x - 9 * scale, y - 38 * scale, 17 * scale, 12 * scale, 'mid', 0.8);
+      drawScallopedFoliageCluster(x + 10 * scale, y - 37 * scale, 17 * scale, 12 * scale, 'mid', 0.8);
 
-      for (let tIdx = 0; tIdx < tiers.length; tIdx++) {
-        const t = tiers[tIdx];
-        const tierSway = Math.sin(swayPhase - tIdx * 0.32) * 3.1 * t.swayMul;
-        const txCenter = x + tierSway;
-        const baseY = y + t.oy * scale + crownBob * t.swayMul * 0.5;
-        const peakY = baseY - t.h * scale;
-        const halfW = t.w * scale;
+      // Upper-mid bright green leaf clusters
+      drawScallopedFoliageCluster(x - 16 * scale, y - 52 * scale, 16 * scale, 11.5 * scale, 'bright', 1.05);
+      drawScallopedFoliageCluster(x + 15 * scale, y - 51 * scale, 16 * scale, 11.5 * scale, 'bright', 1.05);
+      drawScallopedFoliageCluster(x, y - 49 * scale, 18 * scale, 12.5 * scale, 'bright', 1.0);
 
-        ctx.fillStyle = t.dark;
-        ctx.beginPath();
-        ctx.moveTo(txCenter + tierSway * 0.25, peakY);
-        ctx.quadraticCurveTo(txCenter + halfW * 0.6, baseY - 4, txCenter + halfW, baseY + 2);
-        ctx.quadraticCurveTo(txCenter + halfW * 0.5, baseY + 7, txCenter + halfW * 0.18, baseY + 3);
-        ctx.quadraticCurveTo(txCenter, baseY + 8, txCenter - halfW * 0.18, baseY + 3);
-        ctx.quadraticCurveTo(txCenter - halfW * 0.5, baseY + 7, txCenter - halfW, baseY + 2);
-        ctx.quadraticCurveTo(txCenter - halfW * 0.6, baseY - 4, txCenter + tierSway * 0.25, peakY);
-        ctx.closePath();
-        ctx.fill();
+      // Sunlit golden-lime crown clusters at the top of the oak
+      drawScallopedFoliageCluster(x - 6 * scale, y - 61 * scale, 15 * scale, 10.5 * scale, 'crown', 1.25);
+      drawScallopedFoliageCluster(x + 7 * scale, y - 59 * scale, 14 * scale, 10 * scale, 'crown', 1.25);
+    } else if (species === 1) {
+      // ARCHETYPE 1: Tall Rounded Woodland Tree (Top-Right medium-tall tree in image.png)
+      drawScallopedFoliageCluster(x, y - 32 * scale, 21 * scale, 12 * scale, 'shadow', 0.6);
+      drawBarkTrunk(7.2 * scale, 4.5 * scale, 40 * scale, false);
 
-        const boughGrad = ctx.createLinearGradient(txCenter - halfW, peakY, txCenter + halfW, baseY);
-        boughGrad.addColorStop(0, t.lit);
-        boughGrad.addColorStop(0.55, t.mid);
-        boughGrad.addColorStop(1, t.dark);
-        ctx.fillStyle = boughGrad;
-        ctx.beginPath();
-        ctx.moveTo(txCenter + tierSway * 0.25, peakY);
-        ctx.quadraticCurveTo(txCenter + halfW * 0.55, baseY - 5, txCenter + halfW * 0.9, baseY);
-        ctx.quadraticCurveTo(txCenter + halfW * 0.4, baseY + 4, txCenter, baseY + 2);
-        ctx.quadraticCurveTo(txCenter - halfW * 0.4, baseY + 4, txCenter - halfW * 0.9, baseY);
-        ctx.quadraticCurveTo(txCenter - halfW * 0.55, baseY - 5, txCenter + tierSway * 0.25, peakY);
-        ctx.closePath();
-        ctx.fill();
-      }
+      // Lower-mid wide green skirt
+      drawScallopedFoliageCluster(x - 13 * scale, y - 37 * scale, 15 * scale, 11 * scale, 'mid', 0.75);
+      drawScallopedFoliageCluster(x + 13 * scale, y - 36 * scale, 15 * scale, 11 * scale, 'mid', 0.75);
+      drawScallopedFoliageCluster(x, y - 35 * scale, 16 * scale, 11.5 * scale, 'mid', 0.75);
+
+      // Middle dome tier
+      drawScallopedFoliageCluster(x - 10 * scale, y - 48 * scale, 15 * scale, 11 * scale, 'bright', 1.0);
+      drawScallopedFoliageCluster(x + 10 * scale, y - 47 * scale, 15 * scale, 11 * scale, 'bright', 1.0);
+      drawScallopedFoliageCluster(x, y - 46 * scale, 16 * scale, 11.5 * scale, 'bright', 0.95);
+
+      // High sunlit lime dome crown
+      drawScallopedFoliageCluster(x - 4 * scale, y - 59 * scale, 14 * scale, 10.5 * scale, 'crown', 1.25);
+      drawScallopedFoliageCluster(x + 5 * scale, y - 57 * scale, 13 * scale, 9.5 * scale, 'crown', 1.2);
+      drawScallopedFoliageCluster(x, y - 65 * scale, 11 * scale, 8.5 * scale, 'crown', 1.35);
+    } else if (species === 2) {
+      // ARCHETYPE 2: Compact Meadow Shade Tree (Bottom-Left medium tree in image.png)
+      drawScallopedFoliageCluster(x, y - 28 * scale, 19 * scale, 11 * scale, 'shadow', 0.55);
+      drawBarkTrunk(6.5 * scale, 4.0 * scale, 34 * scale, true);
+
+      drawScallopedFoliageCluster(x - 12 * scale, y - 34 * scale, 14.5 * scale, 10.5 * scale, 'mid', 0.8);
+      drawScallopedFoliageCluster(x + 12 * scale, y - 33 * scale, 14.5 * scale, 10.5 * scale, 'mid', 0.8);
+      drawScallopedFoliageCluster(x, y - 32 * scale, 15.5 * scale, 11 * scale, 'mid', 0.75);
+
+      drawScallopedFoliageCluster(x - 8 * scale, y - 44 * scale, 14 * scale, 10 * scale, 'bright', 1.05);
+      drawScallopedFoliageCluster(x + 8 * scale, y - 43 * scale, 14 * scale, 10 * scale, 'bright', 1.05);
+      drawScallopedFoliageCluster(x, y - 51 * scale, 13.5 * scale, 9.5 * scale, 'crown', 1.2);
     } else {
-      // SPECIES 0 (Vibrant Emerald Oak), 2 (Sunlit Golden Birch), 3 (Radiant Blossoming Sakura)
-      const isBirch = species === 2;
-      const isBlossom = species === 3;
+      // ARCHETYPE 3: Young Forked Sapling Tree (Center-Left small tree in image.png with visible branches between leaf puffs)
+      const bSway = baseSway * 0.5;
+      // Airy back leaf cluster
+      drawScallopedFoliageCluster(x + 8 * scale, y - 29 * scale, 10.5 * scale, 7.8 * scale, 'mid', 0.75);
 
-      const trunkLeft = isBirch ? '#f1f5f9' : isBlossom ? '#54291a' : '#78442a';
-      const trunkMid = isBirch ? '#cbd5e1' : isBlossom ? '#3d1c11' : '#542d19';
-      const trunkRight = isBirch ? '#64748b' : isBlossom ? '#240f08' : '#30180b';
-
-      const trunkGrad = ctx.createLinearGradient(x - 10, y, x + 10, y);
-      trunkGrad.addColorStop(0, trunkLeft);
-      trunkGrad.addColorStop(0.5, trunkMid);
-      trunkGrad.addColorStop(1, trunkRight);
-      ctx.fillStyle = trunkGrad;
-
-      const branchSway = baseSway * 0.55;
+      // Slender forked sapling trunk & visible upper branches
+      ctx.strokeStyle = '#211208';
+      ctx.lineWidth = 4.2 * scale;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(x - 11 * scale, y + 4);
-      ctx.quadraticCurveTo(x - 6 * scale, y - 2, x - 5.5 * scale + branchSway * 0.4, y - 16 * scale);
-      ctx.lineTo(x - 15 * scale + branchSway, y - 34 * scale);
-      ctx.lineTo(x - 10 * scale + branchSway, y - 36 * scale);
-      ctx.lineTo(x - 2 * scale + branchSway * 0.6, y - 22 * scale);
-      ctx.lineTo(x + 2 * scale + branchSway * 0.6, y - 24 * scale);
-      ctx.lineTo(x + 12 * scale + branchSway, y - 35 * scale);
-      ctx.lineTo(x + 16 * scale + branchSway, y - 32 * scale);
-      ctx.lineTo(x + 5.5 * scale + branchSway * 0.4, y - 15 * scale);
-      ctx.quadraticCurveTo(x + 6 * scale, y - 2, x + 11 * scale, y + 4);
-      ctx.quadraticCurveTo(x, y + 6, x - 11 * scale, y + 4);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = isBirch ? '#334155' : 'rgba(15, 8, 4, 0.55)';
-      ctx.lineWidth = 1.1;
-      ctx.beginPath();
-      if (isBirch) {
-        ctx.moveTo(x - 4 * scale, y - 6 * scale);
-        ctx.lineTo(x + 2 * scale, y - 6 * scale);
-        ctx.moveTo(x - 3 * scale, y - 13 * scale);
-        ctx.lineTo(x + 4 * scale, y - 13 * scale);
-        ctx.moveTo(x - 4 * scale + branchSway * 0.3, y - 19 * scale);
-        ctx.lineTo(x + 1 * scale + branchSway * 0.3, y - 19 * scale);
-      } else {
-        ctx.moveTo(x - 3 * scale, y + 3);
-        ctx.quadraticCurveTo(x - 2 * scale, y - 10 * scale, x - 4 * scale + branchSway * 0.5, y - 22 * scale);
-        ctx.moveTo(x + 2 * scale, y + 4);
-        ctx.quadraticCurveTo(x + 1 * scale, y - 9 * scale, x + 3 * scale + branchSway * 0.5, y - 20 * scale);
-      }
+      ctx.moveTo(x, y + 3);
+      ctx.quadraticCurveTo(x - 1, y - 14 * scale, x + bSway * 0.4, y - 26 * scale);
+      // Left branch
+      ctx.moveTo(x + bSway * 0.3, y - 18 * scale);
+      ctx.lineTo(x - 11 * scale + bSway * 0.8, y - 31 * scale);
+      // Right branch
+      ctx.moveTo(x + bSway * 0.35, y - 21 * scale);
+      ctx.lineTo(x + 11 * scale + bSway * 0.8, y - 33 * scale);
+      // Center-top branch
+      ctx.moveTo(x + bSway * 0.4, y - 25 * scale);
+      ctx.lineTo(x - 2 * scale + bSway, y - 40 * scale);
       ctx.stroke();
 
-      // Vibrant, Lush, Saturated Foliage Palettes
-      const palette = isBirch
-        ? {
-            shadow: '#78350f',
-            deep: '#b45309',
-            mid: '#ea580c',
-            bright: '#f59e0b',
-            crown: '#fef08a',
-          }
-        : isBlossom
-        ? {
-            shadow: '#500724',
-            deep: '#9d174d',
-            mid: '#ec4899',
-            bright: '#f472b6',
-            crown: '#ffe4e6',
-          }
-        : {
-            shadow: '#0c4a24',
-            deep: '#157a3a',
-            mid: '#22a852',
-            bright: '#4ade80',
-            crown: '#bef264',
-          };
+      ctx.strokeStyle = '#754929';
+      ctx.lineWidth = 2.4 * scale;
+      ctx.stroke();
 
-      const drawLeafCloud = (
-        cx: number,
-        cy: number,
-        rx: number,
-        ry: number,
-        topCol: string,
-        botCol: string,
-        swayFactor: number
-      ) => {
-        const scx = cx + baseSway * swayFactor;
-        const scy = cy + crownBob * swayFactor * 0.6;
-        const g = ctx.createLinearGradient(scx, scy - ry, scx, scy + ry);
-        g.addColorStop(0, topCol);
-        g.addColorStop(0.65, botCol);
-        g.addColorStop(1, palette.shadow);
-        ctx.fillStyle = g;
-
-        ctx.beginPath();
-        const lobes = 7;
-        for (let i = 0; i < lobes; i++) {
-          const a = (i / lobes) * Math.PI * 2 + Math.sin(swayPhase + i) * 0.05;
-          const lx = scx + Math.cos(a) * rx * 0.62;
-          const ly = scy + Math.sin(a) * ry * 0.62;
-          const lobeR = (i % 2 === 0 ? 0.53 : 0.45) * Math.min(rx, ry * 1.35);
-          ctx.moveTo(lx + lobeR, ly);
-          ctx.arc(lx, ly, lobeR, 0, Math.PI * 2);
-        }
-        ctx.moveTo(scx + rx * 0.72, scy);
-        ctx.ellipse(scx, scy, rx * 0.72, ry * 0.72, 0, 0, Math.PI * 2);
-        ctx.fill();
-      };
-
-      drawLeafCloud(x - 16 * scale, y - 34 * scale, 19 * scale, 13 * scale, palette.deep, palette.shadow, 0.75);
-      drawLeafCloud(x + 16 * scale, y - 33 * scale, 19 * scale, 13 * scale, palette.deep, palette.shadow, 0.75);
-      drawLeafCloud(x, y - 30 * scale, 24 * scale, 15 * scale, palette.deep, palette.shadow, 0.65);
-
-      drawLeafCloud(x - 14 * scale, y - 42 * scale, 20 * scale, 14 * scale, palette.bright, palette.mid, 1.05);
-      drawLeafCloud(x + 13 * scale, y - 41 * scale, 20 * scale, 14 * scale, palette.bright, palette.mid, 1.05);
-      drawLeafCloud(x, y - 46 * scale, 24 * scale, 16 * scale, palette.bright, palette.mid, 1.15);
-
-      drawLeafCloud(x - 6 * scale, y - 55 * scale, 17 * scale, 12 * scale, palette.crown, palette.bright, 1.35);
-      drawLeafCloud(x + 6 * scale, y - 53 * scale, 15 * scale, 11 * scale, palette.crown, palette.bright, 1.35);
-
-      // Sunlit Rustling Crown Leaf Clusters (swaying with the upper canopy)
-      const topSway = baseSway * 1.45;
-      ctx.fillStyle = palette.crown;
-      ctx.beginPath();
-      ctx.arc(x - 8 * scale + topSway, y - 59 * scale + crownBob, 4.6 * scale, 0, Math.PI * 2);
-      ctx.arc(x - 2 * scale + topSway, y - 61 * scale + crownBob, 5.4 * scale, 0, Math.PI * 2);
-      ctx.arc(x + 5 * scale + topSway, y - 58 * scale + crownBob, 4.2 * scale, 0, Math.PI * 2);
-      ctx.arc(x - 16 * scale + baseSway * 1.1, y - 47 * scale + crownBob * 0.7, 4.3 * scale, 0, Math.PI * 2);
-      ctx.arc(x + 14 * scale + baseSway * 1.1, y - 46 * scale + crownBob * 0.7, 4.0 * scale, 0, Math.PI * 2);
-      ctx.fill();
+      // Distinct airy leaf clusters on the forked sapling branches
+      drawScallopedFoliageCluster(x - 11 * scale, y - 32 * scale, 11 * scale, 8.2 * scale, 'bright', 0.9);
+      drawScallopedFoliageCluster(x + 10 * scale, y - 35 * scale, 10.5 * scale, 8 * scale, 'bright', 0.95);
+      drawScallopedFoliageCluster(x - 1 * scale, y - 43 * scale, 11.5 * scale, 8.5 * scale, 'crown', 1.15);
     }
 
     return canvas;
@@ -2159,8 +2386,8 @@ export class TileAtlasBank {
     ctx.closePath();
     ctx.clip();
 
-    // High-Resolution Recessed Grass-to-Path Step Lip (3D Topsoil Step Bevel + Ambient Shadow + Overhanging Turf Verge)
-    const drawRecessedTurfStepEdge = (
+    // Lush, Thick, Jagged/Tufted Bright-Green Grass Border Fringe (Matching the straight & crossroads paths in image.png)
+    const drawTuftedGrassBorderEdge = (
       u0: number,
       v0: number,
       u1: number,
@@ -2170,153 +2397,148 @@ export class TileAtlasBank {
       isTopEdge: boolean,
       seedSalt: number
     ) => {
-      // 1. Soft Ambient Occlusion Contact Shadow cast onto the sunken dirt path
-      const aoDepth = isTopEdge ? 0.14 : 0.085;
-      const s0 = isoUV(cx, cy, u0, v0, 33.0, 16.5);
-      const s1 = isoUV(cx, cy, u1, v1, 33.0, 16.5);
-      const s2 = isoUV(cx, cy, u1 + duIn * aoDepth, v1 + dvIn * aoDepth, 33.0, 16.5);
-      const s3 = isoUV(cx, cy, u0 + duIn * aoDepth, v0 + dvIn * aoDepth, 33.0, 16.5);
-      ctx.fillStyle = isTopEdge ? 'rgba(42, 26, 10, 0.30)' : 'rgba(42, 26, 10, 0.16)';
+      const steps = 16;
+      const baseRim = 0.145; // Thick, prominent lush grass border like image.png
+
+      // 1. Warm Dark-Earth Undercut Shadow beneath the overhanging grass fringe
+      const shadowDepth = baseRim * (isTopEdge ? 1.45 : 1.22);
+      ctx.fillStyle = isTopEdge ? 'rgba(92, 60, 32, 0.72)' : 'rgba(102, 68, 38, 0.52)';
       ctx.beginPath();
-      ctx.moveTo(s0.x, s0.y);
-      ctx.lineTo(s1.x, s1.y);
-      ctx.lineTo(s2.x, s2.y);
-      ctx.lineTo(s3.x, s3.y);
+      const pStart = isoUV(cx, cy, u0, v0, 33.2, 16.6);
+      ctx.moveTo(pStart.x, pStart.y);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const h = spatialHash(i + seedSalt, mask, 911);
+        const jag = ((h & 7) / 7) * 0.055;
+        const d = shadowDepth + jag;
+        const pt = isoUV(
+          cx,
+          cy,
+          u0 + (u1 - u0) * t + duIn * d,
+          v0 + (v1 - v0) * t + dvIn * d,
+          33.2,
+          16.6
+        );
+        ctx.lineTo(pt.x, pt.y + (isTopEdge ? 0.6 : 0));
+      }
+      const pEnd = isoUV(cx, cy, u1, v1, 33.2, 16.6);
+      ctx.lineTo(pEnd.x, pEnd.y);
       ctx.closePath();
       ctx.fill();
 
-      const steps = 20;
-      const baseRim = 0.068;
-
-      // 2. Exposed 3D Topsoil / Loam Step Wall (visible along North/East top edges where path sits recessed below meadow)
-      if (isTopEdge) {
-        for (let i = 0; i < steps; i++) {
-          const tA = i / steps;
-          const tB = (i + 1) / steps;
-          const h = spatialHash(i + seedSalt, mask, 911);
-          const soilDepth = baseRim * (1.38 + ((h & 3) - 1.5) * 0.12);
-
-          const dp0 = isoUV(cx, cy, u0 + (u1 - u0) * tA, v0 + (v1 - v0) * tA, 33.0, 16.5);
-          const dp1 = isoUV(cx, cy, u0 + (u1 - u0) * tB, v0 + (v1 - v0) * tB, 33.0, 16.5);
-          const dp2 = isoUV(
-            cx,
-            cy,
-            u0 + (u1 - u0) * tB + duIn * soilDepth,
-            v0 + (v1 - v0) * tB + dvIn * soilDepth,
-            33.0,
-            16.5
-          );
-          const dp3 = isoUV(
-            cx,
-            cy,
-            u0 + (u1 - u0) * tA + duIn * soilDepth,
-            v0 + (v1 - v0) * tA + dvIn * soilDepth,
-            33.0,
-            16.5
-          );
-          ctx.fillStyle = (h & 1) === 0 ? '#684a2e' : '#573c24';
-          ctx.beginPath();
-          ctx.moveTo(dp0.x, dp0.y);
-          ctx.lineTo(dp1.x, dp1.y);
-          ctx.lineTo(dp2.x, dp2.y);
-          ctx.lineTo(dp3.x, dp3.y);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-
-      // 3. Organic Scalloped Overhanging Meadow Turf Lip & Crisp Grass Blades
-      for (let i = 0; i < steps; i++) {
-        const tA = i / steps;
-        const tB = (i + 1) / steps;
+      // 2. Deep Forest-Green Jagged Turf Teeth Layer (#286918)
+      ctx.fillStyle = '#286918';
+      ctx.beginPath();
+      ctx.moveTo(pStart.x, pStart.y);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
         const h = spatialHash(i + seedSalt * 3, mask, 947);
-        const wave = Math.sin((i / steps) * Math.PI * 4 + seedSalt) * 0.014;
-        const lipDepth = baseRim * (0.85 + ((h & 3) * 0.09)) + wave;
-
-        const gp0 = isoUV(cx, cy, u0 + (u1 - u0) * tA, v0 + (v1 - v0) * tA, 33.0, 16.5);
-        const gp1 = isoUV(cx, cy, u0 + (u1 - u0) * tB, v0 + (v1 - v0) * tB, 33.0, 16.5);
-        const gp2 = isoUV(
+        const tooth = (i % 2 === 0 ? 0.048 : -0.015) + ((h & 3) * 0.012);
+        const d = baseRim * 1.08 + tooth;
+        const pt = isoUV(
           cx,
           cy,
-          u0 + (u1 - u0) * tB + duIn * lipDepth,
-          v0 + (v1 - v0) * tB + dvIn * lipDepth,
-          33.0,
-          16.5
+          u0 + (u1 - u0) * t + duIn * d,
+          v0 + (v1 - v0) * t + dvIn * d,
+          33.2,
+          16.6
         );
-        const gp3 = isoUV(
+        ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.lineTo(pEnd.x, pEnd.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3. Vibrant Mid-Green Leafy Grass Fringe Body (#4ca828)
+      ctx.fillStyle = '#4ca828';
+      ctx.beginPath();
+      ctx.moveTo(pStart.x, pStart.y);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const h = spatialHash(i + seedSalt * 5, mask, 977);
+        const tooth = (i % 2 === 0 ? 0.038 : -0.012) + ((h & 3) * 0.01);
+        const d = baseRim * 0.82 + tooth;
+        const pt = isoUV(
           cx,
           cy,
-          u0 + (u1 - u0) * tA + duIn * lipDepth,
-          v0 + (v1 - v0) * tA + dvIn * lipDepth,
-          33.0,
-          16.5
+          u0 + (u1 - u0) * t + duIn * d,
+          v0 + (v1 - v0) * t + dvIn * d,
+          33.2,
+          16.6
         );
+        ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.lineTo(pEnd.x, pEnd.y);
+      ctx.closePath();
+      ctx.fill();
 
-        // Deep emerald underside rim
-        ctx.fillStyle = '#337c27';
+      // 4. Sunlit Lime-Yellow Grass Crest & Pointed Blade Tips (#8ce03a)
+      ctx.fillStyle = '#8ce03a';
+      ctx.beginPath();
+      ctx.moveTo(pStart.x, pStart.y);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const tooth = i % 2 === 0 ? 0.025 : -0.008;
+        const d = baseRim * 0.46 + tooth;
+        const pt = isoUV(
+          cx,
+          cy,
+          u0 + (u1 - u0) * t + duIn * d,
+          v0 + (v1 - v0) * t + dvIn * d,
+          33.2,
+          16.6
+        );
+        ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.lineTo(pEnd.x, pEnd.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 5. Individual Crisp Grass Blades Jutting Over the Path Edge
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 1.1;
+      for (let i = 1; i < steps; i += 2) {
+        const t = i / steps;
+        const h = spatialHash(i + seedSalt * 7, mask, 997);
+        const bBase = isoUV(
+          cx,
+          cy,
+          u0 + (u1 - u0) * t + duIn * (baseRim * 0.65),
+          v0 + (v1 - v0) * t + dvIn * (baseRim * 0.65),
+          33.2,
+          16.6
+        );
+        const bTip = isoUV(
+          cx,
+          cy,
+          u0 + (u1 - u0) * t + duIn * (baseRim * 1.25),
+          v0 + (v1 - v0) * t + dvIn * (baseRim * 1.25),
+          33.2,
+          16.6
+        );
+        ctx.strokeStyle = (h & 1) === 0 ? '#8ce03a' : '#53b028';
         ctx.beginPath();
-        ctx.moveTo(gp0.x, gp0.y);
-        ctx.lineTo(gp1.x, gp1.y);
-        ctx.lineTo(gp2.x, gp2.y + 0.45);
-        ctx.lineTo(gp3.x, gp3.y + 0.45);
-        ctx.closePath();
-        ctx.fill();
-
-        // Sunlit meadow grass crest
-        ctx.fillStyle = (h & 1) === 0 ? '#4ca638' : '#449833';
-        ctx.beginPath();
-        ctx.moveTo(gp0.x, gp0.y);
-        ctx.lineTo(gp1.x, gp1.y);
-        ctx.lineTo(gp2.x, gp2.y);
-        ctx.lineTo(gp3.x, gp3.y);
-        ctx.closePath();
-        ctx.fill();
-
-        // Crisp high-DPI grass blade tips overhanging the recessed path edge
-        if (i % 2 === 0) {
-          const midT = (tA + tB) * 0.5;
-          const bBase = isoUV(
-            cx,
-            cy,
-            u0 + (u1 - u0) * midT + duIn * (lipDepth * 0.75),
-            v0 + (v1 - v0) * midT + dvIn * (lipDepth * 0.75),
-            33.0,
-            16.5
-          );
-          const bTip = isoUV(
-            cx,
-            cy,
-            u0 + (u1 - u0) * midT + duIn * (lipDepth + 0.032),
-            v0 + (v1 - v0) * midT + dvIn * (lipDepth + 0.032),
-            33.0,
-            16.5
-          );
-          ctx.strokeStyle = (h & 2) === 0 ? '#62c34a' : '#3d8f2f';
-          ctx.lineWidth = 0.85;
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(bBase.x, bBase.y);
-          ctx.lineTo(bTip.x, bTip.y - 0.5);
-          ctx.stroke();
-        }
+        ctx.moveTo(bBase.x, bBase.y);
+        ctx.lineTo(bTip.x, bTip.y - 0.8);
+        ctx.stroke();
       }
     };
 
     // North neighbor (ty - 1): v = 0 edge (u from 0 to 1, inward is +v)
     if ((mask & 1) !== 0) {
-      drawRecessedTurfStepEdge(0, 0, 1, 0, 0, 1, true, 13);
+      drawTuftedGrassBorderEdge(0, 0, 1, 0, 0, 1, true, 13);
     }
     // East neighbor (tx + 1): u = 1 edge (v from 0 to 1, inward is -u)
     if ((mask & 2) !== 0) {
-      drawRecessedTurfStepEdge(1, 0, 1, 1, -1, 0, true, 29);
+      drawTuftedGrassBorderEdge(1, 0, 1, 1, -1, 0, true, 29);
     }
     // South neighbor (ty + 1): v = 1 edge (u from 0 to 1, inward is -v)
     if ((mask & 4) !== 0) {
-      drawRecessedTurfStepEdge(0, 1, 1, 1, 0, -1, false, 47);
+      drawTuftedGrassBorderEdge(0, 1, 1, 1, 0, -1, false, 47);
     }
     // West neighbor (tx - 1): u = 0 edge (v from 0 to 1, inward is +u)
     if ((mask & 8) !== 0) {
-      drawRecessedTurfStepEdge(0, 0, 0, 1, 1, 0, false, 61);
+      drawTuftedGrassBorderEdge(0, 0, 0, 1, 1, 0, false, 61);
     }
 
     ctx.restore();

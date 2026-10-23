@@ -54,9 +54,9 @@ export const App: React.FC = () => {
     startClientX: 0,
     startClientY: 0,
     originX: 16,
-    originY: 80,
+    originY: 168,
     currentX: 16,
-    currentY: 80,
+    currentY: 168,
   });
 
   const handleGuidePointerDown = (e: React.PointerEvent<HTMLElement>) => {
@@ -129,10 +129,11 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     engine.isPaused = isAnyModalOpen;
+    engine.isMenuCameraMode = isInMainMenu;
     if (isAnyModalOpen) {
       engine.clearInput();
     }
-  }, [engine, isAnyModalOpen]);
+  }, [engine, isAnyModalOpen, isInMainMenu]);
 
   useEffect(() => {
     engine.onInteract = () => {
@@ -256,10 +257,16 @@ export const App: React.FC = () => {
       {/* Main Menu Screen (Initial or Pause overlay) */}
       {(isInMainMenu || isPausedMenu) && (
         <MainMenuModal
+          engine={engine}
           isPausedMode={!isInMainMenu && isPausedMenu}
           onResume={() => setIsPausedMenu(false)}
           onNewGame={handleResetGame}
           onContinue={handleContinueGame}
+          onSelectClass={handleOpenClassSelect}
+          onOpenInventory={() => {
+            setIsPausedMenu(false);
+            setShowInventory(true);
+          }}
           onQuit={handleQuitToMenu}
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
@@ -280,7 +287,7 @@ export const App: React.FC = () => {
       />
 
       {/* Minimap Radar */}
-      <Minimap engine={engine} />
+      <Minimap engine={engine} onOpenMenu={() => setIsPausedMenu(true)} />
 
       {/* Chronicle / Combat Feed */}
       <CombatLog logs={engine.state.combatLogs} />
@@ -290,6 +297,12 @@ export const App: React.FC = () => {
         <aside
           id="controls-guide"
           ref={controlsGuideRef}
+          style={
+            {
+              '--guide-x': `${guideDragRef.current.currentX}px`,
+              '--guide-y': `${guideDragRef.current.currentY}px`,
+            } as React.CSSProperties
+          }
           onPointerDown={handleGuidePointerDown}
           onPointerMove={handleGuidePointerMove}
           onPointerUp={handleGuidePointerUp}

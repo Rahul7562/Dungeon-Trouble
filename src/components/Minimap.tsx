@@ -11,10 +11,22 @@ import {
   TOWN_TILE_FLAG_INTERIOR_STONE,
   TOWN_TILE_FLAG_INTERIOR_CARPET,
 } from '../engine/town';
-import { Compass, Sun, Sunrise, Sunset, Moon, CloudSun, Sparkles, Home } from 'lucide-react';
+import {
+  Sun,
+  Sunrise,
+  Sunset,
+  Moon,
+  CloudSun,
+  Sparkles,
+  Home,
+  ZoomIn,
+  Settings,
+  FastForward,
+} from 'lucide-react';
 
 interface MinimapProps {
   engine: GameEngine;
+  onOpenMenu?: () => void;
 }
 
 function getPhaseVisuals(phase: TimeOfDayPhase) {
@@ -23,55 +35,49 @@ function getPhaseVisuals(phase: TimeOfDayPhase) {
       return {
         Icon: Sunrise,
         iconColor: 'text-rose-400',
-        badgeBg: 'bg-rose-950/80 border-rose-700/60 text-rose-200',
+        badgeBg: 'bg-rose-950/85 border-rose-600/60 text-rose-200',
         barGradient: 'from-indigo-500 via-rose-400 to-amber-300',
-        glowColor: 'shadow-rose-500/15',
       };
     case 'Morning':
       return {
         Icon: CloudSun,
         iconColor: 'text-amber-300',
-        badgeBg: 'bg-amber-950/75 border-amber-700/60 text-amber-200',
+        badgeBg: 'bg-amber-950/85 border-amber-600/60 text-amber-200',
         barGradient: 'from-rose-400 via-amber-300 to-sky-400',
-        glowColor: 'shadow-amber-400/15',
       };
     case 'Afternoon':
       return {
         Icon: Sun,
         iconColor: 'text-yellow-300',
-        badgeBg: 'bg-sky-950/80 border-sky-700/60 text-sky-200',
+        badgeBg: 'bg-sky-950/85 border-sky-600/60 text-sky-200',
         barGradient: 'from-amber-300 via-yellow-300 to-orange-400',
-        glowColor: 'shadow-yellow-400/15',
       };
     case 'Evening':
       return {
         Icon: Sunset,
         iconColor: 'text-orange-400',
-        badgeBg: 'bg-orange-950/80 border-orange-700/60 text-orange-200',
+        badgeBg: 'bg-orange-950/85 border-orange-600/60 text-orange-200',
         barGradient: 'from-yellow-400 via-orange-500 to-purple-500',
-        glowColor: 'shadow-orange-500/20',
       };
     case 'Dusk':
       return {
         Icon: Sparkles,
         iconColor: 'text-purple-300',
-        badgeBg: 'bg-purple-950/85 border-purple-700/60 text-purple-200',
+        badgeBg: 'bg-purple-950/85 border-purple-600/60 text-purple-200',
         barGradient: 'from-orange-500 via-purple-600 to-indigo-900',
-        glowColor: 'shadow-purple-500/20',
       };
     case 'Night':
     default:
       return {
         Icon: Moon,
         iconColor: 'text-indigo-300',
-        badgeBg: 'bg-indigo-950/90 border-indigo-700/70 text-indigo-200',
+        badgeBg: 'bg-indigo-950/90 border-indigo-600/70 text-indigo-200',
         barGradient: 'from-indigo-900 via-indigo-500 to-slate-800',
-        glowColor: 'shadow-indigo-500/20',
       };
   }
 }
 
-export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
+export const Minimap: React.FC<MinimapProps> = ({ engine, onOpenMenu }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const staticLayerRef = useRef<{ map: TileMap; canvas: HTMLCanvasElement } | null>(null);
 
@@ -81,7 +87,6 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
   const phaseVisuals = getPhaseVisuals(daylight.phase);
   const PhaseIcon = phaseVisuals.Icon;
 
-  // Check if player is currently inside any building in Town-1
   const currentBuilding = isTown
     ? engine.state.townLevel.buildings.find((b) =>
         isPlayerInsideBuilding(
@@ -92,18 +97,6 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
         )
       )
     : undefined;
-
-  // Compute human-readable countdown / next transition hint for the player
-  const nextTransitionLabel = (() => {
-    const h = daylight.timeHours;
-    if (h < 5.0) return 'Dawn at 05:00 AM';
-    if (h < 7.5) return 'Morning at 07:30 AM';
-    if (h < 12.0) return 'Afternoon at 12:00 PM';
-    if (h < 16.5) return 'Evening at 04:30 PM';
-    if (h < 19.25) return 'Dusk at 07:15 PM';
-    if (h < 21.0) return 'Night at 09:00 PM';
-    return 'Dawn at 05:00 AM';
-  })();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -116,14 +109,13 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
     const scaleX = canvas.width / map.width;
     const scaleY = canvas.height / map.height;
 
-    // Bake static terrain layer once per map instance to avoid 9,216 fillRect calls per tick!
     if (!staticLayerRef.current || staticLayerRef.current.map !== map) {
       const offscreen = document.createElement('canvas');
       offscreen.width = canvas.width;
       offscreen.height = canvas.height;
       const octx = offscreen.getContext('2d');
       if (octx) {
-        octx.fillStyle = '#090d16';
+        octx.fillStyle = '#070a12';
         octx.fillRect(0, 0, offscreen.width, offscreen.height);
 
         const tileFlags = isTown ? engine.state.townLevel.tileFlags : null;
@@ -143,30 +135,30 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
                       TOWN_TILE_FLAG_INTERIOR_CARPET)) !==
                   0;
                 const isRoad = (flags & TOWN_TILE_FLAG_ROAD) !== 0;
-                octx.fillStyle = isInterior ? '#5c4330' : isRoad ? '#736c62' : '#255c34';
+                octx.fillStyle = isInterior ? '#6b4c35' : isRoad ? '#8a7e6e' : '#235331';
               } else {
-                octx.fillStyle = '#1e293b';
+                octx.fillStyle = '#334155';
               }
               octx.fillRect(x * scaleX, y * scaleY, Math.ceil(scaleX), Math.ceil(scaleY));
             } else if (type === TileType.Wall && isTown) {
               const isTree = (flags & TOWN_TILE_FLAG_TREE) !== 0;
-              octx.fillStyle = isTree ? '#164526' : '#857768';
+              octx.fillStyle = isTree ? '#143820' : '#9a8873';
               octx.fillRect(x * scaleX, y * scaleY, Math.ceil(scaleX), Math.ceil(scaleY));
             } else if (type === TileType.Water) {
               octx.fillStyle = '#0ea5e9';
               octx.fillRect(x * scaleX, y * scaleY, Math.ceil(scaleX), Math.ceil(scaleY));
             } else if (type === TileType.Exit) {
-              octx.fillStyle = '#a855f7';
-              octx.fillRect(x * scaleX, y * scaleY, scaleX + 1.5, scaleY + 1.5);
+              octx.fillStyle = '#c084fc';
+              octx.fillRect(x * scaleX, y * scaleY, scaleX + 2, scaleY + 2);
             } else if (type === TileType.Chest) {
-              octx.fillStyle = '#f59e0b';
-              octx.fillRect(x * scaleX, y * scaleY, scaleX + 1, scaleY + 1);
+              octx.fillStyle = '#fbbf24';
+              octx.fillRect(x * scaleX, y * scaleY, scaleX + 1.5, scaleY + 1.5);
             }
           }
         }
 
         if (isTown) {
-          octx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+          octx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
           octx.lineWidth = 0.8;
           for (const b of engine.state.townLevel.buildings) {
             octx.strokeRect(b.x * scaleX, b.y * scaleY, b.w * scaleX, b.h * scaleY);
@@ -184,43 +176,34 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
       staticLayerRef.current = { map, canvas: offscreen };
     }
 
-    // 1. Blit pre-baked static terrain in a single call
     ctx.drawImage(staticLayerRef.current.canvas, 0, 0);
 
-    // 2. Dynamic overlays: active building highlight & NPC / Enemy markers
     if (isTown) {
       if (currentBuilding) {
         ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.6;
         ctx.strokeRect(
           currentBuilding.x * scaleX,
           currentBuilding.y * scaleY,
           currentBuilding.w * scaleX,
           currentBuilding.h * scaleY
         );
-        if (currentBuilding.wing) {
-          ctx.strokeRect(
-            currentBuilding.wing.x * scaleX,
-            currentBuilding.wing.y * scaleY,
-            currentBuilding.wing.w * scaleX,
-            currentBuilding.wing.h * scaleY
-          );
-        }
       }
 
-      // Draw NPCs batched by role color
-      ctx.fillStyle = '#fde047';
+      // Facility NPCs (bright gold)
+      ctx.fillStyle = '#fef08a';
       ctx.beginPath();
       for (const npc of engine.state.townLevel.npcs) {
         if (npc.role === 'villager') continue;
         const nt = map.worldToTile(npc.x, npc.y);
         const cx = (nt.x + 0.5) * scaleX;
         const cy = (nt.y + 0.5) * scaleY;
-        ctx.moveTo(cx + 2.5, cy);
-        ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+        ctx.moveTo(cx + 2.6, cy);
+        ctx.arc(cx, cy, 2.6, 0, Math.PI * 2);
       }
       ctx.fill();
 
+      // Villagers (warm amber)
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
       for (const npc of engine.state.townLevel.npcs) {
@@ -228,118 +211,136 @@ export const Minimap: React.FC<MinimapProps> = ({ engine }) => {
         const nt = map.worldToTile(npc.x, npc.y);
         const cx = (nt.x + 0.5) * scaleX;
         const cy = (nt.y + 0.5) * scaleY;
-        ctx.moveTo(cx + 1.9, cy);
-        ctx.arc(cx, cy, 1.9, 0, Math.PI * 2);
+        ctx.moveTo(cx + 1.8, cy);
+        ctx.arc(cx, cy, 1.8, 0, Math.PI * 2);
       }
       ctx.fill();
     } else {
-      // In dungeon: draw enemies as red dots in a single batched path
+      // Dungeon enemies (bright crimson)
       ctx.fillStyle = '#ef4444';
       ctx.beginPath();
       for (const enemy of enemies) {
         const et = map.worldToTile(enemy.x, enemy.y);
         const cx = (et.x + 0.5) * scaleX;
         const cy = (et.y + 0.5) * scaleY;
-        ctx.moveTo(cx + 2, cy);
-        ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+        ctx.moveTo(cx + 2.2, cy);
+        ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
       }
       ctx.fill();
     }
 
-    // Draw player as bright cyan dot with subtle halo
+    // Player marker (glowing cyan-emerald)
     const pt = map.worldToTile(player.x, player.y);
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.32)';
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.36)';
     ctx.beginPath();
-    ctx.arc((pt.x + 0.5) * scaleX, (pt.y + 0.5) * scaleY, 5.5, 0, Math.PI * 2);
+    ctx.arc((pt.x + 0.5) * scaleX, (pt.y + 0.5) * scaleY, 6, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = '#38bdf8';
     ctx.beginPath();
-    ctx.arc((pt.x + 0.5) * scaleX, (pt.y + 0.5) * scaleY, 3, 0, Math.PI * 2);
+    ctx.arc((pt.x + 0.5) * scaleX, (pt.y + 0.5) * scaleY, 3.2, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  // Calculate sun/moon marker position along the 24h cycle bar (0% at 00:00, 50% at 12:00, 100% at 24:00)
   const dayProgressPercent = Math.min(100, Math.max(0, (daylight.timeHours / 24) * 100));
 
   return (
-    <div className="pointer-events-auto absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2 select-none">
-      {/* Overworld Daylight Clock & Phase Widget (Directly Above Minimap) */}
-      {isTown && (
-        <div
-          id="daylight-clock-widget"
-          className={`w-[164px] bg-slate-950/95 border border-slate-800/90 rounded-2xl px-3 py-2 shadow-2xl ${phaseVisuals.glowColor} transition-colors duration-500`}
-        >
-          <div className="flex items-center justify-between gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <PhaseIcon className={`w-4 h-4 ${phaseVisuals.iconColor} shrink-0`} />
-              <span className="font-mono text-xs font-bold tracking-tight text-slate-100">
-                {daylight.formattedTime}
-              </span>
-            </div>
-            <span
-              className={`text-[10px] font-cinzel font-bold px-1.5 py-0.5 rounded-md border ${phaseVisuals.badgeBg}`}
-            >
-              {daylight.phase}
-            </span>
-          </div>
+    <div className="pointer-events-auto absolute top-3 right-3 z-20 flex flex-col items-end gap-2 select-none">
+      {/* Ornate Circular Compass Radar Frame (Matching image_5f5e217c.png) */}
+      <div className="relative w-[166px] h-[166px] flex items-center justify-center">
+        {/* Outer Dark-Iron & Gold Beveled Compass Ring */}
+        <div className="absolute inset-1 rounded-full bg-gradient-to-b from-stone-700 via-stone-900 to-stone-950 border-[3px] border-amber-500 shadow-[0_10px_30px_rgba(0,0,0,0.95)]" />
+        <div className="absolute inset-2.5 rounded-full border border-amber-300/50 pointer-events-none" />
 
-          {/* 24-Hour Horizon Progress Bar with Morning (06:00) & Night (20:30) Markers */}
-          <div className="mt-1.5">
-            <div className="relative h-1.5 w-full rounded-full bg-slate-900 overflow-hidden border border-slate-800/80">
-              <div
-                className={`h-full rounded-full bg-gradient-to-r ${phaseVisuals.barGradient} transition-all duration-300`}
-                style={{ width: `${dayProgressPercent}%` }}
-              />
-              {/* Dawn/Morning threshold tick (06:00 = 25%) */}
-              <div
-                className="absolute top-0 bottom-0 w-[1px] bg-amber-300/60"
-                style={{ left: '25%' }}
-                title="Morning (06:00 AM)"
-              />
-              {/* Night threshold tick (20:30 = 85.4%) */}
-              <div
-                className="absolute top-0 bottom-0 w-[1px] bg-indigo-300/60"
-                style={{ left: '85.4%' }}
-                title="Nightfall (08:30 PM)"
-              />
-            </div>
-            <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 mt-1">
-              <span>{nextTransitionLabel}</span>
-              <span className="text-slate-500">24h / 4m</span>
-            </div>
-          </div>
+        {/* 4 Cardinal Gold Compass Spikes (N, S, E, W) */}
+        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 bg-gradient-to-br from-yellow-200 via-amber-400 to-amber-700 border border-stone-950 shadow z-10" />
+        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 bg-gradient-to-br from-yellow-200 via-amber-400 to-amber-700 border border-stone-950 shadow z-10" />
+        <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-4 h-4 rotate-45 bg-gradient-to-br from-yellow-200 via-amber-400 to-amber-700 border border-stone-950 shadow z-10" />
+        <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-4 h-4 rotate-45 bg-gradient-to-br from-yellow-200 via-amber-400 to-amber-700 border border-stone-950 shadow z-10" />
+
+        {/* Circular Clipped Minimap Canvas */}
+        <div className="relative w-[138px] h-[138px] rounded-full overflow-hidden border-2 border-amber-600/80 bg-slate-950 shadow-inner">
+          <canvas
+            id="minimap-canvas"
+            ref={canvasRef}
+            width={138}
+            height={138}
+            className="w-full h-full block"
+          />
+        </div>
+
+        {/* Satellite Button 1 (Top-Right Rim): Settings / Pause Menu Gear */}
+        {onOpenMenu && (
+          <button
+            onClick={onOpenMenu}
+            title="Pause & Settings (Esc)"
+            className="absolute top-1 right-1 z-20 w-8 h-8 rounded-full bg-gradient-to-b from-stone-700 to-stone-900 hover:from-stone-600 hover:to-stone-800 border-2 border-amber-400 shadow-lg flex items-center justify-center text-amber-300 transition active:scale-95"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Satellite Button 2 (Bottom-Right Rim): 2.5D Camera Zoom Toggle (Magnifying Glass) */}
+        <button
+          id="minimap-zoom-btn"
+          onClick={() => engine.cycleCameraZoom()}
+          title={`Cycle 2.5D Camera Zoom (Current: ${(engine.cameraZoom || 1.22).toFixed(2)}x • Or use Mouse Wheel)`}
+          className="absolute bottom-2 right-0.5 z-20 w-8 h-8 rounded-full bg-gradient-to-b from-stone-700 to-stone-900 hover:from-stone-600 hover:to-stone-800 border-2 border-amber-400 shadow-lg flex items-center justify-center text-amber-200 transition active:scale-95"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </button>
+
+        {/* Satellite Badge (Bottom-Left Rim): Zone / Floor Indicator */}
+        <div className="absolute bottom-1 left-1 z-20 px-2 py-0.5 rounded-full bg-stone-900/95 border border-amber-500/80 text-[10px] font-cinzel font-bold text-amber-300 shadow">
+          {isTown ? 'Town-1' : `F${engine.state.currentFloor}`}
+        </div>
+      </div>
+
+      {/* Active Building Interior Banner when inside a Medieval House */}
+      {isTown && currentBuilding && (
+        <div className="flex items-center gap-1.5 bg-stone-900/95 border border-amber-500/70 rounded-lg px-2.5 py-1 text-[10px] text-amber-200 font-cinzel font-bold shadow-lg">
+          <Home className="w-3 h-3 text-amber-400 shrink-0" />
+          <span className="truncate max-w-[140px]">{currentBuilding.name}</span>
         </div>
       )}
 
-      {/* Minimap Card */}
-      <div className="w-[164px] bg-slate-950/95 border border-slate-800 rounded-2xl p-2.5 shadow-2xl">
-        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300 mb-1.5 px-0.5">
-          <div className="flex items-center gap-1.5 truncate">
-            <Compass className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span className="truncate">{isTown ? 'Oakridge Village' : 'Chamber Radar'}</span>
+      {/* Overworld Daylight Chronometer Bar (Town-1) */}
+      {isTown && (
+        <div
+          id="daylight-clock-widget"
+          className="w-[166px] bg-gradient-to-b from-stone-900/95 to-stone-950/95 border border-amber-500/60 rounded-xl px-2.5 py-1.5 shadow-xl"
+        >
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1">
+              <PhaseIcon className={`w-3.5 h-3.5 ${phaseVisuals.iconColor} shrink-0`} />
+              <span className="font-mono text-[11px] font-bold tracking-tight text-amber-100 tabular-nums">
+                {daylight.formattedTime}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span
+                className={`text-[9px] font-cinzel font-bold px-1.5 py-0.5 rounded border ${phaseVisuals.badgeBg}`}
+              >
+                {daylight.phase}
+              </span>
+              <button
+                onClick={() => engine.advanceWorldTime(3)}
+                title="Advance Time +3 Hours"
+                className="p-0.5 rounded bg-stone-800 hover:bg-stone-700 border border-amber-500/40 text-amber-300 transition"
+              >
+                <FastForward className="w-2.5 h-2.5" />
+              </button>
+            </div>
           </div>
-          <span className="font-mono text-[10px] text-amber-400/90 shrink-0">
-            {isTown ? 'Town-1' : `F${engine.state.currentFloor}`}
-          </span>
+
+          <div className="mt-1 relative h-1.5 w-full rounded-full bg-stone-950 overflow-hidden border border-stone-800">
+            <div
+              className={`h-full rounded-full bg-gradient-to-r ${phaseVisuals.barGradient} transition-all duration-300`}
+              style={{ width: `${dayProgressPercent}%` }}
+            />
+          </div>
         </div>
-
-        {/* Active Building Interior Indicator when Player steps inside a House */}
-        {isTown && currentBuilding && (
-          <div className="flex items-center gap-1.5 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2 py-1 mb-1.5 text-[10px] text-amber-200 font-medium truncate">
-            <Home className="w-3 h-3 text-amber-400 shrink-0" />
-            <span className="truncate">{currentBuilding.name}</span>
-          </div>
-        )}
-
-        <canvas
-          id="minimap-canvas"
-          ref={canvasRef}
-          width={142}
-          height={142}
-          className="w-full h-auto rounded-lg border border-slate-800/90 block"
-        />
-      </div>
+      )}
     </div>
   );
 };

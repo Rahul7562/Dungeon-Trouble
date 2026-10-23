@@ -1,0 +1,673 @@
+# MASTER PROMPT: COMPLETE GAME VISUAL OVERHAUL, 2.5D CAMERA REDESIGN & UI/MAIN MENU REMODELING
+
+## ROLE AND OBJECTIVE
+
+Act as a senior game developer, graphics programmer, technical artist, 2.5D game designer, UI/UX designer, animation engineer, and rendering specialist.
+
+I already have an existing playable video game running in Google AI Studio. The current implementation has poorly developed graphics, basic environments, inadequate visual depth, underdeveloped character presentation, unsatisfactory camera angles, and an interface that I now want to redesign.
+
+I will provide reference images showing the visual quality and style I want to achieve. Some images may represent environments, characters, camera perspectives, lighting, menus, HUDs, buttons, or complete game screens.
+
+Your task is to perform a **comprehensive visual and interface overhaul of the existing game**.
+
+This includes:
+
+1. Rebuilding the graphical presentation of the 2.5D game world.
+2. Redesigning the camera system and scene composition.
+3. Improving environments, characters, textures, materials, lighting, animations, and visual effects.
+4. Completely redesigning the main menu and primary GUI interface.
+5. Modernizing the HUD, pause menu, settings, loading screens, and other existing interface screens where applicable.
+6. Integrating all improvements into the real, playable game.
+7. Testing the result and correcting visual or functional problems.
+
+This is not a minor polish task. I expect a substantial transformation of the existing game's appearance.
+
+**Optimize for the strongest achievable final visual result, not for the smallest number of code changes.** You may extensively refactor or replace the visual implementation and interface architecture when necessary, but preserve the working game, its mechanics, and its project identity.
+
+---
+
+# PART 1 — INSPECT THE EXISTING PROJECT
+
+Before editing, inspect the existing Google AI Studio project and understand how it works.
+
+Determine:
+
+- The current game engine and rendering framework.
+- The project structure and major source files.
+- The existing 2.5D rendering approach.
+- How scenes, levels, characters, enemies, props, and backgrounds are created.
+- How the camera, projection, zoom, tracking, and transitions work.
+- How player movement, physics, collision, combat, animation, and game state operate.
+- How the main menu, HUD, pause menu, settings, and other screens are implemented.
+- Which graphics and interface components are placeholders or poorly designed.
+- Which assets, libraries, and existing features can be reused.
+- Which components need to be reconstructed or substantially refactored.
+
+Identify the underlying reasons for the poor visual quality. Do not assume that changing colors, adding glow, or increasing texture detail will solve structural problems with the camera, geometry, scene composition, or interface layout.
+
+Do not create an unrelated replacement game. Work directly within the current project.
+
+---
+
+# PART 2 — ANALYZE ALL PROVIDED REFERENCE IMAGES
+
+Carefully examine every reference image before implementing the redesign.
+
+Treat the images as a visual specification rather than loose inspiration.
+
+For each image, determine the relevant characteristics:
+
+### Visual identity
+- Art direction and overall visual style.
+- Main colors, accent colors, shadows, and highlights.
+- Realistic, stylized, cartoon, fantasy, cinematic, dark, retro, or other visual treatment.
+- Level of detail and consistency between assets.
+
+### Game world
+- Environment geometry and architecture.
+- Terrain, platforms, buildings, rooms, props, and background elements.
+- Character and enemy silhouettes, proportions, materials, and details.
+- Foreground, gameplay plane, and background separation.
+
+### Camera
+- Viewing angle and perspective.
+- Camera tilt, distance, projection, framing, and composition.
+- Field of view or orthographic scale.
+- Relative size of the player and environment.
+- Depth and relationship between foreground and background.
+
+### Lighting and atmosphere
+- Light direction, shadow softness, contrast, reflections, and highlights.
+- Ambient lighting, fog, haze, bloom, and color grading.
+- The intended mood and environmental atmosphere.
+
+### User interface
+- Main menu composition.
+- Logo and title treatment.
+- Typography and text hierarchy.
+- Button design, spacing, iconography, panels, and menus.
+- HUD arrangement and readability.
+- Background presentation and visual effects.
+
+If several images represent different parts of the desired design, combine them into a consistent art direction. If any references conflict, use the most relevant image for each particular subsystem.
+
+Do not simply copy an entire screenshot and display it in the game. Recreate the appropriate visual components as functional, integrated game assets and interface elements.
+
+---
+
+# PART 3 — COMPLETE 2.5D GRAPHICS OVERHAUL
+
+## 3.1 Environment and level remodeling
+
+Substantially improve the visual quality of the playable world.
+
+Replace basic, empty, repetitive, or placeholder-looking scenery with a cohesive environment that matches the supplied references.
+
+Improve:
+
+- Level geometry and environmental structure.
+- Platforms, pathways, terrain, rooms, buildings, and architecture.
+- Foreground elements and background scenery.
+- Environmental props, decoration, and visual landmarks.
+- Surface detail and material variation.
+- Depth separation and spatial composition.
+- Environmental lighting and atmospheric effects.
+- Scene transitions and consistency between different areas.
+
+Use actual meshes, sprites, textures, materials, shaders, or procedural assets appropriate to the existing engine.
+
+Create convincing depth between the foreground, gameplay plane, and background. Use parallax layers when they improve the intended 2.5D presentation.
+
+Avoid flat, empty environments and generic geometric placeholders unless the reference style specifically calls for them.
+
+Maintain gameplay readability. Important platforms, enemies, hazards, and interactable objects must remain distinguishable from decorative scenery.
+
+## 3.2 Character and enemy remodeling
+
+Improve the player's appearance and the presentation of all important characters, enemies, and interactive objects.
+
+Depending on the current implementation, use appropriately detailed 3D models, sprites, skeletal animation, procedural geometry, or a suitable combination.
+
+Improve:
+
+- Silhouette and proportions.
+- Textures and materials.
+- Surface detail and visual identity.
+- Lighting, shadows, and highlights.
+- Animation quality and transitions.
+- Visual consistency with the surrounding world.
+
+Do not replace detailed character assets with simple primitives or emoji.
+
+Ensure that character models remain correctly aligned with their gameplay positions. Keep visual meshes and collision geometry coordinated without unnecessarily changing gameplay hitboxes.
+
+## 3.3 Materials, textures, and rendering
+
+Use a deliberate material system rather than relying on generic, untextured geometry.
+
+Where supported, implement:
+
+- High-quality textures and correct UV mapping.
+- Material roughness and metallic properties.
+- Normal maps or other suitable surface-detail techniques.
+- Custom shaders and procedural materials.
+- Correct transparency and depth handling.
+- Reflections and highlights when appropriate.
+- Consistent texture resolution and asset scaling.
+
+Improve the rendering pipeline if the current one is limiting visual quality.
+
+If the game uses Three.js or another browser-based 3D framework, inspect the existing renderer configuration, scene graph, camera, lighting, shadow setup, materials, textures, and post-processing before deciding which components to replace.
+
+Retain the current engine unless a genuine technical reason requires otherwise.
+
+## 3.4 Lighting and atmosphere
+
+Rebuild the lighting design to establish depth, mood, and visual coherence.
+
+Implement appropriate combinations of:
+
+- Directional, ambient, and local lighting.
+- Cast shadows and contact shadows.
+- Reflections and highlights.
+- Fog, haze, and environmental atmosphere.
+- Bloom and restrained post-processing.
+- Color grading and contrast control.
+- Environmental and emissive lighting effects.
+
+Lighting should improve material definition and depth rather than obscure gameplay.
+
+Use expensive effects only where they provide meaningful improvements.
+
+---
+
+# PART 4 — REDESIGN THE CAMERA SYSTEM
+
+**The camera is a core part of this task and must be evaluated and redesigned deliberately.**
+
+Do not assume that the current camera setup is adequate.
+
+First identify the intended perspective from the reference images, then rebuild the camera configuration as needed.
+
+Possible approaches include:
+
+- Side-on 2.5D with a 3D environment.
+- Angled side perspective with visible environmental depth.
+- Isometric-style presentation.
+- A cinematic 2.5D composition.
+- A hybrid perspective using constrained player movement.
+
+Select the approach that best matches the reference images and the existing gameplay. Do not force a particular camera style without considering how the game actually works.
+
+Implement and tune:
+
+- Camera position and rotation.
+- Perspective or orthographic projection.
+- Camera tilt and angle.
+- Field of view, orthographic scale, and zoom.
+- Camera distance and player framing.
+- Smooth tracking and camera follow.
+- Dead zones and look-ahead behavior.
+- Vertical and horizontal offsets.
+- Level boundaries and camera clamping.
+- Smooth transitions between areas.
+- Foreground and background composition.
+- Parallax depth where appropriate.
+- Controlled camera shake for relevant events.
+- Cinematic framing for encounters or transitions where useful.
+
+The camera must present the environment attractively while keeping the player, hazards, enemies, and important objects visible.
+
+Prevent camera jitter, sudden snapping, clipping, inappropriate zoom, unwanted rotation, and excessive motion.
+
+Do not let camera changes break world coordinates, movement direction, collision detection, aiming, or interaction systems.
+
+## Main menu and gameplay camera separation
+
+The main menu must have its own intentional presentation rather than automatically inheriting the gameplay camera.
+
+Where appropriate, create a dedicated menu scene, camera, lighting configuration, and background composition.
+
+Gameplay should use the redesigned gameplay camera. Menus should use the appropriate UI camera or scene composition.
+
+Switching between the menu and gameplay must restore the correct camera state without visual glitches.
+
+---
+
+# PART 5 — COMPLETE MAIN MENU AND GUI REDESIGN
+
+**The main menu and GUI are a major deliverable. Do not treat them as secondary polish.**
+
+I want a substantially redesigned interface that looks professionally art-directed and consistent with the redesigned game world.
+
+Inspect the current interface and replace its weak visual design rather than simply changing the colors of existing buttons.
+
+Use the provided interface reference images where available.
+
+## 5.1 Main menu / title screen
+
+Redesign the entire main menu, including:
+
+### Background presentation
+Create an intentional title-screen composition that matches the game's visual identity.
+
+Possible elements include a detailed environment, a dedicated 3D scene, animated background layers, atmospheric effects, subtle particles, environmental motion, or cinematic lighting.
+
+Select effects that suit the references rather than adding every possible effect.
+
+The menu background should be visually appealing but must not reduce the readability of the title or menu options.
+
+### Game title and logo
+Improve the presentation of the game title using appropriate typography, scale, spacing, color, contrast, and effects.
+
+Use an existing logo or asset if suitable. If a new logo treatment is needed, construct it using available assets, typography, and graphics.
+
+Do not substitute a proper title treatment with arbitrary emoji or generic text styling.
+
+### Main menu navigation
+Design a clear, cohesive main menu that includes the applicable existing functions, such as:
+
+- Play / Start Game.
+- Continue, if a save or continuation system exists.
+- Level Select, if supported.
+- Settings / Options.
+- Credits, if implemented or appropriate to the existing game.
+- Exit or return functionality, where supported by the platform.
+
+Do not add menu entries that imply functionality that does not exist.
+
+If the game has no existing save or level-select system, do not fabricate one merely to fill the menu. Keep the design focused on the game's actual capabilities.
+
+### Menu visual quality
+Use deliberate typography, spacing, alignment, button shapes, iconography, hover states, selected states, pressed states, and transition effects.
+
+Buttons should be visually polished and consistent with the game's art direction.
+
+Add subtle transitions and animated states where they enhance the experience. Keep navigation responsive and readable.
+
+Avoid the appearance of a generic web dashboard pasted onto a game.
+
+## 5.2 HUD redesign
+
+Inspect the existing in-game HUD and redesign it to match the new visual identity.
+
+Retain only the information relevant to the actual gameplay and preserve its underlying data connections.
+
+Where applicable, improve:
+
+- Health and stamina indicators.
+- Player status and ability indicators.
+- Score, currency, and progression.
+- Ammunition or other combat resources.
+- Interaction prompts.
+- Objectives and mission information.
+- Inventory indicators.
+- Enemy health indicators.
+- Notifications and damage feedback.
+
+Do not invent gameplay statistics or add unnecessary HUD clutter.
+
+HUD elements must remain readable over different environments and lighting conditions. Use appropriate contrast, panels, subtle outlines, and scaling.
+
+Anchor interface elements to the screen layout rather than unintentionally tying them to world coordinates.
+
+## 5.3 Pause menu
+
+Create or improve a visually coherent pause menu with working controls for the existing functionality.
+
+Include applicable options such as:
+
+- Resume.
+- Restart.
+- Settings.
+- Main Menu.
+
+Preserve existing restart, resume, and menu-transition behavior. Do not create controls that appear functional but have no working handlers.
+
+Ensure that pausing correctly stops or freezes the appropriate gameplay systems and that resuming restores the game without breaking animation, physics, or the camera.
+
+## 5.4 Settings and options
+
+Redesign the settings interface if the current game supports or needs it.
+
+Expose only settings that can actually be implemented. Potential settings include:
+
+- Master volume and music volume, if audio is present.
+- Sound effects volume.
+- Graphics quality, where meaningful.
+- Camera sensitivity or other appropriate camera settings.
+- Fullscreen or display controls where supported.
+- Control or input settings if applicable.
+
+Connect every visible setting to the relevant system. A slider must modify the actual value, a toggle must change the corresponding behavior, and a back button must navigate correctly.
+
+Do not add fake configuration options.
+
+## 5.5 Other screens
+
+Where applicable, update:
+
+- Loading screens.
+- Game-over and victory screens.
+- Level-selection screens.
+- Dialogue and notification panels.
+- Inventory screens.
+- Confirmation dialogs.
+- Credits.
+- Restart and quit confirmation overlays.
+
+Maintain a unified visual language across all screens.
+
+Use the game's actual features to determine which screens require work. Do not invent unnecessary systems.
+
+## 5.6 Interface implementation and behavior
+
+The redesigned GUI must be part of the actual application and fully functional.
+
+If the game is browser-based, ensure that the interface integrates properly with its rendering canvas, input events, application state, and existing frontend framework.
+
+Use DOM/CSS for suitable conventional interface elements, canvas or game-engine UI for appropriate in-engine elements, and hybrid implementation only when justified by the current architecture.
+
+Ensure that:
+
+- Menu buttons invoke real actions.
+- Navigation works reliably.
+- Keyboard and game controls continue to work where supported.
+- Pointer interactions do not interfere with gameplay input.
+- The interface can be opened and closed correctly.
+- HUD values stay synchronized with the game state.
+- Settings are applied rather than merely displayed.
+- UI elements do not accidentally capture movement or combat input.
+- Screen transitions do not leave invisible overlays blocking interaction.
+
+Keep the interface separate from the world camera wherever necessary so that HUD positioning, text, buttons, and layout remain stable.
+
+---
+
+# PART 6 — RESPONSIVE LAYOUT AND VISUAL CONSISTENCY
+
+The redesign must work across the screen sizes supported by the existing game.
+
+Test the layout at representative desktop and smaller browser viewport sizes where possible.
+
+Prevent:
+
+- Text overflow.
+- Overlapping buttons.
+- Cropped menu options.
+- Distorted backgrounds.
+- Incorrect aspect ratios.
+- HUD elements covering the player or key gameplay information.
+- Controls becoming difficult to select.
+- Layout changes that make the interface unusable.
+
+Preserve the correct aspect ratio of artwork and maintain good visual hierarchy.
+
+Use consistent rules for typography, spacing, buttons, panels, icons, colors, and transitions.
+
+The menu, HUD, gameplay environment, and secondary screens should feel as though they belong to the same professionally designed game.
+
+Accessibility and readability take priority over decorative effects.
+
+---
+
+# PART 7 — ANIMATION, PARTICLES, AND VISUAL EFFECTS
+
+Improve the overall motion quality of the game.
+
+Where relevant, implement:
+
+- Idle, walking, running, jumping, falling, attacking, and landing animation improvements.
+- Better transitions between animation states.
+- Enemy reactions and movement animation.
+- Particle effects for impacts, magic, environmental events, and interactions.
+- Dust, sparks, ambient particles, or other effects where they fit the visual style.
+- Environmental animation.
+- Animated menu backgrounds.
+- Button hover and selection effects.
+- Fade transitions between screens.
+- Appropriate damage, victory, defeat, and interaction feedback.
+
+All effects must be integrated into the game's actual animation and state systems.
+
+Avoid excessive particles, distracting effects, or animations that reduce responsiveness.
+
+The purpose is to make the game feel intentional and polished, not merely more visually busy.
+
+---
+
+# PART 8 — PRESERVE GAMEPLAY AND PROJECT STABILITY
+
+This task authorizes substantial changes to the visual presentation, not the unnecessary removal of functioning game features.
+
+Preserve all existing functionality, including:
+
+- Movement and player controls.
+- Physics and collision systems.
+- Combat and damage calculation.
+- Enemy behavior and AI.
+- Health, inventory, scoring, and progression.
+- Level structure and transitions.
+- Game state and checkpoints.
+- Input handling.
+- Existing audio behavior.
+- Save and loading behavior.
+- Existing functional menus and settings.
+- Restart, pause, resume, and other working actions.
+
+Keep game logic, rendering logic, and UI state organized so that visual refactoring does not introduce accidental coupling.
+
+If the existing architecture makes the overhaul difficult, refactor it carefully and test the resulting behavior.
+
+Do not modify gameplay mechanics purely to simplify the graphics work.
+
+Do not remove existing code until you understand whether it is needed. Avoid overwriting stable functionality with placeholder implementations.
+
+---
+
+# PART 9 — ASSET CREATION AND IMPLEMENTATION
+
+Use the asset-creation approach most suitable for the existing game.
+
+Prioritize:
+
+1. Existing assets that already meet the required quality.
+2. Appropriate new assets that can be integrated into the game.
+3. Generated or custom-designed textures, sprites, models, and other visual resources.
+4. Procedural geometry, shaders, or rendering techniques where they make sense.
+
+Use external assets only when their licensing and usage conditions are appropriate.
+
+If a specific model, texture, or effect cannot be obtained, implement the strongest feasible alternative rather than leaving major areas unfinished.
+
+Do not produce concept art that remains disconnected from the game.
+
+Do not use a screenshot of an improved scene as a fake background layer over the existing game.
+
+Do not use static artwork to simulate working menus, animations, camera motion, or interactive scenes.
+
+Every visual improvement should be integrated into the running game wherever technically feasible.
+
+---
+
+# PART 10 — PERFORMANCE AND TECHNICAL QUALITY
+
+Maintain reasonable performance while improving graphics quality.
+
+Optimize where appropriate:
+
+- Geometry complexity.
+- Texture size and loading.
+- Draw calls and material usage.
+- Shader workloads.
+- Lighting and shadow maps.
+- Particle counts.
+- Animation updates.
+- UI layout and rendering.
+- Asset loading and scene transitions.
+
+Avoid unnecessary dependencies and excessively large downloads.
+
+Prevent:
+
+- Rendering errors.
+- Missing textures.
+- Broken materials.
+- Z-fighting.
+- Incorrect transparency.
+- Texture stretching.
+- Camera clipping.
+- Unintended frame-rate drops.
+- Input delays.
+- Broken UI interactions.
+- Memory leaks caused by repeated scene creation.
+- Console errors or unresolved imports.
+
+Use the quality and performance capabilities of the actual rendering framework. Do not add expensive post-processing effects merely because they are available.
+
+---
+
+# PART 11 — EXECUTION WORKFLOW
+
+Work directly on the existing Google AI Studio project.
+
+Do not stop after producing a report, a plan, or a list of recommendations.
+
+## Phase 1: Project inspection
+
+Map the existing project structure and identify the files responsible for the game world, camera, rendering, assets, animations, main menu, HUD, settings, and application state.
+
+Understand how the existing game runs before replacing components.
+
+## Phase 2: Reference analysis
+
+Analyze all supplied references and establish a unified design direction for the environment, characters, perspective, lighting, main menu, and HUD.
+
+Use each image for the elements it represents.
+
+## Phase 3: Visual architecture
+
+Determine the changes needed to the scene structure, camera configuration, asset pipeline, interface architecture, and state handling.
+
+Prioritize the components that currently limit visual quality.
+
+## Phase 4: Main visual transformation
+
+Implement the core environment redesign, camera overhaul, major character improvements, geometry, materials, and lighting.
+
+Do not leave the project in a state where only superficial details have changed.
+
+## Phase 5: Main menu and GUI transformation
+
+Implement the redesigned title screen, menu navigation, button states, HUD, pause menu, settings, and other applicable screens.
+
+Connect each interface element to the actual game functionality.
+
+## Phase 6: Animation and polish
+
+Improve environmental details, effects, animation transitions, UI feedback, atmosphere, and other relevant visual elements.
+
+## Phase 7: Integration and verification
+
+Run the game through the available Google AI Studio preview or development environment.
+
+Test the actual implementation rather than assuming that code which appears syntactically correct will work.
+
+Check the main menu, start-game flow, camera behavior, gameplay, pause/resume, settings, restart, and all modified interface interactions.
+
+Inspect rendering errors and fix them.
+
+## Phase 8: Visual refinement
+
+Compare the resulting game against the reference images.
+
+Identify the largest remaining visual mismatches and improve them in priority order.
+
+Focus on camera composition, environment quality, character presentation, lighting, visual depth, and overall interface design.
+
+Continue refining until the available time and environment permit the strongest practical result.
+
+If an important feature cannot be completed or tested, identify it explicitly rather than claiming it works.
+
+---
+
+# PART 12 — PRIORITY ORDER
+
+When making implementation decisions, use this order of importance:
+
+**Priority 1: Major visual identity**
+
+Establish the correct art direction, camera perspective, scene composition, and overall graphical quality.
+
+**Priority 2: Game world**
+
+Remodel environments, characters, major objects, geometry, materials, and lighting.
+
+**Priority 3: Main menu and primary interface**
+
+Create a substantially improved title screen and a cohesive, functional main menu. Redesign the HUD and other core UI screens.
+
+**Priority 4: Animation and effects**
+
+Improve movement presentation, environmental effects, particles, transitions, and visual feedback.
+
+**Priority 5: Detail and optimization**
+
+Refine small visual elements, eliminate rendering artifacts, test responsiveness, and improve performance.
+
+Do not spend the entire implementation effort on minor effects while the core environment, camera, and menu remain poorly designed.
+
+---
+
+# PART 13 — DEFINITION OF DONE
+
+The task is complete only when the following requirements have been addressed:
+
+### Graphics
+- The 2.5D environment has undergone a substantial visual improvement.
+- Important characters and objects are appropriately detailed.
+- Materials, textures, lighting, shadows, and environmental depth are coherent.
+- The result follows the supplied art direction.
+
+### Camera
+- The perspective and framing have been deliberately redesigned.
+- Player tracking and camera transitions work appropriately.
+- Gameplay remains readable and the camera does not introduce major clipping or jitter.
+
+### Main menu and GUI
+- The main menu has been substantially redesigned.
+- Its background, typography, composition, and buttons match the game's visual identity.
+- The HUD and other applicable screens use a consistent design system.
+- All visible controls have working behavior.
+- Interface elements scale and remain readable at supported screen sizes.
+
+### Functionality
+- Existing gameplay mechanics are preserved.
+- Menu-to-gameplay transitions work.
+- Pause, resume, restart, settings, and other applicable controls work.
+- The actual game remains playable.
+
+### Verification
+- The changes have been integrated into the existing project.
+- The game has been run and tested wherever the environment permits.
+- Known defects and incomplete features are reported honestly.
+
+---
+
+# FINAL INSTRUCTIONS
+
+You are working on an existing game, not creating a new one from scratch.
+
+Use my reference images to guide the complete visual transformation of both the **2.5D gameplay experience and the main menu/interface**.
+
+You may make substantial changes to the graphical architecture, camera system, assets, rendering code, scene composition, and UI structure.
+
+Preserve stable gameplay logic and project functionality.
+
+Make real code changes, integrate the resulting assets, connect UI controls to their actual handlers, run the game, inspect the result, and fix discovered problems.
+
+Do not stop after analysis. Do not provide only sample code or a separate demo. Do not claim that work has been completed when it has not been implemented or verified.
+
+**The final result should feel like a coherent, deliberately art-directed game, with a redesigned world, a suitable 2.5D camera, high-quality visual presentation, and a polished, functional main menu and GUI.**
+
+Begin by inspecting my current project and the reference images. Then implement the overhaul directly in the existing codebase.

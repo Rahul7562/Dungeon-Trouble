@@ -21,27 +21,32 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
 
     let viewW = window.innerWidth;
     let viewH = window.innerHeight;
+    let appliedZoom = engine.cameraZoom || 1.22;
 
-    const updateSize = () => {
+    const applyTransformAndSize = () => {
       viewW = window.innerWidth;
       viewH = window.innerHeight;
+      appliedZoom = engine.isMenuCameraMode ? 1.12 : engine.cameraZoom || 1.22;
       const rawDpr = window.devicePixelRatio || 1;
       const dpr = viewW * viewH > 1_000_000 ? 1 : Math.min(1.5, rawDpr);
       canvas.width = Math.round(viewW * dpr);
       canvas.height = Math.round(viewH * dpr);
       canvas.style.width = `${viewW}px`;
       canvas.style.height = `${viewH}px`;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(dpr * appliedZoom, 0, 0, dpr * appliedZoom, 0, 0);
       ctx.imageSmoothingEnabled = true;
+
+      const logicalW = Math.round(viewW / appliedZoom);
+      const logicalH = Math.round(viewH / appliedZoom);
       if (!rendererRef.current) {
-        rendererRef.current = new IsometricRenderer(ctx, viewW, viewH);
+        rendererRef.current = new IsometricRenderer(ctx, logicalW, logicalH);
       } else {
-        rendererRef.current.resize(viewW, viewH);
+        rendererRef.current.resize(logicalW, logicalH);
       }
     };
 
-    updateSize();
-    window.addEventListener('resize', updateSize);
+    applyTransformAndSize();
+    window.addEventListener('resize', applyTransformAndSize);
 
     // Input handlers
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -68,7 +73,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
 
     const updateFacing = () => {
       if (rendererRef.current) {
-        const worldMouse = rendererRef.current.screenToWorld(mouseClientX, mouseClientY, engine.camera);
+        const zoom = appliedZoom || 1;
+        const worldMouse = rendererRef.current.screenToWorld(
+          mouseClientX / zoom,
+          mouseClientY / zoom,
+          engine.camera
+        );
         engine.worldMousePos = worldMouse;
         const dx = worldMouse.x - engine.state.player.x;
         const dy = worldMouse.y - engine.state.player.y;
@@ -99,6 +109,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
       }
     };
 
+    const handleWheel = (e: WheelEvent) => {
+      if (engine.isPaused) return;
+      e.preventDefault();
+      const delta = -Math.sign(e.deltaY) * 0.08;
+      engine.setCameraZoom(engine.cameraZoom + delta);
+    };
+
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
     };
@@ -109,6 +126,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
     document.addEventListener('visibilitychange', handleBlur);
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
     canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
     canvas.addEventListener('contextmenu', handleContextMenu);
 
     // Main Game Loop
@@ -138,6 +156,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
       // Clamp dt between 0.001s and 0.05s to prevent tunneling or teleporting on lag spikes
       const dt = Math.min(0.05, Math.max(0.001, elapsedSec));
 
+      const targetZoom = engine.isMenuCameraMode ? 1.12 : engine.cameraZoom || 1.22;
+      if (Math.abs(targetZoom - appliedZoom) > 0.005) {
+        applyTransformAndSize();
+      }
+
       engine.update(dt);
       if (!engine.isPaused) {
         updateFacing();
@@ -150,6 +173,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
 
       if (rendererRef.current) {
         const renderer = rendererRef.current;
+        renderer.quality = engine.renderQuality || 'high';
         const maxHp = engine.state.playerStats.calculated[StatType.MaxHealth];
         const shake = engine.state.screenShake || 0;
         shakenCamera.x = engine.camera.x + (shake > 0 ? (Math.random() - 0.5) * shake * 2 : 0);
@@ -164,12 +188,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           engine.isMoveActive('left') ||
           engine.isMoveActive('right');
 
+        const logicalW = Math.round(viewW / appliedZoom);
+        const logicalH = Math.round(viewH / appliedZoom);
+
         // Compute world-space viewport AABB from the 4 screen corners and query GameEngine SpatialGrid
         const pad = 220;
         const cNW = renderer.screenToWorld(-pad, -pad, shakenCamera);
-        const cNE = renderer.screenToWorld(viewW + pad, -pad, shakenCamera);
-        const cSW = renderer.screenToWorld(-pad, viewH + pad, shakenCamera);
-        const cSE = renderer.screenToWorld(viewW + pad, viewH + pad, shakenCamera);
+        const cNE = renderer.screenToWorld(logicalW + pad, -pad, shakenCamera);
+        const cSW = renderer.screenToWorld(-pad, logicalH + pad, shakenCamera);
+        const cSE = renderer.screenToWorld(logicalW + pad, logicalH + pad, shakenCamera);
         const minWX = Math.min(cNW.x, cNE.x, cSW.x, cSE.x);
         const maxWX = Math.max(cNW.x, cNE.x, cSW.x, cSE.x);
         const minWY = Math.min(cNW.y, cNE.y, cSW.y, cSE.y);
@@ -210,7 +237,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
           visible.props,
           isTown,
           isTown ? engine.state.townLevel : undefined,
-          engine.state.worldTimeHours ?? 9.5
+          engine.isMenuCameraMode ? 18.1 : (engine.state.worldTimeHours ?? 9.5)
         );
       }
 
@@ -221,13 +248,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engine, onEngineTick }) 
 
     return () => {
       cancelAnimationFrame(animId);
-      window.removeEventListener('resize', updateSize);
+      window.removeEventListener('resize', applyTransformAndSize);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleBlur);
       window.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('wheel', handleWheel);
       canvas.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [engine, onEngineTick]);

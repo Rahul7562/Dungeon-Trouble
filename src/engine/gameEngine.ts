@@ -116,6 +116,13 @@ export class GameEngine {
   public mousePos = { x: 0, y: 0 };
   public worldMousePos = { x: 0, y: 0 };
   public camera = { x: 0, y: 0 };
+  public cameraZoom = 1.22;
+  public cameraSensitivity = 1.0;
+  public renderQuality: 'low' | 'medium' | 'high' = 'high';
+  public isMenuCameraMode = false;
+  private menuCameraAngle = 0;
+  private lookAheadX = 0;
+  private lookAheadY = 0;
   private nextEntityId = 1;
 
   // Spatial Partitioning Grids for O(1) simulation & viewport culling
@@ -1698,8 +1705,47 @@ export class GameEngine {
     }
   }
 
+  public setCameraZoom(zoom: number): void {
+    this.cameraZoom = Math.max(0.85, Math.min(1.55, Number(zoom.toFixed(2))));
+  }
+
+  public cycleCameraZoom(): number {
+    const presets = [1.0, 1.22, 1.4, 0.88];
+    let bestIdx = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < presets.length; i++) {
+      const d = Math.abs(this.cameraZoom - presets[i]);
+      if (d < minDiff) {
+        minDiff = d;
+        bestIdx = i;
+      }
+    }
+    this.cameraZoom = presets[(bestIdx + 1) % presets.length];
+    return this.cameraZoom;
+  }
+
+  public advanceWorldTime(hoursDelta: number): void {
+    if (!this.state) return;
+    this.state.worldTimeHours = ((this.state.worldTimeHours ?? 9.5) + hoursDelta + 24) % 24;
+  }
+
   public update(dt: number) {
     const state = this.state;
+    if (this.isMenuCameraMode && state) {
+      this.menuCameraAngle += dt * 0.22;
+      const focusX = state.townLevel?.fountainPos?.x ?? state.player.x;
+      const focusY = state.townLevel?.fountainPos?.y ?? state.player.y;
+      const cellX = focusX / 64;
+      const cellY = focusY / 64;
+      const baseCamX = (cellX - cellY) * 32;
+      const baseCamY = (cellX + cellY) * 16;
+      const orbitX = Math.cos(this.menuCameraAngle) * 76;
+      const orbitY = Math.sin(this.menuCameraAngle * 2) * 28 - 18;
+      const lerp = 1 - Math.exp(-4 * dt);
+      this.camera.x += (baseCamX + orbitX - this.camera.x) * lerp;
+      this.camera.y += (baseCamY + orbitY - this.camera.y) * lerp;
+      return;
+    }
     if (this.isPaused || state.isGameOver || state.isVictory) return;
 
     // 1. Ability Cooldowns update
@@ -2211,13 +2257,37 @@ export class GameEngine {
       }
     }
 
-    // Smooth Camera Follow
+    // Smooth 2.5D Camera Follow with Velocity + Aim Look-Ahead, Dead-Zone & Level Boundary Clamping
     const cellX = state.player.x / 64;
     const cellY = state.player.y / 64;
-    const targetCamX = (cellX - cellY) * 32;
-    const targetCamY = (cellX + cellY) * 16;
+    const baseCamX = (cellX - cellY) * 32;
+    const baseCamY = (cellX + cellY) * 16;
 
-    const camFactor = 1 - Math.exp(-18 * dt);
+    // Velocity lead + subtle cursor look-ahead with dead-zone
+    const isoMoveX = (wx - wy) * 18 * this.cameraSensitivity;
+    const isoMoveY = (wx + wy) * 9 * this.cameraSensitivity;
+    const aimDx = this.worldMousePos.x - state.player.x;
+    const aimDy = this.worldMousePos.y - state.player.y;
+    const aimDist = Math.hypot(aimDx, aimDy);
+    let isoAimX = 0;
+    let isoAimY = 0;
+    if (aimDist > 42 && (wx !== 0 || wy !== 0 || state.player.isAttacking)) {
+      const clampedDist = Math.min(220, aimDist - 42) / 220;
+      const nx = aimDx / aimDist;
+      const ny = aimDy / aimDist;
+      isoAimX = (nx - ny) * 16 * clampedDist * this.cameraSensitivity;
+      isoAimY = (nx + ny) * 8 * clampedDist * this.cameraSensitivity;
+    }
+
+    const lookLerp = 1 - Math.exp(-6.5 * dt);
+    this.lookAheadX += (isoMoveX + isoAimX - this.lookAheadX) * lookLerp;
+    this.lookAheadY += (isoMoveY + isoAimY - this.lookAheadY) * lookLerp;
+
+    // Slight vertical framing offset (+10 screen Y) so the hero stands cleanly above the bottom Gargoyle action bar
+    const targetCamX = baseCamX + this.lookAheadX;
+    const targetCamY = baseCamY + this.lookAheadY + 10;
+
+    const camFactor = 1 - Math.exp(-16 * dt);
     this.camera.x += (targetCamX - this.camera.x) * camFactor;
     this.camera.y += (targetCamY - this.camera.y) * camFactor;
 

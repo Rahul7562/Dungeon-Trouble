@@ -1804,9 +1804,9 @@ export class IsometricRenderer {
         ctx.closePath();
         ctx.fill();
 
-        // Shingle course lines on front slope
+        // Shingle course lines & colorful clay tile / mossy thatch accents on front slope (Matching image_98f09f5a.png & image_ca614f3b.png)
         ctx.strokeStyle = palette.shingleLine;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.1;
         for (let s = 1; s <= 4; s++) {
           const t = s / 5;
           const lx = rStart.x + (sw.x - rStart.x) * t;
@@ -1817,6 +1817,35 @@ export class IsometricRenderer {
           ctx.moveTo(lx, ly);
           ctx.lineTo(rxPt, ryPt);
           ctx.stroke();
+
+          // Individual multi-toned terracotta tiles or green moss patches along courses
+          const tileSteps = Math.max(4, Math.min(10, Math.floor(rw * 0.9)));
+          for (let k = 0; k < tileSteps; k++) {
+            const kt = (k + 0.5) / tileSteps;
+            const txPt = lx + (rxPt - lx) * kt;
+            const tyPt = ly + (ryPt - ly) * kt;
+            const hash = ((k * 37 + s * 19 + b.x * 7) & 7);
+            if (b.roofStyle === 'rustic_cottage' && hash < 2) {
+              // Lush green moss patch on golden thatched roof (image_ca614f3b.png)
+              ctx.fillStyle = hash === 0 ? 'rgba(77, 124, 15, 0.72)' : 'rgba(101, 163, 13, 0.65)';
+              ctx.beginPath();
+              ctx.ellipse(txPt, tyPt, 7, 3.2, -0.2, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (b.roofStyle === 'terracotta_tudor' && hash < 4) {
+              // Colorful terracotta orange, ochre, and slate-green roof shingles (image_98f09f5a.png)
+              ctx.fillStyle =
+                hash === 0
+                  ? 'rgba(234, 88, 12, 0.55)'
+                  : hash === 1
+                  ? 'rgba(217, 119, 6, 0.52)'
+                  : hash === 2
+                  ? 'rgba(71, 118, 108, 0.52)'
+                  : 'rgba(185, 28, 28, 0.48)';
+              ctx.beginPath();
+              ctx.arc(txPt, tyPt, 4.2, 0, Math.PI);
+              ctx.fill();
+            }
+          }
         }
         ctx.strokeStyle = palette.timber;
         ctx.lineWidth = 2;
@@ -1834,19 +1863,32 @@ export class IsometricRenderer {
         ctx.lineWidth = 2.4;
         ctx.stroke();
 
-        // Timber king-post & attic window on East Gable
+        // Timber king-post & diagonal Tudor struts on East Gable
         const gMidX = (ne.x + se.x) * 0.5;
         const gMidY = (ne.y + se.y) * 0.5;
         ctx.beginPath();
         ctx.moveTo(rEnd.x, rEnd.y);
         ctx.lineTo(gMidX, gMidY);
+        ctx.moveTo((ne.x + gMidX) * 0.5, (ne.y + gMidY) * 0.5);
+        ctx.lineTo((rEnd.x + gMidX) * 0.5, (rEnd.y + gMidY) * 0.5);
+        ctx.moveTo((se.x + gMidX) * 0.5, (se.y + gMidY) * 0.5);
+        ctx.lineTo((rEnd.x + gMidX) * 0.5, (rEnd.y + gMidY) * 0.5);
         ctx.stroke();
 
         const winX = (rEnd.x + gMidX) * 0.5;
         const winY = (rEnd.y + gMidY) * 0.5;
-        ctx.fillStyle = isNight ? '#fbbf24' : '#1e293b';
-        ctx.fillRect(winX - 4, winY - 5, 8, 9);
-        ctx.strokeRect(winX - 4, winY - 5, 8, 9);
+        ctx.fillStyle = isNight ? '#fbbf24' : '#d97706';
+        ctx.fillRect(winX - 4.5, winY - 5, 9, 10);
+        ctx.strokeStyle = palette.timber;
+        ctx.lineWidth = 1.4;
+        ctx.strokeRect(winX - 4.5, winY - 5, 9, 10);
+        // Window mullion crossbars
+        ctx.beginPath();
+        ctx.moveTo(winX, winY - 5);
+        ctx.lineTo(winX, winY + 5);
+        ctx.moveTo(winX - 4.5, winY);
+        ctx.lineTo(winX + 4.5, winY);
+        ctx.stroke();
 
         // 5. Dormer Gable Windows jutting out of the Front South Slope
         if (!isWing && rw >= 7) {
@@ -2004,18 +2046,136 @@ export class IsometricRenderer {
       }
     }
 
-    // Crisp Building Signboard Plaque Above Doorway (Always readable, gently rises when inside)
-    ctx.globalAlpha = 0.94;
+    // Authentic Projecting Timber & Wrought-Iron Hanging Shop Signboard (Matching image.png)
+    const bracketX = doorScreen.x + 24;
+    const bracketY = roofAlpha < 0.5 ? doorScreen.y + 6 : doorScreen.y - 18;
+    const signSwing = Math.sin(gameTime * 2.1 + b.x * 0.5) * 1.2;
+
+    if (roofAlpha >= 0.25) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.98, roofAlpha + 0.15);
+
+      // 1. Wall mounting plate & horizontal timber/iron support beam
+      ctx.fillStyle = '#27272a';
+      ctx.fillRect(bracketX - 18, bracketY - 6, 3.5, 13);
+      ctx.fillStyle = '#451a03';
+      ctx.strokeStyle = '#1c0a00';
+      ctx.lineWidth = 1;
+      ctx.fillRect(bracketX - 16, bracketY - 4, 24, 3.5);
+      ctx.strokeRect(bracketX - 16, bracketY - 4, 24, 3.5);
+
+      // Diagonal timber/iron brace strut & decorative wrought-iron scroll curl
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(bracketX - 15, bracketY + 5);
+      ctx.lineTo(bracketX - 4, bracketY - 3);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(bracketX + 6, bracketY - 5.5, 2.5, 0, Math.PI * 1.5);
+      ctx.stroke();
+
+      // 2. Twin iron suspension rings/chains
+      const plaqueX = bracketX - 4 + signSwing * 0.5;
+      const plaqueY = bracketY + 1;
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(bracketX - 10, bracketY - 0.5);
+      ctx.lineTo(plaqueX - 6, plaqueY + 1);
+      ctx.moveTo(bracketX + 2, bracketY - 0.5);
+      ctx.lineTo(plaqueX + 6, plaqueY + 1);
+      ctx.stroke();
+
+      // 3. Framed Honey-Oak Hanging Plaque Board with Bevelled Trim
+      ctx.fillStyle = 'rgba(10, 15, 28, 0.38)';
+      ctx.fillRect(plaqueX - 11, plaqueY + 2, 22, 16);
+
+      ctx.fillStyle = '#5c2d0c';
+      ctx.strokeStyle = '#2a1204';
+      ctx.lineWidth = 1.3;
+      ctx.fillRect(plaqueX - 11, plaqueY, 22, 15);
+      ctx.strokeRect(plaqueX - 11, plaqueY, 22, 15);
+
+      // Inner warm honey-oak recessed panel
+      ctx.fillStyle = '#9a521c';
+      ctx.fillRect(plaqueX - 9, plaqueY + 2, 18, 11);
+      ctx.fillStyle = '#c2712d';
+      ctx.fillRect(plaqueX - 9, plaqueY + 2, 18, 2);
+
+      // Brass corner rivets
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(plaqueX - 10, plaqueY + 1, 1.5, 1.5);
+      ctx.fillRect(plaqueX + 8.5, plaqueY + 1, 1.5, 1.5);
+      ctx.fillRect(plaqueX - 10, plaqueY + 12.5, 1.5, 1.5);
+      ctx.fillRect(plaqueX + 8.5, plaqueY + 12.5, 1.5, 1.5);
+
+      // Painted golden emblem inside the hanging shop signboard
+      ctx.fillStyle = '#fde047';
+      ctx.strokeStyle = '#451a03';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      if (b.id.includes('inn')) {
+        // Golden Tankard / Shield
+        ctx.roundRect(plaqueX - 3.5, plaqueY + 4, 6, 7, 1.5);
+      } else if (b.id.includes('blacksmith')) {
+        // Anvil / Hammer silhouette
+        ctx.moveTo(plaqueX - 5, plaqueY + 5);
+        ctx.lineTo(plaqueX + 5, plaqueY + 5);
+        ctx.lineTo(plaqueX + 3, plaqueY + 10);
+        ctx.lineTo(plaqueX - 3, plaqueY + 10);
+        ctx.closePath();
+      } else if (b.id.includes('merchant')) {
+        // Round Potion Flask
+        ctx.arc(plaqueX, plaqueY + 8.2, 3.6, 0, Math.PI * 2);
+      } else {
+        // Heraldic Diamond Crest
+        ctx.moveTo(plaqueX, plaqueY + 3.5);
+        ctx.lineTo(plaqueX + 4.5, plaqueY + 7.5);
+        ctx.lineTo(plaqueX, plaqueY + 11.5);
+        ctx.lineTo(plaqueX - 4.5, plaqueY + 7.5);
+        ctx.closePath();
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Crisp Carved Oak Building Nameplate Plaque Above Doorway (Always readable, gently rises when inside)
+    ctx.globalAlpha = 0.96;
     ctx.font = 'bold 10px "Cinzel", serif';
     ctx.textAlign = 'center';
-    const labelW = ctx.measureText(b.name).width + 18;
+    const labelW = ctx.measureText(b.name).width + 20;
     const signY = roofAlpha < 0.5 ? doorScreen.y + 18 : doorScreen.y - 8;
 
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1.1;
+    // Outer dark oak & wrought-iron border
+    ctx.fillStyle = '#3b1a06';
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1.4;
+    ctx.fillRect(doorScreen.x - labelW / 2 - 1, signY - 15, labelW + 2, 19);
+    ctx.strokeRect(doorScreen.x - labelW / 2 - 1, signY - 15, labelW + 2, 19);
+
+    // Warm carved honey-oak plaque body with sunlit top bevel
+    const signGrad = ctx.createLinearGradient(0, signY - 14, 0, signY + 3);
+    signGrad.addColorStop(0, '#7c3f14');
+    signGrad.addColorStop(0.5, '#5c2d0c');
+    signGrad.addColorStop(1, '#3d1b06');
+    ctx.fillStyle = signGrad;
     ctx.fillRect(doorScreen.x - labelW / 2, signY - 14, labelW, 17);
-    ctx.strokeRect(doorScreen.x - labelW / 2, signY - 14, labelW, 17);
+
+    ctx.strokeStyle = '#d48238';
+    ctx.lineWidth = 1.0;
+    ctx.strokeRect(doorScreen.x - labelW / 2 + 0.5, signY - 13.5, labelW - 1, 16);
+
+    // Brass mounting studs on left & right ends of nameplate
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(doorScreen.x - labelW / 2 + 4, signY - 5.5, 1.3, 0, Math.PI * 2);
+    ctx.arc(doorScreen.x + labelW / 2 - 4, signY - 5.5, 1.3, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.fillStyle = '#fef08a';
     ctx.fillText(b.name, doorScreen.x, signY - 2);
@@ -2064,9 +2224,9 @@ export class IsometricRenderer {
     ctx.globalAlpha = alpha;
     ctx.translate(x, y);
     ctx.transform(1, canopyLift, windShear, 1, 0, 0);
-    ctx.fillStyle = '#451a03';
+    ctx.fillStyle = '#5c381c';
     ctx.fillRect(-4, -24, 8, 26);
-    ctx.fillStyle = species === 2 ? '#f59e0b' : species === 3 ? '#f472b6' : '#15803d';
+    ctx.fillStyle = species === 0 ? '#2f7a18' : species === 1 ? '#3b8f22' : '#4ea826';
     ctx.beginPath();
     ctx.arc(0, -34, 18, 0, Math.PI * 2);
     ctx.fill();
@@ -2323,28 +2483,353 @@ export class IsometricRenderer {
       ctx.fill();
       ctx.stroke();
     } else if (prop.kind === 'street_lantern') {
-      // Wrought-Iron Medieval Street Lamp Post with Hanging Warm Glass Lantern
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 3;
+      // Ornate Medieval Wrought-Iron Lamp Post with Stepped Stone Pedestal,
+      // Hanging Wooden Directional Signboards & Glowing Amber Glass Lantern (Matching image.png)
+      const sway = Math.sin(gameTime * 2.2 + x * 0.03 + y * 0.02) * 0.6;
+
+      // 1. Ground Shadow Ellipse
+      ctx.fillStyle = 'rgba(10, 15, 28, 0.45)';
       ctx.beginPath();
-      ctx.moveTo(x, y + 2);
-      ctx.lineTo(x, y - 44);
-      ctx.lineTo(x + 10, y - 44);
+      ctx.ellipse(x + 2, y + 3, 14, 6.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Stepped Chiseled Stone Plinth & Pedestal Base
+      // Lower wider stone step (3D isometric block)
+      ctx.fillStyle = '#475061';
+      ctx.strokeStyle = '#252a34';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(x - 9, y + 1);
+      ctx.lineTo(x, y + 5);
+      ctx.lineTo(x + 9, y + 1);
+      ctx.lineTo(x + 9, y - 3);
+      ctx.lineTo(x, y - 7);
+      ctx.lineTo(x - 9, y - 3);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
 
-      // Hanging Lantern Cage (fast translucent glow halo instead of shadowBlur)
-      const glowActive = isNight;
-      if (glowActive) {
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
-        ctx.beginPath();
-        ctx.arc(x + 10, y - 36.5, 12, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.fillStyle = glowActive ? '#fef08a' : '#cbd5e1';
-      ctx.fillRect(x + 7, y - 41, 6, 9);
-      ctx.strokeStyle = '#1e293b';
+      // Sunlit top bevel of lower plinth step
+      ctx.fillStyle = '#7c8699';
+      ctx.beginPath();
+      ctx.moveTo(x - 9, y - 3);
+      ctx.lineTo(x, y + 1);
+      ctx.lineTo(x + 9, y - 3);
+      ctx.lineTo(x, y - 7);
+      ctx.closePath();
+      ctx.fill();
+
+      // Upper tapered stone pedestal block (Left lit face, Right shaded face, Top cap)
+      ctx.fillStyle = '#687285';
+      ctx.beginPath();
+      ctx.moveTo(x - 6.5, y - 3);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x, y - 11);
+      ctx.lineTo(x - 6.5, y - 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#4b5363';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 6.5, y - 3);
+      ctx.lineTo(x + 6.5, y - 14);
+      ctx.lineTo(x, y - 11);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Pedestal top stone cap
+      ctx.fillStyle = '#949fb3';
+      ctx.beginPath();
+      ctx.moveTo(x - 7, y - 14);
+      ctx.lineTo(x, y - 11);
+      ctx.lineTo(x + 7, y - 14);
+      ctx.lineTo(x, y - 17);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Lush green moss tufts & tiny yellow flower around the stone pedestal base
+      ctx.fillStyle = '#2f6e1e';
+      ctx.beginPath();
+      ctx.arc(x - 7, y + 2, 3.2, 0, Math.PI * 2);
+      ctx.arc(x + 6, y + 2.5, 2.8, 0, Math.PI * 2);
+      ctx.arc(x - 2, y + 4, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#65a30d';
+      ctx.beginPath();
+      ctx.arc(x - 7.3, y + 1.2, 2.0, 0, Math.PI * 2);
+      ctx.arc(x + 5.7, y + 1.8, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(x - 6.5, y + 1.2, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. Tall Dark Wrought-Iron Lamp Post Shaft with Decorative Collar Rings & Finial Spire
+      // Cast-iron base boot collar
+      ctx.fillStyle = '#1e2530';
+      ctx.strokeStyle = '#0f141c';
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 7, y - 41, 6, 9);
+      ctx.beginPath();
+      ctx.ellipse(x, y - 14, 3.6, 1.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Main vertical iron pillar (y - 14 up to y - 66)
+      ctx.fillStyle = '#1e2530';
+      ctx.fillRect(x - 2.2, y - 66, 4.4, 52);
+      // Metallic left-edge highlight along the iron post
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(x - 1.8, y - 65, 1.2, 50);
+
+      // Decorative wrought-iron molded node rings along the shaft
+      const collarYs = [y - 24, y - 47, y - 57];
+      for (const cy of collarYs) {
+        ctx.fillStyle = '#334155';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 0.9;
+        ctx.fillRect(x - 3.2, cy - 1.2, 6.4, 2.4);
+        ctx.strokeRect(x - 3.2, cy - 1.2, 6.4, 2.4);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(x - 2.6, cy - 0.8, 2.0, 1.2);
+      }
+
+      // Top pointed wrought-iron finial spire
+      ctx.fillStyle = '#1e2530';
+      ctx.beginPath();
+      ctx.moveTo(x - 2.8, y - 66);
+      ctx.lineTo(x, y - 73);
+      ctx.lineTo(x + 2.8, y - 66);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.arc(x, y - 66.5, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4. Hanging Wooden Directional Signboards Mounted on the Post (Matching image.png)
+      // Left Signboard (pointing West/North-West at y - 40)
+      {
+        const barY = y - 43;
+        // Horizontal iron sign bracket bar extending left
+        ctx.strokeStyle = '#1e2530';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(x - 2, barY);
+        ctx.lineTo(x - 21, barY);
+        ctx.stroke();
+        // Small iron end-curl
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(x - 21, barY - 1.8, 1.8, 0, Math.PI * 1.5);
+        ctx.stroke();
+
+        // Twin iron hanging rings
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x - 6, barY);
+        ctx.lineTo(x - 6, barY + 3);
+        ctx.moveTo(x - 16, barY);
+        ctx.lineTo(x - 16, barY + 3);
+        ctx.stroke();
+
+        // Pointed carved honey-oak signboard plaque
+        const sy = barY + 2.5;
+        ctx.fillStyle = '#8c4a19';
+        ctx.strokeStyle = '#3b1905';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(x - 3, sy);
+        ctx.lineTo(x - 18.5, sy);
+        ctx.lineTo(x - 22.5, sy + 4.2);
+        ctx.lineTo(x - 18.5, sy + 8.4);
+        ctx.lineTo(x - 3, sy + 8.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Sunlit top wood bevel & carved inscription lines
+        ctx.strokeStyle = '#df8b3e';
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(x - 3.5, sy + 1.1);
+        ctx.lineTo(x - 18.2, sy + 1.1);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#451e06';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(x - 5.5, sy + 3.6);
+        ctx.lineTo(x - 16.5, sy + 3.6);
+        ctx.moveTo(x - 5.5, sy + 5.8);
+        ctx.lineTo(x - 14.0, sy + 5.8);
+        ctx.stroke();
+      }
+
+      // Right Signboard (pointing East/South-East at y - 34)
+      {
+        const barY = y - 36;
+        // Horizontal iron sign bracket bar extending right
+        ctx.strokeStyle = '#1e2530';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(x + 2, barY);
+        ctx.lineTo(x + 20, barY);
+        ctx.stroke();
+
+        // Twin iron hanging rings
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x + 6, barY);
+        ctx.lineTo(x + 6, barY + 3);
+        ctx.moveTo(x + 15, barY);
+        ctx.lineTo(x + 15, barY + 3);
+        ctx.stroke();
+
+        // Carved honey-oak signboard plaque pointing right
+        const sy = barY + 2.5;
+        ctx.fillStyle = '#9e561e';
+        ctx.strokeStyle = '#3b1905';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(x + 3, sy);
+        ctx.lineTo(x + 17.5, sy);
+        ctx.lineTo(x + 21.5, sy + 4.0);
+        ctx.lineTo(x + 17.5, sy + 8.0);
+        ctx.lineTo(x + 3, sy + 8.0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Sunlit top wood bevel & carved inscription lines
+        ctx.strokeStyle = '#eab364';
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(x + 3.5, sy + 1.1);
+        ctx.lineTo(x + 17.2, sy + 1.1);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#451e06';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(x + 5.5, sy + 3.5);
+        ctx.lineTo(x + 15.8, sy + 3.5);
+        ctx.moveTo(x + 5.5, sy + 5.6);
+        ctx.lineTo(x + 13.5, sy + 5.6);
+        ctx.stroke();
+      }
+
+      // 5. Ornate Wrought-Iron S-Scroll Cross-Arm at Top of Post (y - 62)
+      ctx.strokeStyle = '#1e2530';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(x - 6, y - 60);
+      ctx.quadraticCurveTo(x - 3, y - 64, x, y - 62);
+      ctx.quadraticCurveTo(x + 7, y - 66, x + 15, y - 61);
+      ctx.stroke();
+
+      // Metallic highlight on top of cross-arm
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(x + 1, y - 62.8);
+      ctx.quadraticCurveTo(x + 7, y - 66.5, x + 14.5, y - 61.6);
+      ctx.stroke();
+
+      // Decorative wrought-iron volute curls under & above the bracket arm
+      ctx.strokeStyle = '#263040';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      // Under-arm support scroll
+      ctx.moveTo(x + 2, y - 55);
+      ctx.quadraticCurveTo(x + 6, y - 55, x + 8, y - 61);
+      // Spiral curl
+      ctx.arc(x + 5.2, y - 57.5, 2.2, 0, Math.PI * 1.6);
+      ctx.stroke();
+
+      // Left counterbalance curl
+      ctx.beginPath();
+      ctx.arc(x - 5.5, y - 58.2, 2.0, 0, Math.PI * 1.5);
+      ctx.stroke();
+
+      // 6. Hanging Hexagonal Tapered Warm Amber Glass Lantern (at x + 15, y - 52)
+      const lx = x + 15 + sway;
+      const ly = y - 53;
+
+      // Short suspension chain link
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(x + 15, y - 61);
+      ctx.lineTo(lx, ly - 5);
+      ctx.stroke();
+
+      // Warm golden radial halo around the lantern (brighter at night, warm daytime sheen too)
+      const haloRadius = isNight ? 24 : 13;
+      const haloGrad = ctx.createRadialGradient(lx, ly + 1, 1.5, lx, ly + 1, haloRadius);
+      haloGrad.addColorStop(0, isNight ? 'rgba(254, 240, 138, 0.75)' : 'rgba(251, 191, 36, 0.38)');
+      haloGrad.addColorStop(0.45, isNight ? 'rgba(245, 158, 11, 0.35)' : 'rgba(245, 158, 11, 0.14)');
+      haloGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.fillStyle = haloGrad;
+      ctx.beginPath();
+      ctx.arc(lx, ly + 1, haloRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tiered dark iron lantern hood cap
+      ctx.fillStyle = '#1e2530';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(lx - 6.5, ly - 2);
+      ctx.lineTo(lx - 2.5, ly - 5.5);
+      ctx.lineTo(lx + 2.5, ly - 5.5);
+      ctx.lineTo(lx + 6.5, ly - 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing tapered hexagonal glass cage (Warm orange outer -> golden yellow -> white-gold core)
+      const glassGrad = ctx.createRadialGradient(lx, ly + 2, 0.8, lx, ly + 2, 6.5);
+      glassGrad.addColorStop(0, '#fef9c3');
+      glassGrad.addColorStop(0.45, '#fde047');
+      glassGrad.addColorStop(0.8, '#f59e0b');
+      glassGrad.addColorStop(1, '#ea580c');
+      ctx.fillStyle = glassGrad;
+      ctx.beginPath();
+      ctx.moveTo(lx - 5.2, ly - 2);
+      ctx.lineTo(lx + 5.2, ly - 2);
+      ctx.lineTo(lx + 3.8, ly + 7);
+      ctx.lineTo(lx - 3.8, ly + 7);
+      ctx.closePath();
+      ctx.fill();
+
+      // Wrought-iron lantern cage muntin bars & bottom finial drop
+      ctx.strokeStyle = '#1e2530';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(lx - 5.2, ly - 2);
+      ctx.lineTo(lx + 5.2, ly - 2);
+      ctx.lineTo(lx + 3.8, ly + 7);
+      ctx.lineTo(lx - 3.8, ly + 7);
+      ctx.closePath();
+      // Center vertical & diagonal cage bars
+      ctx.moveTo(lx, ly - 2);
+      ctx.lineTo(lx, ly + 7);
+      ctx.stroke();
+
+      // Bottom iron base cap & finial spike
+      ctx.fillStyle = '#1e2530';
+      ctx.beginPath();
+      ctx.moveTo(lx - 4.2, ly + 7);
+      ctx.lineTo(lx + 4.2, ly + 7);
+      ctx.lineTo(lx, ly + 10.5);
+      ctx.closePath();
+      ctx.fill();
     } else if (prop.kind === 'market_stall') {
       // Medieval Merchant Awning Stall with Striped Canopy & Goods
       ctx.fillStyle = '#78350f';
@@ -2361,69 +2846,156 @@ export class IsometricRenderer {
       ctx.lineWidth = 1.2;
       ctx.strokeRect(x - 22, y - 42, 44, 9);
     } else if (prop.kind === 'bench') {
-      // Detailed 3D Isometric Carved Honey-Oak & Wrought-Iron Sanctuary Park Bench
-      // Isometric bench axis: runs along the South-West to North-East isometric diagonal
-      // Left end centered around (x - 14, y + 3), Right end centered around (x + 14, y - 5)
+      // Detailed 3D Isometric Carved Golden-Oak & Wrought-Iron Scrollwork Park Bench
+      // with Lush Green Grass & Wildflower Tuft at Base (Matching image.png)
+      // Isometric bench axis: runs along the South-West to North-East diagonal
       // 1. Soft elongated isometric ground shadow underneath bench
-      ctx.fillStyle = 'rgba(10, 15, 28, 0.48)';
+      ctx.fillStyle = 'rgba(10, 15, 28, 0.46)';
       ctx.beginPath();
-      ctx.ellipse(x, y + 3, 22, 8.5, -0.26, 0, Math.PI * 2);
+      ctx.ellipse(x + 1, y + 2.5, 23, 9, -0.26, 0, Math.PI * 2);
       ctx.fill();
 
-      // 2. Rear & Front Cast Wrought-Iron Legs (Left & Right supports)
-      ctx.fillStyle = '#1e293b';
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 1.2;
-      // Back-left leg & upright post
-      ctx.fillRect(x - 16, y - 21, 3.2, 22);
-      ctx.strokeRect(x - 16, y - 21, 3.2, 22);
-      // Back-right leg & upright post
-      ctx.fillRect(x + 9, y - 28, 3.2, 22);
-      ctx.strokeRect(x + 9, y - 28, 3.2, 22);
-      // Front-left leg
-      ctx.fillRect(x - 11, y - 7, 3.2, 11);
-      ctx.strokeRect(x - 11, y - 7, 3.2, 11);
-      // Front-right leg
-      ctx.fillRect(x + 14, y - 14, 3.2, 11);
-      ctx.strokeRect(x + 14, y - 14, 3.2, 11);
-
-      // Under-seat wrought-iron cross-brace stretcher
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 1.8;
+      // 2. Back-side grass tuft behind the rear right leg
+      ctx.fillStyle = '#2d6a1e';
       ctx.beginPath();
-      ctx.moveTo(x - 12, y - 3);
+      ctx.arc(x + 15, y - 10, 3.8, 0, Math.PI * 2);
+      ctx.arc(x + 18, y - 9, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#65a30d';
+      ctx.beginPath();
+      ctx.arc(x + 15.5, y - 11, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. Rear & Front Cast Wrought-Iron Frame Legs & Under-Seat Stretcher Arch
+      ctx.fillStyle = '#1e2530';
+      ctx.strokeStyle = '#0f141c';
+      ctx.lineWidth = 1.2;
+
+      // Back-left iron leg & backrest upright stile
+      ctx.fillRect(x - 16.5, y - 22, 3.4, 23);
+      ctx.strokeRect(x - 16.5, y - 22, 3.4, 23);
+      // Back-right iron leg & backrest upright stile
+      ctx.fillRect(x + 9.5, y - 29, 3.4, 23);
+      ctx.strokeRect(x + 9.5, y - 29, 3.4, 23);
+
+      // Under-seat wrought-iron cross-brace stretcher & curved side supports
+      ctx.strokeStyle = '#263040';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(x - 13, y - 3);
       ctx.lineTo(x + 13, y - 10);
+      // Left side iron arch brace between front & back leg
+      ctx.moveTo(x - 15, y - 4);
+      ctx.quadraticCurveTo(x - 12.5, y - 7, x - 10, y - 1);
+      // Right side iron arch brace between front & back leg
+      ctx.moveTo(x + 11, y - 11);
+      ctx.quadraticCurveTo(x + 13.5, y - 14, x + 15.5, y - 8);
       ctx.stroke();
 
-      // 3. 3D Slatted Honey-Oak Seat Deck (Isometric Parallelogram with 3 distinct wood slats & front thickness)
-      // Seat corners: Back-Left (-15, -10), Back-Right (+11, -17), Front-Right (+17, -13), Front-Left (-9, -6)
-      // 3a. Dark oak under-frame & 3D front-edge thickness
-      ctx.fillStyle = '#45210a';
+      // 4. Angled Slatted Golden-Oak Backrest (3 Distinct Horizontal Oak Planks with Wood Grain & Bolts)
+      // Backrest rises from (-15.5, -10.5) -> (-16.5, -22) on left, and (+10.5, -17.5) -> (+9.5, -29) on right
+      // Dark oak rear frame backing
+      ctx.fillStyle = '#3b1905';
       ctx.beginPath();
-      ctx.moveTo(x - 15, y - 10);
-      ctx.lineTo(x + 11, y - 17);
-      ctx.lineTo(x + 17, y - 13);
-      ctx.lineTo(x + 17, y - 10.5);
-      ctx.lineTo(x - 9, y - 3.5);
-      ctx.lineTo(x - 15, y - 7.5);
+      ctx.moveTo(x - 16.2, y - 10.5);
+      ctx.lineTo(x + 11.2, y - 17.5);
+      ctx.lineTo(x + 10.2, y - 28.5);
+      ctx.lineTo(x - 17.0, y - 21.5);
       ctx.closePath();
       ctx.fill();
 
-      // 3b. Three Individual Isometric Honey-Oak Seat Slats
+      // Center vertical iron/oak reinforcement strap behind slats
+      ctx.fillStyle = '#263040';
+      ctx.beginPath();
+      ctx.moveTo(x - 3.5, y - 13.5);
+      ctx.lineTo(x - 1.5, y - 14.0);
+      ctx.lineTo(x - 2.3, y - 25.2);
+      ctx.lineTo(x - 4.3, y - 24.7);
+      ctx.closePath();
+      ctx.fill();
+
+      const backSlats = [
+        { y0: -11.0, y1: -14.2, fill: '#9a521c', hi: '#c87632', border: '#3b1905' },
+        { y0: -14.8, y1: -18.0, fill: '#b06124', hi: '#df8b3e', border: '#3b1905' },
+        { y0: -18.6, y1: -22.0, fill: '#c4712c', hi: '#f3ac5c', border: '#3b1905' },
+      ];
+      for (const bs of backSlats) {
+        ctx.fillStyle = bs.fill;
+        ctx.strokeStyle = bs.border;
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(x - 15.5, y + bs.y0);
+        ctx.lineTo(x + 10.8, y + bs.y0 - 7.0);
+        ctx.lineTo(x + 10.3, y + bs.y1 - 7.0);
+        ctx.lineTo(x - 16.0, y + bs.y1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Warm sunlit top edge highlight along each oak plank
+        ctx.strokeStyle = bs.hi;
+        ctx.lineWidth = 0.95;
+        ctx.beginPath();
+        ctx.moveTo(x - 15.4, y + bs.y1 + 0.6);
+        ctx.lineTo(x + 9.8, y + bs.y1 - 6.4);
+        ctx.stroke();
+
+        // Subtle wood-grain joint notch
+        ctx.strokeStyle = 'rgba(59, 25, 5, 0.55)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(x - 3.0, y + bs.y0 - 3.3);
+        ctx.lineTo(x - 3.3, y + bs.y1 - 3.3);
+        ctx.stroke();
+      }
+
+      // Wrought-iron side stiles & rounded top finials flanking the backrest
+      ctx.fillStyle = '#1e2530';
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.arc(x - 15.2, y - 22.2, 2.0, 0, Math.PI * 2);
+      ctx.arc(x + 10.8, y - 29.2, 2.0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Brass/iron bolt studs on the backrest planks
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(x - 14.5, y - 19.8, 0.95, 0, Math.PI * 2);
+      ctx.arc(x - 14.2, y - 16.0, 0.95, 0, Math.PI * 2);
+      ctx.arc(x + 9.5, y - 26.8, 0.95, 0, Math.PI * 2);
+      ctx.arc(x + 9.8, y - 23.0, 0.95, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 5. 3D Slatted Golden-Oak Seat Deck (3 Planks + Bevelled Front Apron)
+      // Dark oak under-frame & 3D front-edge thickness
+      ctx.fillStyle = '#3b1905';
+      ctx.beginPath();
+      ctx.moveTo(x - 15.5, y - 10.2);
+      ctx.lineTo(x + 11.0, y - 17.2);
+      ctx.lineTo(x + 17.8, y - 12.8);
+      ctx.lineTo(x + 17.8, y - 10.0);
+      ctx.lineTo(x - 8.8, y - 3.0);
+      ctx.lineTo(x - 15.5, y - 7.4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Three Individual Isometric Golden-Oak Seat Planks
       const seatSlats = [
-        { t0: 0.0, t1: 0.30, fill: '#8a501e', hi: '#ad6b30' },
-        { t0: 0.35, t1: 0.65, fill: '#9c5c24', hi: '#c27a38' },
-        { t0: 0.70, t1: 1.0, fill: '#ab682c', hi: '#d48c46' },
+        { t0: 0.0, t1: 0.31, fill: '#9a521c', hi: '#c87632' },
+        { t0: 0.34, t1: 0.65, fill: '#b06124', hi: '#df8b3e' },
+        { t0: 0.68, t1: 1.0, fill: '#c4712c', hi: '#f3ac5c' },
       ];
       for (const sl of seatSlats) {
-        const blX = -15 + 6 * sl.t0;
-        const blY = -10 + 4 * sl.t0;
-        const brX = 11 + 6 * sl.t0;
-        const brY = -17 + 4 * sl.t0;
-        const frX = 11 + 6 * sl.t1;
-        const frY = -17 + 4 * sl.t1;
-        const flX = -15 + 6 * sl.t1;
-        const flY = -10 + 4 * sl.t1;
+        const blX = -15.2 + 6.6 * sl.t0;
+        const blY = -10.2 + 4.4 * sl.t0;
+        const brX = 11.0 + 6.6 * sl.t0;
+        const brY = -17.2 + 4.4 * sl.t0;
+        const frX = 11.0 + 6.6 * sl.t1;
+        const frY = -17.2 + 4.4 * sl.t1;
+        const flX = -15.2 + 6.6 * sl.t1;
+        const flY = -10.2 + 4.4 * sl.t1;
 
         ctx.fillStyle = sl.fill;
         ctx.beginPath();
@@ -2434,83 +3006,238 @@ export class IsometricRenderer {
         ctx.closePath();
         ctx.fill();
 
-        // Crisp sunlit front-top wood grain highlight on each slat
+        // Crisp sunlit front-top wood grain highlight on each plank
         ctx.strokeStyle = sl.hi;
-        ctx.lineWidth = 0.85;
+        ctx.lineWidth = 0.95;
         ctx.beginPath();
         ctx.moveTo(x + flX + 0.5, y + flY - 0.3);
         ctx.lineTo(x + frX - 0.5, y + frY - 0.3);
         ctx.stroke();
       }
 
-      // 4. Angled Slatted Honey-Oak Backrest with Carved Crest Rail & Brass Studs
-      // Backrest rises from Back-Left (-15, -10) -> (-16, -21) and Back-Right (+11, -17) -> (+10, -28)
-      // 4a. Lower & Upper Backrest Slats
-      const backSlats = [
-        { yOff0: -12.5, yOff1: -15.8, fill: '#8c5220', border: '#3d1d08' },
-        { yOff0: -17.0, yOff1: -20.8, fill: '#a6652b', border: '#3d1d08' },
-      ];
-      for (const bs of backSlats) {
-        ctx.fillStyle = bs.fill;
-        ctx.strokeStyle = bs.border;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.moveTo(x - 15.5, y + bs.yOff0);
-        ctx.lineTo(x + 10.5, y + bs.yOff0 - 7);
-        ctx.lineTo(x + 10.0, y + bs.yOff1 - 7);
-        ctx.lineTo(x - 16.0, y + bs.yOff1);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-      }
-
-      // 4b. Sculpted Top Crest Rail with Warm Specular Highlight & End Finials
-      ctx.strokeStyle = '#c8823e';
-      ctx.lineWidth = 1.8;
-      ctx.lineCap = 'round';
+      // Warm amber front lip bevel on the foremost seat plank
+      ctx.fillStyle = '#8c4a19';
       ctx.beginPath();
-      ctx.moveTo(x - 16.5, y - 21.2);
-      ctx.lineTo(x + 10.5, y - 28.2);
-      ctx.stroke();
-
-      // Center vertical backrest stile
-      ctx.fillStyle = '#5c3110';
-      ctx.beginPath();
-      ctx.moveTo(x - 3.5, y - 13.5);
-      ctx.lineTo(x - 1.5, y - 14.0);
-      ctx.lineTo(x - 2.0, y - 24.5);
-      ctx.lineTo(x - 4.0, y - 24.0);
+      ctx.moveTo(x - 8.6, y - 5.8);
+      ctx.lineTo(x + 17.6, y - 12.8);
+      ctx.lineTo(x + 17.6, y - 10.6);
+      ctx.lineTo(x - 8.6, y - 3.6);
       ctx.closePath();
       ctx.fill();
 
-      // Brass bolt rivets along backrest posts
-      ctx.fillStyle = '#fbbf24';
+      // 6. Front Cast Wrought-Iron Legs & Ornate S-Scroll Volute Armrests
+      // Front-left leg with flared foot
+      ctx.fillStyle = '#1e2530';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1.0;
+      ctx.fillRect(x - 10.8, y - 6.5, 3.4, 11.2);
+      ctx.strokeRect(x - 10.8, y - 6.5, 3.4, 11.2);
+      // Front-right leg with flared foot
+      ctx.fillRect(x + 14.5, y - 13.5, 3.4, 11.2);
+      ctx.strokeRect(x + 14.5, y - 13.5, 3.4, 11.2);
+
+      // Ornate Curved Wrought-Iron Scrollwork Armrests on Left and Right Ends
+      ctx.strokeStyle = '#1e2530';
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.arc(x - 14.8, y - 19.0, 1.0, 0, Math.PI * 2);
-      ctx.arc(x + 9.2, y - 26.0, 1.0, 0, Math.PI * 2);
+      // Left armrest S-scroll with front spiral volute
+      ctx.moveTo(x - 15.2, y - 16.5);
+      ctx.bezierCurveTo(x - 11.5, y - 15.5, x - 8.2, y - 13.0, x - 9.2, y - 6.5);
+      // Right armrest S-scroll with front spiral volute
+      ctx.moveTo(x + 10.8, y - 23.5);
+      ctx.bezierCurveTo(x + 14.5, y - 22.5, x + 17.8, y - 20.0, x + 16.2, y - 13.5);
+      ctx.stroke();
+
+      // Specular metallic highlight on top of iron armrests & spiral curls
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(x - 15.0, y - 17.2);
+      ctx.quadraticCurveTo(x - 10.2, y - 15.2, x - 9.0, y - 10.8);
+      ctx.arc(x - 10.2, y - 10.5, 1.8, 0, Math.PI * 1.4);
+      ctx.moveTo(x + 11.0, y - 24.2);
+      ctx.quadraticCurveTo(x + 15.8, y - 22.2, x + 16.6, y - 17.8);
+      ctx.stroke();
+
+      // 7. Foreground Green Grass Tuft & Golden-Yellow Wildflowers at Front-Left Bench Foot (Matching image.png)
+      ctx.fillStyle = '#2d6a1e';
+      ctx.beginPath();
+      ctx.arc(x - 12.5, y + 4.2, 4.2, 0, Math.PI * 2);
+      ctx.arc(x - 8.5, y + 5.0, 3.5, 0, Math.PI * 2);
+      ctx.arc(x - 15.5, y + 3.2, 3.0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 5. Curved Wrought-Iron & Oak Armrests on Left and Right Ends
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 2.2;
+      // Crisp upward grass blades at base
+      ctx.strokeStyle = '#65a30d';
+      ctx.lineWidth = 1.3;
       ctx.beginPath();
-      // Left armrest scroll
-      ctx.moveTo(x - 15.5, y - 15.5);
-      ctx.quadraticCurveTo(x - 10.0, y - 13.5, x - 9.5, y - 6.5);
-      // Right armrest scroll
-      ctx.moveTo(x + 10.5, y - 22.5);
-      ctx.quadraticCurveTo(x + 16.0, y - 20.5, x + 16.2, y - 13.5);
+      ctx.moveTo(x - 14, y + 4);
+      ctx.lineTo(x - 16, y - 1);
+      ctx.moveTo(x - 12, y + 5);
+      ctx.lineTo(x - 12, y - 1.5);
+      ctx.moveTo(x - 9.5, y + 5);
+      ctx.lineTo(x - 7.5, y);
       ctx.stroke();
 
-      // Sunlit iron highlight on armrests
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 0.9;
+      // Tiny blooming golden-yellow wildflowers on the bench base tuft
+      ctx.fillStyle = '#facc15';
       ctx.beginPath();
-      ctx.moveTo(x - 15.2, y - 16.2);
-      ctx.quadraticCurveTo(x - 10.2, y - 14.2, x - 9.8, y - 10.0);
-      ctx.moveTo(x + 10.8, y - 23.2);
-      ctx.quadraticCurveTo(x + 15.8, y - 21.2, x + 16.0, y - 17.0);
-      ctx.stroke();
+      ctx.arc(x - 13.5, y + 2.2, 1.4, 0, Math.PI * 2);
+      ctx.arc(x - 9.2, y + 3.4, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(x - 13.5, y + 2.0, 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (prop.kind === 'bush') {
+      // Lush Leafy Shrubs, Pink-Blossoming Hydrangea Bushes & Wildflower Tufts (Matching image.png)
+      const v = (prop.variant ?? 0) % 3;
+      const sway = Math.sin(gameTime * 2.6 + x * 0.04 + y * 0.03) * 1.1;
+
+      const drawBushCluster = (bx: number, by: number, rx: number, ry: number, hasPinkFlowers: boolean, hasYellowFlowers: boolean) => {
+        // 1. Deep forest-green scalloped base lobes & dark outline
+        const lobes = 8;
+        ctx.beginPath();
+        for (let i = 0; i < lobes; i++) {
+          const a = (i / lobes) * Math.PI * 2;
+          const lx = bx + sway * 0.5 + Math.cos(a) * rx * 0.65;
+          const ly = by + Math.sin(a) * ry * 0.65;
+          const lr = (i % 2 === 0 ? 0.48 : 0.40) * Math.min(rx, ry * 1.3);
+          ctx.moveTo(lx + lr, ly);
+          ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+        }
+        ctx.moveTo(bx + rx * 0.72, by);
+        ctx.ellipse(bx + sway * 0.5, by, rx * 0.72, ry * 0.72, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#1b5211';
+        ctx.fill();
+        ctx.strokeStyle = '#0d2b07';
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+
+        // 2. Vibrant mid-emerald leafy body
+        ctx.fillStyle = '#439c23';
+        ctx.beginPath();
+        for (let i = 0; i < lobes; i++) {
+          const a = (i / lobes) * Math.PI * 2;
+          if (Math.sin(a) > 0.6) continue;
+          const lx = bx + sway * 0.7 - 0.5 + Math.cos(a) * rx * 0.58;
+          const ly = by - 1.4 + Math.sin(a) * ry * 0.58;
+          const lr = (i % 2 === 0 ? 0.44 : 0.36) * Math.min(rx, ry * 1.25);
+          ctx.moveTo(lx + lr, ly);
+          ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+        }
+        ctx.ellipse(bx + sway * 0.7 - 0.4, by - 1.4, rx * 0.62, ry * 0.58, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3. Sunlit lime-green crown puffs
+        ctx.fillStyle = '#8ce03a';
+        ctx.beginPath();
+        ctx.arc(bx + sway - rx * 0.26, by - ry * 0.38, rx * 0.28, 0, Math.PI * 2);
+        ctx.arc(bx + sway + rx * 0.12, by - ry * 0.44, rx * 0.25, 0, Math.PI * 2);
+        ctx.arc(bx + sway - rx * 0.44, by - ry * 0.12, rx * 0.20, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 4. Blossoms (Magenta-Pink Hydrangea/Rose clusters OR Yellow-Gold Florets as in image.png)
+        if (hasPinkFlowers) {
+          const pinkSpots = [
+            { ox: -0.45, oy: -0.25, r: 2.3 },
+            { ox: 0.05, oy: -0.52, r: 2.5 },
+            { ox: 0.48, oy: -0.22, r: 2.2 },
+            { ox: -0.22, oy: 0.18, r: 2.4 },
+            { ox: 0.28, oy: 0.15, r: 2.3 },
+            { ox: -0.58, oy: 0.12, r: 1.9 },
+          ];
+          for (const sp of pinkSpots) {
+            const fx = bx + sway * 0.8 + sp.ox * rx;
+            const fy = by - 1 + sp.oy * ry;
+            ctx.fillStyle = '#db2777';
+            ctx.beginPath();
+            ctx.arc(fx, fy, sp.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#f472b6';
+            ctx.beginPath();
+            ctx.arc(fx - 0.4, fy - 0.4, sp.r * 0.72, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fbcfe8';
+            ctx.beginPath();
+            ctx.arc(fx - 0.6, fy - 0.6, sp.r * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (hasYellowFlowers) {
+          const yellowSpots = [
+            { ox: -0.38, oy: -0.32, r: 1.7 },
+            { ox: 0.18, oy: -0.45, r: 1.8 },
+            { ox: 0.45, oy: -0.1, r: 1.6 },
+            { ox: -0.15, oy: 0.15, r: 1.8 },
+            { ox: 0.25, oy: 0.22, r: 1.6 },
+          ];
+          for (const sp of yellowSpots) {
+            const fx = bx + sway * 0.8 + sp.ox * rx;
+            const fy = by - 1 + sp.oy * ry;
+            ctx.fillStyle = '#eab308';
+            ctx.beginPath();
+            ctx.arc(fx, fy, sp.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(fx - 0.3, fy - 0.3, sp.r * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      };
+
+      if (v === 0) {
+        // Variant 0: Rounded Green Bush with Yellow-Gold Florets (bottom-left bush in image.png)
+        drawBushCluster(x, y - 9, 15.5, 11.5, false, true);
+      } else if (v === 1) {
+        // Variant 1: Lush Pink-Blossoming Hydrangea / Rose Shrub (middle bush in image.png)
+        drawBushCluster(x, y - 10, 17, 12.5, true, false);
+      } else {
+        // Variant 2: Compact Leafy Bush + Blooming 3-Flower Plant & Crisp 5-Blade Grass Tuft (image.png)
+        drawBushCluster(x - 7, y - 8, 12.5, 9.5, false, true);
+
+        // Blooming 3-flower wildflower clump on the right
+        const fx = x + 9;
+        const fy = y - 2;
+        ctx.fillStyle = '#1b5211';
+        ctx.beginPath();
+        ctx.ellipse(fx, fy + 1.5, 6.5, 2.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Broad green basal leaves
+        ctx.fillStyle = '#48a126';
+        ctx.beginPath();
+        ctx.ellipse(fx - 3.5, fy, 3.8, 1.6, -0.35, 0, Math.PI * 2);
+        ctx.ellipse(fx + 3.5, fy, 3.8, 1.6, 0.35, 0, Math.PI * 2);
+        ctx.ellipse(fx, fy - 1, 3.2, 1.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const flowers = [
+          { ox: -3.5, oy: -7.5, col: '#fb923c', core: '#fef08a' },
+          { ox: 0.5, oy: -9.5, col: '#facc15', core: '#b45309' },
+          { ox: 4.0, oy: -6.8, col: '#f472b6', core: '#fef08a' },
+        ];
+        ctx.strokeStyle = '#256e18';
+        ctx.lineWidth = 1.3;
+        for (const fl of flowers) {
+          const bx = fx + fl.ox + sway * 0.6;
+          const by = fy + fl.oy;
+          ctx.beginPath();
+          ctx.moveTo(fx + fl.ox * 0.3, fy);
+          ctx.lineTo(bx, by);
+          ctx.stroke();
+
+          ctx.fillStyle = fl.col;
+          ctx.beginPath();
+          ctx.arc(bx, by, 2.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = fl.core;
+          ctx.beginPath();
+          ctx.arc(bx, by, 0.95, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     } else if (prop.kind === 'brazier') {
       // Forged Iron Tripod Legs & Bowl
       ctx.strokeStyle = '#1e293b';
@@ -2733,47 +3460,146 @@ export class IsometricRenderer {
       ctx.arc(x, y - 42, 20, Math.PI, 0);
       ctx.stroke();
     } else if (prop.kind === 'barrel') {
-      const bGrad = ctx.createLinearGradient(x - 8, y - 18, x + 8, y);
-      bGrad.addColorStop(0, '#92400e');
-      bGrad.addColorStop(0.5, '#78350f');
-      bGrad.addColorStop(1, '#451a03');
+      // Coopered Honey-Oak Barrel with Dual Wrought-Iron Hoops & Rivets (Matching image.png)
+      ctx.fillStyle = 'rgba(10, 15, 28, 0.42)';
+      ctx.beginPath();
+      ctx.ellipse(x + 1, y + 1.5, 9.5, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const bGrad = ctx.createLinearGradient(x - 9, y - 18, x + 9, y);
+      bGrad.addColorStop(0, '#c2712d');
+      bGrad.addColorStop(0.45, '#9a521c');
+      bGrad.addColorStop(1, '#5c2d0c');
       ctx.fillStyle = bGrad;
       ctx.beginPath();
-      ctx.ellipse(x, y - 9, 8.5, 10, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y - 9, 8.8, 10.5, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#27272a';
+      ctx.strokeStyle = '#2a1204';
       ctx.lineWidth = 1.1;
       ctx.stroke();
 
-      ctx.strokeStyle = '#52525b';
-      ctx.lineWidth = 1.6;
+      // Vertical stave seam lines
+      ctx.strokeStyle = 'rgba(42, 18, 4, 0.55)';
+      ctx.lineWidth = 0.8;
       ctx.beginPath();
-      ctx.ellipse(x, y - 13, 8, 3, 0, 0, Math.PI);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.ellipse(x, y - 5, 8, 3, 0, 0, Math.PI);
+      ctx.moveTo(x - 4, y - 16);
+      ctx.lineTo(x - 4.5, y - 1);
+      ctx.moveTo(x, y - 15);
+      ctx.lineTo(x, y);
+      ctx.moveTo(x + 4, y - 16);
+      ctx.lineTo(x + 4.5, y - 1);
       ctx.stroke();
 
-      ctx.fillStyle = '#78350f';
+      // Dual wrought-iron barrel hoops with metallic highlight & rivets
+      ctx.strokeStyle = '#272f3d';
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.ellipse(x, y - 17, 6.8, 3.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y - 13, 8.4, 3.0, 0, 0, Math.PI);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(x, y - 5.5, 8.4, 3.0, 0, 0, Math.PI);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.ellipse(x, y - 13.4, 8.2, 2.8, 0, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+
+      // Top recessed oak lid & bung cork
+      ctx.fillStyle = '#8c4a19';
+      ctx.strokeStyle = '#3b1905';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.ellipse(x, y - 17.2, 7.0, 3.4, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-    } else if (prop.kind === 'crate') {
-      ctx.fillStyle = '#78350f';
-      ctx.strokeStyle = '#451a03';
-      ctx.lineWidth = 1.2;
-      ctx.fillRect(x - 9, y - 16, 18, 16);
-      ctx.strokeRect(x - 9, y - 16, 18, 16);
 
-      ctx.strokeStyle = '#92400e';
-      ctx.lineWidth = 2;
+      ctx.fillStyle = '#451a03';
       ctx.beginPath();
-      ctx.moveTo(x - 8, y - 15);
-      ctx.lineTo(x + 8, y - 1);
-      ctx.moveTo(x + 8, y - 15);
-      ctx.lineTo(x - 8, y - 1);
+      ctx.ellipse(x + 2, y - 17.2, 1.4, 0.9, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (prop.kind === 'crate') {
+      // 3D Isometric Framed Honey-Oak Crate with Diagonal Cross-Braces & Iron Studs (Matching image.png)
+      // Ground shadow
+      ctx.fillStyle = 'rgba(10, 15, 28, 0.44)';
+      ctx.beginPath();
+      ctx.ellipse(x + 1, y + 2, 12.5, 6.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Left Lit Face (x - 10..x, y - 14..y + 1)
+      ctx.fillStyle = '#a85d22';
+      ctx.strokeStyle = '#3b1905';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(x - 10, y - 4);
+      ctx.lineTo(x, y + 1);
+      ctx.lineTo(x, y - 12);
+      ctx.lineTo(x - 10, y - 17);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
+
+      // Left Face Diagonal Cross-Brace Plank
+      ctx.strokeStyle = '#c87632';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(x - 8.5, y - 15);
+      ctx.lineTo(x - 1.5, y - 1);
+      ctx.stroke();
+      ctx.strokeStyle = '#6b3610';
+      ctx.lineWidth = 0.9;
+      ctx.strokeRect(x - 8.8, y - 15.2, 7.4, 12.5);
+
+      // Right Shaded Face (x..x + 10, y + 1..y - 17)
+      ctx.fillStyle = '#7c3f14';
+      ctx.strokeStyle = '#3b1905';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 1);
+      ctx.lineTo(x + 10, y - 4);
+      ctx.lineTo(x + 10, y - 17);
+      ctx.lineTo(x, y - 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Right Face Diagonal Cross-Brace Plank
+      ctx.strokeStyle = '#9a521c';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(x + 1.5, y - 10.5);
+      ctx.lineTo(x + 8.5, y - 5.5);
+      ctx.stroke();
+
+      // Top Sunlit Isometric Lid (Diamond at y - 12..y - 22)
+      ctx.fillStyle = '#c87632';
+      ctx.strokeStyle = '#3b1905';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(x - 10, y - 17);
+      ctx.lineTo(x, y - 12);
+      ctx.lineTo(x + 10, y - 17);
+      ctx.lineTo(x, y - 22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Top lid plank lines & sunlit rim highlight
+      ctx.strokeStyle = '#eab364';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(x - 8.5, y - 17);
+      ctx.lineTo(x, y - 21);
+      ctx.lineTo(x + 8.5, y - 17);
+      ctx.stroke();
+
+      // Dark iron corner bolt rivets
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(x - 9.2, y - 16.2, 1.4, 1.4);
+      ctx.fillRect(x - 1.4, y - 12.2, 1.4, 1.4);
+      ctx.fillRect(x - 1.4, y - 1.2, 1.4, 1.4);
+      ctx.fillRect(x + 7.8, y - 16.2, 1.4, 1.4);
     } else if (prop.kind === 'bones') {
       ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 2;
@@ -2973,306 +3799,108 @@ export class IsometricRenderer {
     }
 
     ctx.save();
+    const phase = gameTime * 4.5;
 
-    // 1. Ground Ambient Shadow & Outer Radial Stone Tile Ring (Reference Image 5 circular cobble ring)
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
+    // 1. Ground Shadow & Stepped Outer Ashlar Base Ring
+    ctx.fillStyle = 'rgba(15, 20, 28, 0.45)';
     ctx.beginPath();
-    ctx.ellipse(x, y + 4, 58, 29, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y + 8, 63, 31, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Circular Stepped Stone Tile Apron (16 radial wedge stone blocks)
-    const apronRx = 54;
-    const apronRy = 27;
-    ctx.fillStyle = '#8b8378';
-    ctx.strokeStyle = '#2b2520';
+    const apronRx = 56;
+    const apronRy = 27.5;
+    ctx.fillStyle = '#8b949e';
+    ctx.strokeStyle = '#212529';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.ellipse(x, y + 2, apronRx, apronRy, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y + 3, apronRx, apronRy, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Radial stone tile mortar joints around the circular plaza ring
-    const radialSegments = 16;
-    ctx.strokeStyle = 'rgba(38, 32, 26, 0.72)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    for (let i = 0; i < radialSegments; i++) {
-      const a = (i / radialSegments) * Math.PI * 2;
-      const cosA = Math.cos(a);
-      const sinA = Math.sin(a);
-      ctx.moveTo(x + cosA * 40, y + 2 + sinA * 20);
-      ctx.lineTo(x + cosA * apronRx, y + 2 + sinA * apronRy);
-    }
-    ctx.stroke();
-
-    // 2. Lower Basin Cylindrical Carved Stone Masonry Wall (3D exterior front wall + top coping ring)
-    const basinRx = 45;
+    // 2. Two-Course Cylindrical Stone Basin Wall & Wide Coping Rim
+    const basinRx = 47;
     const basinRy = 22.5;
-    const wallDrop = 9;
+    const wallDrop = 14;
+    const rimY = y - 10;
 
-    // 3D front stone wall skirt of the circular basin
-    const wallGrad = ctx.createLinearGradient(x - basinRx, y, x + basinRx, y + wallDrop);
-    wallGrad.addColorStop(0, '#94a3b8');
-    wallGrad.addColorStop(0.5, '#64748b');
-    wallGrad.addColorStop(1, '#475569');
-    ctx.fillStyle = wallGrad;
+    ctx.fillStyle = '#646d75';
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.ellipse(x, y - 2, basinRx, basinRy, 0, 0, Math.PI);
-    ctx.lineTo(x - basinRx, y - 2 + wallDrop);
-    ctx.ellipse(x, y - 2 + wallDrop, basinRx, basinRy, 0, Math.PI, 0, true);
+    ctx.ellipse(x, rimY, basinRx, basinRy, 0, 0, Math.PI);
+    ctx.lineTo(x - basinRx, rimY + wallDrop);
+    ctx.ellipse(x, rimY + wallDrop, basinRx, basinRy, 0, Math.PI, 0, true);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.4;
     ctx.stroke();
 
-    // Vertical chiseled stone block joints along the 3D basin wall
-    ctx.strokeStyle = 'rgba(15, 23, 42, 0.65)';
-    ctx.lineWidth = 1.1;
+    ctx.fillStyle = '#adb5bd';
     ctx.beginPath();
-    for (let i = 1; i < 8; i++) {
-      const a = (i / 8) * Math.PI;
-      const jx = x + Math.cos(a) * basinRx;
-      const jy = y - 2 + Math.sin(a) * basinRy;
-      ctx.moveTo(jx, jy);
-      ctx.lineTo(jx, jy + wallDrop);
-    }
+    ctx.ellipse(x, rimY, basinRx + 1.5, basinRy + 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.stroke();
 
-    // Top Carved Stone Coping Ring of Lower Basin (segmented radial stone tiles)
-    ctx.fillStyle = '#94a3b8';
-    ctx.strokeStyle = '#1e293b';
+    // 3. Crystal-Blue Pool & 4-Point Star Sparkles
+    const poolRx = 38;
+    const poolRy = 18;
+    ctx.fillStyle = '#29b6f6';
+    ctx.beginPath();
+    ctx.ellipse(x, rimY + 1.5, poolRx - 1, poolRy - 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#e0f2fe';
     ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 4. Middle & Upper Stone Bowls + Conical Finial + 4 Ribbon Waterfalls
+    const midY = rimY - 22;
+    const topBowlY = midY - 18;
+
+    ctx.fillStyle = '#6c757d';
+    ctx.fillRect(x - 8, midY, 16, 22);
+    ctx.fillStyle = '#adb5bd';
     ctx.beginPath();
-    ctx.ellipse(x, y - 2, basinRx, basinRy, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, midY, 22, 10.5, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Sunlit bevel highlight on the stone rim
-    ctx.strokeStyle = 'rgba(248, 250, 252, 0.55)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(x, y - 2.5, basinRx - 1.5, basinRy - 0.8, 0, Math.PI * 0.9, Math.PI * 1.95);
-    ctx.stroke();
-
-    // Radial stone joints on the basin rim coping
-    ctx.strokeStyle = 'rgba(30, 41, 59, 0.68)';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2;
-      const cosA = Math.cos(a);
-      const sinA = Math.sin(a);
-      ctx.moveTo(x + cosA * 37, y - 2 + sinA * 18.5);
-      ctx.lineTo(x + cosA * basinRx, y - 2 + sinA * basinRy);
-    }
-    ctx.stroke();
-
-    // 3. Lower Basin Water Pool with Animated Sine Waves & Ripples
-    const poolRx = 37;
-    const poolRy = 18.5;
-    const waterGrad = ctx.createRadialGradient(x, y - 2, 4, x, y - 2, poolRx);
-    waterGrad.addColorStop(0, '#38bdf8');
-    waterGrad.addColorStop(0.6, '#0284c7');
-    waterGrad.addColorStop(1, '#0c4a6e');
-    ctx.fillStyle = waterGrad;
-    ctx.beginPath();
-    ctx.ellipse(x, y - 2, poolRx, poolRy, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Flowing sine-wave ripples across the lower pool surface
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(x, y - 2, poolRx - 1, poolRy - 0.5, 0, 0, Math.PI * 2);
-    ctx.clip();
-
-    for (let wIdx = -2; wIdx <= 2; wIdx++) {
-      const baseWy = y - 2 + wIdx * 5.2;
-      ctx.strokeStyle = wIdx % 2 === 0 ? 'rgba(224, 242, 254, 0.52)' : 'rgba(125, 211, 252, 0.38)';
-      ctx.lineWidth = 1.2;
+    for (const ox of [-13.5, 13.5]) {
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(x + ox - 3, midY + 6, 6, 18);
+      ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      for (let sx = -poolRx; sx <= poolRx; sx += 4) {
-        const sy = baseWy + Math.sin(sx * 0.24 - gameTime * 4.5 + wIdx * 1.3) * 1.6;
-        if (sx === -poolRx) ctx.moveTo(x + sx, sy);
-        else ctx.lineTo(x + sx, sy);
-      }
-      ctx.stroke();
-    }
-
-    // Expanding concentric wave rings from the cascading waterfall
-    for (let ring = 0; ring < 2; ring++) {
-      const prog = ((gameTime * 0.85 + ring * 0.5) % 1);
-      const rRx = 18 + prog * 18;
-      const rRy = 9 + prog * 9;
-      ctx.strokeStyle = `rgba(224, 242, 254, ${(1 - prog) * 0.65})`;
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.ellipse(x, y - 2, rRx, rRy, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // 4. Lower Stone Pedestal Column & Middle Carved Stone Basin (at y - 22)
-    ctx.fillStyle = '#475569';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.3;
-    ctx.fillRect(x - 10, y - 22, 20, 18);
-    ctx.strokeRect(x - 10, y - 22, 20, 18);
-
-    // Middle Circular Carved Stone Bowl (y - 22)
-    const midY = y - 22;
-    const midRx = 24;
-    const midRy = 12;
-
-    // Bowl underside stone masonry
-    ctx.fillStyle = '#475569';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.ellipse(x, midY + 4, midRx * 0.85, midRy * 0.85, 0, 0, Math.PI);
-    ctx.lineTo(x - midRx, midY);
-    ctx.lineTo(x + midRx, midY);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Middle Stone Rim with radial stone block joints
-    ctx.fillStyle = '#94a3b8';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.ellipse(x, midY, midRx, midRy, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(30, 41, 59, 0.65)';
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2;
-      ctx.moveTo(x + Math.cos(a) * 18, midY + Math.sin(a) * 9);
-      ctx.lineTo(x + Math.cos(a) * midRx, midY + Math.sin(a) * midRy);
-    }
-    ctx.stroke();
-
-    // Middle Bowl Water Pool
-    ctx.fillStyle = '#0ea5e9';
-    ctx.beginPath();
-    ctx.ellipse(x, midY, 19, 9.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 5. Animated Sine-Wave Waterfall Curtain Flowing Down from Middle Stone Bowl into Lower Pool!
-    const numStreams = 9;
-    ctx.lineCap = 'round';
-    for (let s = 0; s < numStreams; s++) {
-      // Spread streams across the front arc of the circular stone bowl (angle from 0.12*PI to 0.88*PI)
-      const angle = (0.12 + (s / (numStreams - 1)) * 0.76) * Math.PI;
-      const topX = x + Math.cos(angle) * (midRx - 1);
-      const topY = midY + Math.sin(angle) * (midRy - 0.5);
-      const botY = topY + 19;
-
-      // Translucent cyan water ribbon base
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.52)';
-      ctx.lineWidth = 2.8;
-      ctx.beginPath();
-      for (let step = 0; step <= 6; step++) {
-        const frac = step / 6;
-        const py = topY + frac * (botY - topY);
-        const sineWave = Math.sin(frac * Math.PI * 2.5 - gameTime * 9.0 + s * 0.85) * 1.7;
-        const px = topX + sineWave;
-        if (step === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-
-      // Bright white-aqua sine-wave crest flowing downward
-      ctx.strokeStyle = 'rgba(224, 242, 254, 0.82)';
-      ctx.lineWidth = 1.25;
-      ctx.beginPath();
-      for (let step = 0; step <= 6; step++) {
-        const frac = step / 6;
-        const py = topY + frac * (botY - topY);
-        const sineWave = Math.sin(frac * Math.PI * 2.5 - gameTime * 9.0 + s * 0.85) * 1.7;
-        const px = topX + sineWave;
-        if (step === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-
-      // Foaming splash ring where each sine-wave stream hits the lower pool
-      const foamRadius = 2.2 + Math.sin(gameTime * 8 + s * 1.5) * 0.8;
-      ctx.fillStyle = 'rgba(224, 242, 254, 0.75)';
-      ctx.beginPath();
-      ctx.ellipse(topX, botY, foamRadius * 1.4, foamRadius * 0.7, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + ox, rimY + 4, 5, 2.2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Descending horizontal sine-wave water rings along the waterfall curtain
-    for (let wRing = 0; wRing < 2; wRing++) {
-      const fallFrac = (gameTime * 1.6 + wRing * 0.5) % 1;
-      const dropY = fallFrac * 18;
-      ctx.strokeStyle = `rgba(224, 242, 254, ${(1 - fallFrac * 0.5) * 0.65})`;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      for (let i = 0; i <= 16; i++) {
-        const a = (0.12 + (i / 16) * 0.76) * Math.PI;
-        const wx = x + Math.cos(a) * (midRx - 0.5);
-        const wy =
-          midY +
-          Math.sin(a) * midRy +
-          dropY +
-          Math.sin(i * 1.1 - gameTime * 8.0) * 1.3;
-        if (i === 0) ctx.moveTo(wx, wy);
-        else ctx.lineTo(wx, wy);
-      }
-      ctx.stroke();
-    }
-
-    // 6. Upper Carved Stone Pedestal & Top Crown Spout Tier (y - 38)
-    const topTierY = y - 38;
-    ctx.fillStyle = '#64748b';
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.2;
-    ctx.fillRect(x - 6, topTierY, 12, 16);
-    ctx.strokeRect(x - 6, topTierY, 12, 16);
-
-    // Top Circular Carved Stone Crown Bowl
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#6c757d';
+    ctx.fillRect(x - 5, topBowlY, 10, 18);
+    ctx.fillStyle = '#ced4da';
     ctx.beginPath();
-    ctx.ellipse(x, topTierY, 12, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, topBowlY, 13.5, 6.5, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Bubbling water dome & downward-flowing sine-wave streams from top crown into middle bowl
-    const spoutPulse = Math.sin(gameTime * 6) * 1.5;
-    ctx.fillStyle = '#bae6fd';
-    ctx.beginPath();
-    ctx.ellipse(x, topTierY - 2 + spoutPulse * 0.3, 6.5, 4.2, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    for (let u = 0; u < 5; u++) {
-      const a = (0.15 + (u / 4) * 0.7) * Math.PI;
-      const ux = x + Math.cos(a) * 11;
-      const uy = topTierY + Math.sin(a) * 5.5;
-      const uBotY = uy + 14;
-
-      ctx.strokeStyle = 'rgba(224, 242, 254, 0.8)';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      for (let step = 0; step <= 5; step++) {
-        const frac = step / 5;
-        const py = uy + frac * (uBotY - uy);
-        const sx = ux + Math.sin(frac * Math.PI * 2 - gameTime * 9.5 + u) * 1.3;
-        if (step === 0) ctx.moveTo(sx, py);
-        else ctx.lineTo(sx, py);
-      }
-      ctx.stroke();
+    for (const ox of [-7.8, 7.8]) {
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(x + ox - 2, topBowlY + 4, 4, 15);
     }
 
-    ctx.fillStyle = '#bae6fd';
-    ctx.font = 'bold 10px "Cinzel", serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('SANCTUARY FOUNTAIN', x, y - 50);
+    // Conical Acorn Finial
+    ctx.fillStyle = '#adb5bd';
+    ctx.beginPath();
+    ctx.moveTo(x, topBowlY - 19);
+    ctx.lineTo(x + 5, topBowlY - 1);
+    ctx.lineTo(x - 5, topBowlY - 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Star Sparkles
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x - 24, rimY - 3, 2 + Math.sin(phase) * 0.5, 0, Math.PI * 2);
+    ctx.arc(x + 23, rimY - 2, 2 + Math.cos(phase) * 0.5, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
   }

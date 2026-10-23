@@ -24,6 +24,8 @@ import {
   User,
 } from 'lucide-react';
 
+import { ClassPortraitArt } from './RpgArtAssets';
+
 interface ClassSelectModalProps {
   initialPlayerName: string;
   currentClass: CharacterClass;
@@ -44,19 +46,6 @@ export const ClassSelectModal: React.FC<ClassSelectModalProps> = ({
   const [showConfirm, setShowConfirm] = useState(false);
 
   const selectedDef = CLASS_DEFINITIONS[activeClass];
-
-  const getClassIcon = (cls: CharacterClass, className = 'w-6 h-6') => {
-    switch (cls) {
-      case 'swordsman':
-        return <Sword className={className} />;
-      case 'archer':
-        return <Crosshair className={className} />;
-      case 'mage':
-        return <Sparkles className={className} />;
-      case 'necromancer':
-        return <Skull className={className} />;
-    }
-  };
 
   const getAbilityIcon = (iconName: string) => {
     switch (iconName) {
@@ -103,22 +92,22 @@ export const ClassSelectModal: React.FC<ClassSelectModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 select-none">
-      <div className="relative w-full max-w-4xl bg-slate-900 border border-slate-700/90 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-4xl bg-[#18120c] border-2 border-[#b48838] rounded-3xl p-6 sm:p-8 shadow-[0_24px_65px_rgba(0,0,0,0.95)] flex flex-col max-h-[92vh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-slate-400 hover:text-slate-100 p-1.5 rounded-xl hover:bg-slate-800 transition"
+          className="absolute top-5 right-5 text-amber-200/70 hover:text-amber-100 p-1.5 rounded-xl hover:bg-amber-950/60 border border-amber-700/40 transition"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Header */}
         <div className="text-center mb-6">
-          <h2 className="font-cinzel text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600">
+          <h2 className="font-cinzel text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-[#fff3b8] via-[#eab308] to-[#92400e] drop-shadow">
             Create Hero & Select Class
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Choose your hero discipline and embark from Town-1 sanctuary into the crypt.
+          <p className="text-xs sm:text-sm text-amber-100/75 mt-1">
+            Choose your hero discipline and embark from Oakhaven Sanctuary into the crypt.
           </p>
           
           {/* Player Name Input */}
@@ -132,18 +121,18 @@ export const ClassSelectModal: React.FC<ClassSelectModalProps> = ({
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 placeholder="Hero Name"
-                className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-100 font-cinzel font-bold text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 text-center"
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-black/70 border border-amber-600/60 text-amber-100 font-cinzel font-bold text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 text-center"
               />
             </div>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+          <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Initiating a new character starts you at the Town-1 hub to prepare and speak with villagers.</span>
           </div>
         </div>
 
-        {/* Class Selection Tabs / Cards */}
+        {/* Class Selection Tabs / Cards with Painted Class Portraits (image_a1d00a81.png) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {(Object.keys(CLASS_DEFINITIONS) as CharacterClass[]).map((clsKey) => {
             const def = CLASS_DEFINITIONS[clsKey];
@@ -156,20 +145,17 @@ export const ClassSelectModal: React.FC<ClassSelectModalProps> = ({
                   setActiveClass(clsKey);
                   setShowConfirm(false);
                 }}
-                className={`flex flex-col items-center p-4 rounded-2xl border transition-all text-center ${
+                className={`flex flex-col items-center p-3.5 rounded-2xl border-2 transition-all text-center ${
                   isSelected
-                    ? 'bg-amber-500/15 border-amber-400 shadow-lg shadow-amber-950/40 ring-2 ring-amber-400/40'
-                    : 'bg-slate-950/60 border-slate-800 hover:bg-slate-800/80 hover:border-slate-700'
+                    ? 'bg-gradient-to-b from-[#3a2815] to-[#1d130a] border-[#facc15] shadow-[0_0_24px_rgba(250,204,21,0.3)] scale-[1.02]'
+                    : 'bg-[#120d08]/90 border-[#5c4322] hover:bg-[#23190f] hover:border-[#9a7232]'
                 }`}
               >
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center mb-2 shadow-inner"
-                  style={{ backgroundColor: `${def.color}15`, color: def.color }}
-                >
-                  {getClassIcon(clsKey, 'w-6 h-6')}
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#d4a548] mb-2 shadow-[0_4px_12px_rgba(0,0,0,0.85)] bg-slate-950">
+                  <ClassPortraitArt heroClass={clsKey} className="w-full h-full" />
                 </div>
-                <span className="font-cinzel font-bold text-sm text-slate-100">{def.name}</span>
-                <span className="text-[11px] text-slate-400 mt-0.5">{def.role}</span>
+                <span className="font-cinzel font-bold text-sm text-amber-100">{def.name}</span>
+                <span className="text-[11px] text-amber-300/75 mt-0.5">{def.role}</span>
               </button>
             );
           })}

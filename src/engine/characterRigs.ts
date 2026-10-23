@@ -212,181 +212,422 @@ export function drawHeroRig(
     ctx.stroke();
   }
 
-  // 3. Torso Cuirass / Robes / Brigandine
+  // 3. Torso Cuirass / Robes / Brigandine (Matching image_a1d00a81.png)
   const torsoY = -20 - bob;
-  if (pClass === 'mage' || pClass === 'necromancer') {
-    // Layered Arcanist / Necromancer Robe Skirt + Surcoat
-    const robeGrad = ctx.createLinearGradient(0, torsoY - 10, 0, -3);
-    robeGrad.addColorStop(0, isGhost ? opts?.ghostColor || '#c084fc' : palette.armorMain);
-    robeGrad.addColorStop(1, isGhost ? '#3b0764' : palette.armorDark);
+  if (pClass === 'mage') {
+    // Royal Blue Wizard Robe with Thick Gold Trim & Collar Brooch
+    const robeGrad = ctx.createLinearGradient(0, torsoY - 10, 0, -2);
+    robeGrad.addColorStop(0, isGhost ? opts?.ghostColor || '#38bdf8' : '#2563eb');
+    robeGrad.addColorStop(0.55, isGhost ? '#1d4ed8' : '#1d4ed8');
+    robeGrad.addColorStop(1, isGhost ? '#0f172a' : '#1e3a8a');
     ctx.fillStyle = robeGrad;
-    ctx.beginPath();
-    ctx.moveTo(-8, torsoY - 8);
-    ctx.lineTo(8, torsoY - 8);
-    ctx.lineTo(10, -4);
-    ctx.lineTo(-10, -4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = palette.armorTrim;
-    ctx.lineWidth = 1.1;
-    ctx.stroke();
-
-    // Central runic stole hanging down the front
-    if (!facingBack) {
-      ctx.fillStyle = palette.cape;
-      ctx.fillRect(-2.5, torsoY - 6, 5, 16);
-      ctx.strokeStyle = palette.armorTrim;
-      ctx.lineWidth = 0.8;
-      ctx.strokeRect(-2.5, torsoY - 6, 5, 16);
-    }
-  } else {
-    // Armored Cuirass + Battle Tabard + Belt (Swordsman / Archer)
-    const chestGrad = ctx.createLinearGradient(-9, torsoY - 9, 9, torsoY + 9);
-    chestGrad.addColorStop(0, isGhost ? opts?.ghostColor || '#38bdf8' : '#94a3b8');
-    chestGrad.addColorStop(0.5, isGhost ? '#0284c7' : palette.armorMain);
-    chestGrad.addColorStop(1, '#0f172a');
-
-    ctx.fillStyle = chestGrad;
     ctx.beginPath();
     ctx.moveTo(-8.5, torsoY - 8);
     ctx.lineTo(8.5, torsoY - 8);
-    ctx.lineTo(7, torsoY + 8);
-    ctx.lineTo(-7, torsoY + 8);
+    ctx.lineTo(11.5, -3);
+    ctx.lineTo(-11.5, -3);
     ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // Gold-trimmed center robe opening & leather belt
+    if (!facingBack) {
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(-2, torsoY - 4);
+      ctx.lineTo(-3, -3);
+      ctx.moveTo(2, torsoY - 4);
+      ctx.lineTo(3, -3);
+      ctx.stroke();
+
+      // Brown wizard sash belt
+      ctx.fillStyle = '#92400e';
+      ctx.fillRect(-8.5, torsoY + 2, 17, 2.8);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(-8.5, torsoY + 2, 17, 2.8);
+
+      // Gold V-collar Mantle & Sapphire Gem Brooch
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-8.5, torsoY - 7);
+      ctx.lineTo(0, torsoY - 1);
+      ctx.lineTo(8.5, torsoY - 7);
+      ctx.stroke();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(0, torsoY - 2, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 0.9;
+      ctx.stroke();
+    }
+  } else if (pClass === 'necromancer') {
+    // Tattered Dark Purple & Charcoal Necromancer Vestments with Jagged Hem
+    const necroGrad = ctx.createLinearGradient(0, torsoY - 10, 0, -2);
+    necroGrad.addColorStop(0, isGhost ? opts?.ghostColor || '#c084fc' : '#3b0764');
+    necroGrad.addColorStop(0.6, '#1e1b4b');
+    necroGrad.addColorStop(1, '#090d16');
+    ctx.fillStyle = necroGrad;
+    ctx.beginPath();
+    ctx.moveTo(-8.5, torsoY - 8);
+    ctx.lineTo(8.5, torsoY - 8);
+    ctx.lineTo(11, -3);
+    ctx.lineTo(6, -6);
+    ctx.lineTo(2, -2.5);
+    ctx.lineTo(-2, -6);
+    ctx.lineTo(-6, -2.5);
+    ctx.lineTo(-11, -3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#7e22ce';
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+
+    // Inner violet tunic & knotted cord belt with bone skull clasp
+    if (!facingBack) {
+      ctx.fillStyle = '#581c87';
+      ctx.beginPath();
+      ctx.moveTo(-3.5, torsoY - 5);
+      ctx.lineTo(3.5, torsoY - 5);
+      ctx.lineTo(4.5, -4);
+      ctx.lineTo(-4.5, -4);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(-8, torsoY + 2.5);
+      ctx.lineTo(8, torsoY + 2.5);
+      ctx.stroke();
+
+      // Mini bone skull brooch at collar
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.arc(0, torsoY - 4, 2.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (pClass === 'archer') {
+    // Forest Green Ranger Tunic with Crossed Leather Straps & Belt
+    const rangerGrad = ctx.createLinearGradient(-8, torsoY - 8, 8, torsoY + 9);
+    rangerGrad.addColorStop(0, isGhost ? opts?.ghostColor || '#4ade80' : '#22c55e');
+    rangerGrad.addColorStop(0.45, '#15803d');
+    rangerGrad.addColorStop(1, '#14532d');
+    ctx.fillStyle = rangerGrad;
+    ctx.beginPath();
+    ctx.moveTo(-8.5, torsoY - 8);
+    ctx.lineTo(8.5, torsoY - 8);
+    ctx.lineTo(7.5, torsoY + 9);
+    ctx.lineTo(-7.5, torsoY + 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#052e16';
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+
+    // Crossed Brown Leather Chest Harness & Silver Buckle Belt
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-7, torsoY - 7);
+    ctx.lineTo(6, torsoY + 4);
+    ctx.moveTo(7, torsoY - 7);
+    ctx.lineTo(-6, torsoY + 4);
+    ctx.stroke();
+
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(-8, torsoY + 3.5, 16, 3);
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1.1;
+    ctx.strokeRect(-2, torsoY + 3.3, 4, 3.4);
+  } else {
+    // SWORDSMAN: Full Polished Silver Plate Cuirass + Crimson & Gold Tabard
+    const chestGrad = ctx.createLinearGradient(-9, torsoY - 9, 9, torsoY + 9);
+    chestGrad.addColorStop(0, isGhost ? opts?.ghostColor || '#38bdf8' : '#f1f5f9');
+    chestGrad.addColorStop(0.45, isGhost ? '#0284c7' : '#94a3b8');
+    chestGrad.addColorStop(1, '#334155');
+
+    ctx.fillStyle = chestGrad;
+    ctx.beginPath();
+    ctx.moveTo(-9, torsoY - 8);
+    ctx.lineTo(9, torsoY - 8);
+    ctx.lineTo(7.5, torsoY + 8);
+    ctx.lineTo(-7.5, torsoY + 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Gold breastplate rivets & center ridge
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(-5, torsoY - 3, 1.1, 0, Math.PI * 2);
+    ctx.arc(5, torsoY - 3, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crimson Heraldic Tabard & Gold-Buckled Belt
+    ctx.fillStyle = '#b91c1c';
+    ctx.fillRect(-4, torsoY + 2, 8, 11);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-4, torsoY + 2, 8, 11);
+
+    ctx.fillStyle = '#991b1b';
+    ctx.fillRect(-8, torsoY + 2.5, 16, 2.8);
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(-2.2, torsoY + 2.2, 4.4, 3.4);
+  }
+
+  // 4. Layered Pauldrons (Shoulder Plates / Bone Skulls / Leather Pads)
+  const shoulderPositions = [
+    { sx: -9.8, sy: torsoY - 6 },
+    { sx: 9.8, sy: torsoY - 6 },
+  ];
+  for (const sh of shoulderPositions) {
+    if (pClass === 'necromancer') {
+      // Bleached Horned Skull Pauldrons (Matching image_a1d00a81.png)
+      ctx.fillStyle = isGhost ? opts?.ghostColor || '#c084fc' : '#e2e8f0';
+      ctx.beginPath();
+      ctx.ellipse(sh.sx, sh.sy, 5.2, 4.0, sh.sx < 0 ? -0.25 : 0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Dark skull eye sockets on pauldron
+      ctx.fillStyle = '#1e1b4b';
+      ctx.beginPath();
+      ctx.arc(sh.sx - 1.4, sh.sy - 0.5, 1.0, 0, Math.PI * 2);
+      ctx.arc(sh.sx + 1.4, sh.sy - 0.5, 1.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Upward curved bone horns on shoulder skulls
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.moveTo(sh.sx, sh.sy - 2.5);
+      ctx.lineTo(sh.sx + (sh.sx < 0 ? -5.5 : 5.5), sh.sy - 8.5);
+      ctx.lineTo(sh.sx + (sh.sx < 0 ? 2 : -2), sh.sy - 1.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (pClass === 'swordsman') {
+      // Heavy Layered Silver Steel Pauldrons with Gold Rim
+      ctx.fillStyle = isGhost ? opts?.ghostColor || '#38bdf8' : '#cbd5e1';
+      ctx.beginPath();
+      ctx.ellipse(sh.sx, sh.sy, 5.4, 4.2, sh.sx < 0 ? -0.3 : 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(sh.sx, sh.sy - 1, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = isGhost
+        ? opts?.ghostColor || '#38bdf8'
+        : pClass === 'archer'
+        ? '#166534'
+        : '#1e40af';
+      ctx.beginPath();
+      ctx.ellipse(sh.sx, sh.sy, 4.6, 3.4, sh.sx < 0 ? -0.3 : 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = palette.armorTrim;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Archer Quiver slung across back with feathered arrows
+  if (pClass === 'archer') {
+    ctx.fillStyle = '#78350f';
+    ctx.beginPath();
+    ctx.moveTo(-7.5, torsoY - 14);
+    ctx.lineTo(-2.5, torsoY - 14);
+    ctx.lineTo(-4.5, torsoY - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+    // White arrow fletchings sticking out
+    ctx.strokeStyle = '#f8fafc';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-6.5, torsoY - 14);
+    ctx.lineTo(-9, torsoY - 19);
+    ctx.moveTo(-5, torsoY - 14);
+    ctx.lineTo(-6.5, torsoY - 20);
+    ctx.moveTo(-3.5, torsoY - 14);
+    ctx.lineTo(-4, torsoY - 19);
+    ctx.stroke();
+  }
+
+  // 5. Head, Helm / Hood / Wizard Hat, & Facial / Visor Details (Matching image_a1d00a81.png)
+  const headY = -33 - bob;
+
+  if (pClass === 'swordsman') {
+    // Polished Silver Knight Greathelm with Visor Slits & Crimson Plume
+    const helmGrad = ctx.createRadialGradient(-2, headY - 2, 1, 0, headY, 7.5);
+    helmGrad.addColorStop(0, isGhost ? '#38bdf8' : '#f8fafc');
+    helmGrad.addColorStop(0.6, isGhost ? '#0284c7' : '#94a3b8');
+    helmGrad.addColorStop(1, '#334155');
+    ctx.fillStyle = helmGrad;
+    ctx.beginPath();
+    ctx.arc(0, headY, 7.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Flowing Crimson Helmet Plume
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath();
+    ctx.moveTo(0, headY - 7);
+    ctx.quadraticCurveTo(-5 * flipX, headY - 15, -11 * flipX, headY - 6);
+    ctx.quadraticCurveTo(-5 * flipX, headY - 8, 0, headY - 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+
+    // Visor Plate & Slits when facing forward/side
+    if (!facingBack && !isGhost) {
+      const vx = dirX * 2.5;
+      const vy = headY + dirY * 1.2;
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(vx - 4, vy - 0.5);
+      ctx.lineTo(vx + 4, vy - 0.5);
+      ctx.stroke();
+      // Vertical respirator vents on faceplate
+      ctx.lineWidth = 1.0;
+      for (let s = -2; s <= 2; s += 2) {
+        ctx.beginPath();
+        ctx.moveTo(vx + s, vy + 1.5);
+        ctx.lineTo(vx + s, vy + 4.2);
+        ctx.stroke();
+      }
+    }
+  } else if (pClass === 'archer') {
+    // Forest Green Ranger Hood framing warm face
+    ctx.fillStyle = isGhost ? opts?.ghostColor || '#4ade80' : '#15803d';
+    ctx.beginPath();
+    ctx.arc(0, headY, 7.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#052e16';
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+
+    // Hood peak
+    ctx.fillStyle = '#166534';
+    ctx.beginPath();
+    ctx.moveTo(-6.5, headY - 2);
+    ctx.lineTo(-2 * flipX, headY - 10.5);
+    ctx.lineTo(6.5, headY - 2);
+    ctx.closePath();
+    ctx.fill();
+
+    if (!facingBack && !isGhost) {
+      const fx = dirX * 2.2;
+      const fy = headY + 0.8;
+      // Face opening inside hood
+      ctx.fillStyle = '#fdba74';
+      ctx.beginPath();
+      ctx.arc(fx, fy, 4.4, 0, Math.PI * 2);
+      ctx.fill();
+      // Emerald ranger eyes
+      ctx.fillStyle = '#16a34a';
+      ctx.beginPath();
+      ctx.arc(fx - 1.6, fy - 0.4, 1.0, 0, Math.PI * 2);
+      ctx.arc(fx + 1.6, fy - 0.4, 1.0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (pClass === 'mage') {
+    // Warm face + Wide-Brimmed Royal Blue Pointed Wizard Hat with Gold Band
+    ctx.fillStyle = isGhost ? '#38bdf8' : !facingBack ? '#fdba74' : '#1e3a8a';
+    ctx.beginPath();
+    ctx.arc(0, headY, 6.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1.0;
+    ctx.stroke();
+
+    if (!facingBack && !isGhost) {
+      const fx = dirX * 2.4;
+      const fy = headY + 1.0;
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(fx - 1.6, fy, 1.15, 0, Math.PI * 2);
+      ctx.arc(fx + 1.6, fy, 1.15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Wide Wizard Hat Brim
+    ctx.fillStyle = '#1d4ed8';
+    ctx.beginPath();
+    ctx.ellipse(0, headY - 2.8, 10.8, 3.6, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 1.1;
     ctx.stroke();
 
-    // Tabard & Gilded Belt
-    ctx.fillStyle = palette.cape;
-    ctx.fillRect(-4, torsoY - 2, 8, 12);
-    ctx.fillStyle = palette.armorTrim;
-    ctx.fillRect(-7.5, torsoY + 4, 15, 2.5);
-  }
+    // Gold Hat Band
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(-5.8, headY - 5.8, 11.6, 2.4);
 
-  // 4. Layered Pauldrons (Shoulder Plates)
-  const shoulderPositions = [
-    { sx: -9.5, sy: torsoY - 6 },
-    { sx: 9.5, sy: torsoY - 6 },
-  ];
-  for (const sh of shoulderPositions) {
-    ctx.fillStyle = isGhost ? opts?.ghostColor || '#38bdf8' : palette.helm;
+    // Tall Pointed Hat Cone with Curved Tip
+    ctx.fillStyle = '#2563eb';
     ctx.beginPath();
-    ctx.ellipse(sh.sx, sh.sy, 4.8, 3.6, sh.sx < 0 ? -0.3 : 0.3, 0, Math.PI * 2);
+    ctx.moveTo(-6.2, headY - 5.2);
+    ctx.quadraticCurveTo(-1, headY - 16, 4.5 * flipX, headY - 17.5);
+    ctx.quadraticCurveTo(3, headY - 11, 6.2, headY - 5.2);
+    ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = palette.armorTrim;
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1.0;
+    ctx.stroke();
+  } else {
+    // NECROMANCER: Deep Shadowed Cowl & Glowing Violet Eyes
+    ctx.fillStyle = isGhost ? opts?.ghostColor || '#c084fc' : '#1e1b4b';
+    ctx.beginPath();
+    ctx.arc(0, headY, 7.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 1.1;
     ctx.stroke();
 
-    if (pClass === 'necromancer') {
-      // Bone spike on pauldron
-      ctx.fillStyle = '#e2e8f0';
+    // Pointed dark hood peak
+    ctx.fillStyle = '#3b0764';
+    ctx.beginPath();
+    ctx.moveTo(-7, headY - 1);
+    ctx.lineTo(0, headY - 11);
+    ctx.lineTo(7, headY - 1);
+    ctx.closePath();
+    ctx.fill();
+
+    if (!facingBack && !isGhost) {
+      const fx = dirX * 2.2;
+      const fy = headY + 0.6;
+      // Abyssal shadowed face cavity
+      ctx.fillStyle = '#090d16';
       ctx.beginPath();
-      ctx.moveTo(sh.sx, sh.sy - 2);
-      ctx.lineTo(sh.sx + (sh.sx < 0 ? -4 : 4), sh.sy - 7);
-      ctx.lineTo(sh.sx + (sh.sx < 0 ? 2 : -2), sh.sy - 1);
-      ctx.closePath();
+      ctx.arc(fx, fy, 4.6, 0, Math.PI * 2);
       ctx.fill();
-    }
-  }
-
-  // Archer Quiver slung across back
-  if (pClass === 'archer') {
-    ctx.fillStyle = '#78350f';
-    ctx.beginPath();
-    ctx.moveTo(-6, torsoY - 13);
-    ctx.lineTo(-2, torsoY - 13);
-    ctx.lineTo(-4, torsoY - 2);
-    ctx.closePath();
-    ctx.fill();
-    // White arrow fletchings sticking out
-    ctx.strokeStyle = '#fef08a';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(-5, torsoY - 13);
-    ctx.lineTo(-7, torsoY - 17);
-    ctx.moveTo(-3, torsoY - 13);
-    ctx.lineTo(-4, torsoY - 18);
-    ctx.stroke();
-  }
-
-  // 5. Head, Helm / Hood / Wizard Hat, & Directional Glowing Gaze
-  const headY = -33 - bob;
-  ctx.fillStyle = isGhost ? opts?.ghostColor || '#38bdf8' : palette.helm;
-  ctx.beginPath();
-  ctx.arc(0, headY, 6.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 1.1;
-  ctx.stroke();
-
-  if (pClass === 'swordsman') {
-    // Knightly Greathelm Crest & Plume
-    ctx.fillStyle = palette.armorTrim;
-    ctx.fillRect(-1.2, headY - 7.5, 2.4, 6);
-    // Flowing crimson helm plume
-    ctx.fillStyle = '#dc2626';
-    ctx.beginPath();
-    ctx.moveTo(0, headY - 7.5);
-    ctx.quadraticCurveTo(-6 * flipX, headY - 13, -9 * flipX, headY - 5);
-    ctx.quadraticCurveTo(-4 * flipX, headY - 7, 0, headY - 5);
-    ctx.fill();
-  } else if (pClass === 'mage') {
-    // Pointed Astral Archmage Hat & Gold Brim
-    ctx.fillStyle = '#1e3a8a';
-    ctx.beginPath();
-    ctx.ellipse(0, headY - 3, 9.5, 3.2, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(-6.5, headY - 3.5);
-    ctx.lineTo(1.5, headY - 16);
-    ctx.lineTo(6.5, headY - 3.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  } else if (pClass === 'necromancer') {
-    // Horned Bone Crown
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(-5, headY - 4);
-    ctx.quadraticCurveTo(-8, headY - 12, -4, headY - 14);
-    ctx.moveTo(5, headY - 4);
-    ctx.quadraticCurveTo(8, headY - 12, 4, headY - 14);
-    ctx.stroke();
-  } else if (pClass === 'archer') {
-    // Pointed Ranger Cowl Peak
-    ctx.fillStyle = '#14532d';
-    ctx.beginPath();
-    ctx.moveTo(-6, headY - 2);
-    ctx.lineTo(-2 * flipX, headY - 10);
-    ctx.lineTo(6, headY - 2);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Directional Visor / Glowing Eyes when not facing straight away
-  if (!facingBack && !isGhost) {
-    const eyeCenterX = dirX * 3.2;
-    const eyeCenterY = headY + dirY * 1.4;
-    if (pClass === 'swordsman') {
-      // T-visor slit with golden inner gleam
-      ctx.strokeStyle = '#fef08a';
-      ctx.lineWidth = 1.5;
+      // Glowing purple necromancer eyes
+      ctx.fillStyle = '#e879f9';
       ctx.beginPath();
-      ctx.moveTo(eyeCenterX - 3.2, eyeCenterY);
-      ctx.lineTo(eyeCenterX + 3.2, eyeCenterY);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = palette.glow;
-      ctx.beginPath();
-      ctx.arc(eyeCenterX - 1.8, eyeCenterY, 1.3, 0, Math.PI * 2);
-      ctx.arc(eyeCenterX + 1.8, eyeCenterY, 1.3, 0, Math.PI * 2);
+      ctx.arc(fx - 1.7, fy - 0.3, 1.35, 0, Math.PI * 2);
+      ctx.arc(fx + 1.7, fy - 0.3, 1.35, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -396,52 +637,57 @@ export function drawHeroRig(
     drawCloak();
   }
 
-  // 6. Off-Hand Shield / Arcane Tome / Soul Lantern
+  // 6. Off-Hand Shield / Crackling Necro Flame / Arcane Hand
   const offHandX = -dirY * 9 - dirX * 2;
   const offHandY = torsoY + 1 + dirX * 4;
   if (pClass === 'swordsman') {
-    // Knightly Heater Shield with golden cross
+    // Heavy Steel-Rimmed Kite Shield (Matching image_a1d00a81.png)
     ctx.save();
     ctx.translate(offHandX, offHandY);
-    ctx.fillStyle = '#1e3a8a';
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1.4;
+    ctx.fillStyle = '#475569';
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.moveTo(-5, -6);
-    ctx.lineTo(5, -6);
-    ctx.lineTo(4.5, 2);
-    ctx.lineTo(0, 7.5);
-    ctx.lineTo(-4.5, 2);
+    ctx.moveTo(-5.8, -6.8);
+    ctx.lineTo(5.8, -6.8);
+    ctx.lineTo(5.2, 1.8);
+    ctx.lineTo(0, 8.5);
+    ctx.lineTo(-5.2, 1.8);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    ctx.strokeStyle = '#fde047';
-    ctx.lineWidth = 1.1;
+    // Golden shield boss & cross
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(0, -4.5);
-    ctx.lineTo(0, 5.5);
-    ctx.moveTo(-3.2, -1);
-    ctx.lineTo(3.2, -1);
+    ctx.moveTo(0, -5);
+    ctx.lineTo(0, 6);
+    ctx.moveTo(-3.6, -1);
+    ctx.lineTo(3.6, -1);
     ctx.stroke();
     ctx.restore();
-  } else if (pClass === 'mage' || pClass === 'necromancer') {
-    // Floating Arcane Orb / Soul Lantern in off-hand
-    const floatY = offHandY - 3 + Math.sin(gameTime * 5) * 2.5;
+  } else if (pClass === 'necromancer') {
+    // Crackling Violet Dark-Magic Flame in Right/Off-Hand (Matching image_a1d00a81.png)
+    const floatY = offHandY - 2 + Math.sin(gameTime * 7) * 2.0;
     ctx.save();
-    ctx.fillStyle = palette.glow;
-    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = '#a855f7';
+    ctx.globalAlpha = 0.38;
     ctx.beginPath();
-    ctx.arc(offHandX, floatY, 6.2, 0, Math.PI * 2);
+    ctx.arc(offHandX, floatY, 7.2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = '#e879f9';
     ctx.beginPath();
-    ctx.arc(offHandX, floatY, 3.2, 0, Math.PI * 2);
+    ctx.moveTo(offHandX - 3.5, floatY + 2);
+    ctx.quadraticCurveTo(offHandX - 4, floatY - 6, offHandX, floatY - 9 - Math.sin(gameTime * 12) * 2);
+    ctx.quadraticCurveTo(offHandX + 4, floatY - 5, offHandX + 3.5, floatY + 2);
+    ctx.closePath();
     ctx.fill();
     ctx.restore();
   }
 
-  // 7. Main-Hand Weapon & Active Attack / Cast Animation
+  // 7. Main-Hand Weapon & Active Attack / Cast Animation (Matching image_a1d00a81.png)
   const handAnchorX = dirY * 8 + dirX * 5;
   const handAnchorY = torsoY + 1 + dirY * 3;
 
@@ -450,129 +696,135 @@ export function drawHeroRig(
   ctx.rotate(isoAngle + swingAngle);
 
   if (pClass === 'swordsman') {
-    // Broad Runed Greatsword
-    // Pommel & Grip
+    // Broad Silver Knight Longsword with Golden Crossguard
     ctx.fillStyle = '#78350f';
-    ctx.fillRect(-5, -1.5, 5, 3);
+    ctx.fillRect(-5.5, -1.6, 5.5, 3.2);
     ctx.fillStyle = '#fbbf24';
     ctx.beginPath();
-    ctx.arc(-6, 0, 2.2, 0, Math.PI * 2);
+    ctx.arc(-6.5, 0, 2.4, 0, Math.PI * 2);
     ctx.fill();
 
     // Cruciform Gold Crossguard
     ctx.fillStyle = '#f59e0b';
-    ctx.fillRect(-0.5, -6.5, 2.8, 13);
+    ctx.fillRect(-0.8, -7, 3.0, 14);
 
-    // Dual-toned Steel Blade with Blood/Rune Fuller
-    const bladeGrad = ctx.createLinearGradient(2, -3, 28, 3);
-    bladeGrad.addColorStop(0, '#f8fafc');
+    // Polished Steel Blade with Center Ridge
+    const bladeGrad = ctx.createLinearGradient(2, -3.5, 29, 3.5);
+    bladeGrad.addColorStop(0, '#ffffff');
     bladeGrad.addColorStop(0.5, '#cbd5e1');
-    bladeGrad.addColorStop(1, '#e2e8f0');
+    bladeGrad.addColorStop(1, '#94a3b8');
     ctx.fillStyle = bladeGrad;
     ctx.beginPath();
-    ctx.moveTo(2, -3.2);
-    ctx.lineTo(24, -2.2);
-    ctx.lineTo(30, 0);
-    ctx.lineTo(24, 2.2);
-    ctx.lineTo(2, 3.2);
+    ctx.moveTo(2, -3.4);
+    ctx.lineTo(24.5, -2.4);
+    ctx.lineTo(31, 0);
+    ctx.lineTo(24.5, 2.4);
+    ctx.lineTo(2, 3.4);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 0.9;
     ctx.stroke();
 
-    // Glowing runic fuller line
-    ctx.strokeStyle = player.isAttacking ? '#fef08a' : '#38bdf8';
+    ctx.strokeStyle = player.isAttacking ? '#fef08a' : '#f8fafc';
     ctx.lineWidth = 1.1;
     ctx.beginPath();
     ctx.moveTo(4, 0);
-    ctx.lineTo(22, 0);
+    ctx.lineTo(25, 0);
     ctx.stroke();
   } else if (pClass === 'archer') {
-    // Recurve Composite Bow & Nocked Glowing Arrow
-    ctx.strokeStyle = '#a16207';
-    ctx.lineWidth = 2.4;
+    // Large Curved Wooden Recurve Longbow & Nocked Arrow (Matching image_a1d00a81.png)
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 2.8;
     ctx.beginPath();
-    ctx.arc(2, 0, 13, -Math.PI * 0.44, Math.PI * 0.44);
+    ctx.arc(2, 0, 14.5, -Math.PI * 0.46, Math.PI * 0.46);
     ctx.stroke();
 
-    // Gold bow tips
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1.6;
+    // Leather grip wrap
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 3.2;
     ctx.beginPath();
-    ctx.arc(2, 0, 13, -Math.PI * 0.44, -Math.PI * 0.34);
+    ctx.arc(2, 0, 14.5, -0.22, 0.22);
     ctx.stroke();
 
     // Bowstring pulled back during attack
-    const pull = player.isAttacking ? -5 : 0;
+    const pull = player.isAttacking ? -5.5 : -0.5;
     ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 0.9;
+    ctx.lineWidth = 1.0;
     ctx.beginPath();
-    ctx.moveTo(4, -12.5);
+    ctx.moveTo(4, -14);
     ctx.lineTo(pull, 0);
-    ctx.lineTo(4, 12.5);
+    ctx.lineTo(4, 14);
     ctx.stroke();
 
-    // Nocked arrow with emerald/gold tip
+    // Nocked arrow with steel broadhead
     ctx.strokeStyle = '#fde047';
-    ctx.lineWidth = 1.6;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(pull, 0);
-    ctx.lineTo(19, 0);
+    ctx.lineTo(20, 0);
     ctx.stroke();
-    ctx.fillStyle = '#4ade80';
+    ctx.fillStyle = '#e2e8f0';
     ctx.beginPath();
-    ctx.moveTo(22, 0);
-    ctx.lineTo(17, -2.5);
-    ctx.lineTo(17, 2.5);
+    ctx.moveTo(23.5, 0);
+    ctx.lineTo(18, -2.6);
+    ctx.lineTo(18, 2.6);
     ctx.closePath();
     ctx.fill();
   } else if (pClass === 'mage') {
-    // Ornate Crystalline Archmage Staff
-    ctx.strokeStyle = '#78350f';
-    ctx.lineWidth = 2.4;
+    // Gnarled Twisted Wooden Wizard Staff with Glowing Cyan Orb & Sparkles (Matching image_a1d00a81.png)
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 2.6;
     ctx.beginPath();
-    ctx.moveTo(-8, 0);
-    ctx.lineTo(22, 0);
+    ctx.moveTo(-9, 0);
+    ctx.lineTo(21, 0);
     ctx.stroke();
 
-    // Golden crescent staff head
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1.8;
+    // Curved wooden crook cradling the orb
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.arc(23, 0, 4.5, -Math.PI * 0.7, Math.PI * 0.7);
+    ctx.arc(23.5, 0, 4.8, -Math.PI * 0.78, Math.PI * 0.65);
     ctx.stroke();
 
-    // Glowing Levitating Staff Crystal
+    // Glowing Cyan Orb + Twinkling Star Sparkles
     ctx.fillStyle = player.isAttacking ? '#fb923c' : '#38bdf8';
     ctx.beginPath();
-    ctx.arc(25, 0, 3.6, 0, Math.PI * 2);
+    ctx.arc(24, 0, 3.6, 0, Math.PI * 2);
     ctx.fill();
+    ctx.fillStyle = '#e0f2fe';
+    ctx.beginPath();
+    ctx.arc(23, -1, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tiny orbiting arcane sparkles
+    const spAngle = gameTime * 4;
+    ctx.fillStyle = '#7dd3fc';
+    ctx.fillRect(24 + Math.cos(spAngle) * 7 - 1, Math.sin(spAngle) * 7 - 1, 2, 2);
+    ctx.fillRect(24 - Math.cos(spAngle * 0.8) * 6.5 - 1, -Math.sin(spAngle * 0.8) * 6.5 - 1, 2, 2);
   } else {
-    // Necromancer Bone Scythe / Skull Staff
-    ctx.strokeStyle = '#cbd5e1';
-    ctx.lineWidth = 2.3;
+    // NECROMANCER: Gnarled Dark Staff Topped with a Large Bleached Human Skull (Matching image_a1d00a81.png)
+    ctx.strokeStyle = '#57534e';
+    ctx.lineWidth = 2.6;
     ctx.beginPath();
-    ctx.moveTo(-8, 0);
-    ctx.lineTo(22, 0);
+    ctx.moveTo(-9, 0);
+    ctx.lineTo(21, 0);
     ctx.stroke();
 
-    // Curved Soul-Reaper Scythe Blade
-    ctx.fillStyle = '#94a3b8';
-    ctx.strokeStyle = '#c084fc';
-    ctx.lineWidth = 1;
+    // Large Bleached Skull Crown at Staff Tip
+    ctx.fillStyle = '#e2e8f0';
     ctx.beginPath();
-    ctx.moveTo(20, -1);
-    ctx.quadraticCurveTo(26, 8, 13, 15);
-    ctx.quadraticCurveTo(20, 6, 17, 0);
-    ctx.closePath();
+    ctx.arc(23.5, 0, 4.4, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 0.9;
     ctx.stroke();
 
-    // Glowing Violet Skull at Scythe Crown
-    ctx.fillStyle = '#c084fc';
+    // Skull eye sockets & nasal cavity
+    ctx.fillStyle = '#090d16';
     ctx.beginPath();
-    ctx.arc(22, 0, 3, 0, Math.PI * 2);
+    ctx.arc(24.5, -1.4, 1.1, 0, Math.PI * 2);
+    ctx.arc(24.5, 1.4, 1.1, 0, Math.PI * 2);
     ctx.fill();
   }
 
